@@ -1,0 +1,64 @@
+import { InteractionSystem } from '../interaction/InteractionSystem.js';
+import { el, ICONS } from './dom.js';
+
+const OBJECTIVES = {
+  kayden: { ru: 'Кайден ждёт за столиком у стойки', en: 'JOIN KAYDEN' },
+  air: { ru: 'Воздух. Дойти до двери', en: 'GET OUTSIDE' },
+};
+
+/** Exploration overlay: objective, interaction marker, phone & menu buttons, toasts. */
+export class HUD {
+  constructor({ root, bus, input, state }) {
+    this.bus = bus;
+    this.input = input;
+    this.state = state;
+    const h = this.el = el('div', 'hud off', root);
+    this.obj = el('div', 'objective', h, '<span class="dia"></span><span class="txt"></span>');
+    this.marker = el('div', 'marker', h, '<div class="lbl"></div><div class="gem"></div>');
+    this.toastEl = el('div', 'toast', h);
+    const btns = el('div', 'hud-btns', h);
+    this.phoneBtn = el('button', 'hud-btn', btns, `${ICONS.phone}<span class="badge"></span>`);
+    this.phoneBtn.title = 'Телефон (Q)';
+    this.phoneBtn.addEventListener('click', () => bus.emit('ui-open', 'phone'));
+    const menuBtn = el('button', 'hud-btn', btns, ICONS.menu);
+    menuBtn.title = 'Меню (Esc)';
+    menuBtn.addEventListener('click', () => bus.emit('ui-open', 'pause'));
+    window.addEventListener('keydown', (e) => { if (e.code === 'KeyQ' && this.visible) bus.emit('ui-open', 'phone'); });
+
+    bus.on('focus', (item) => { this.focus = item; this.renderMarker(); });
+    bus.on('flag', ({ flag, value }) => { if (flag === 'objective') this.setObjective(value); });
+  }
+
+  show(v) { this.visible = v; this.el.classList.toggle('off', !v); }
+
+  setObjective(key) {
+    const o = OBJECTIVES[key];
+    if (!o) { this.obj.classList.remove('show'); return; }
+    this.obj.querySelector('.txt').innerHTML = `${o.ru}<small>${o.en}</small>`;
+    this.obj.classList.add('show');
+  }
+
+  notifyPhone(on) { this.phoneBtn.classList.toggle('notify', on); }
+
+  renderMarker() {
+    const f = this.focus;
+    this.marker.classList.toggle('show', !!f);
+    if (!f) return;
+    const key = this.input.isTouch ? '' : '<span class="key">E</span>';
+    this.marker.querySelector('.lbl').innerHTML = `${key}${f.label}`;
+  }
+
+  update(camera) {
+    if (!this.focus || !this.visible) return;
+    const p = InteractionSystem.project(this.focus.anchor, camera, window.innerWidth, window.innerHeight);
+    this.marker.style.left = `${p.x}px`;
+    this.marker.style.top = `${Math.max(60, p.y - 10)}px`;
+  }
+
+  toast(text, ms = 2200) {
+    this.toastEl.textContent = text;
+    this.toastEl.classList.add('show');
+    clearTimeout(this.toastT);
+    this.toastT = setTimeout(() => this.toastEl.classList.remove('show'), ms);
+  }
+}
