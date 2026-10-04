@@ -392,7 +392,7 @@ export class DialogueView {
     this.vn.style.setProperty('--fx-wobble', wobble * k);
     this.vn.style.setProperty('--fx-ghost', ghost * k);
     this.vn.style.setProperty('--fx-dark', dark);
-    this.vn.classList.toggle('fx-on', blur + hue + red + wobble + ghost > 0);
+    this.vn.classList.toggle('fx-on', Math.abs(blur) + Math.abs(hue) + red + wobble + ghost > 0);
   }
 }
 

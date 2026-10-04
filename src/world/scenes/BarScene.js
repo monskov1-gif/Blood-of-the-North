@@ -734,7 +734,7 @@ export class BarScene {
     const geo = new THREE.ShapeGeometry(shape, 24);
     if (real && !this.low) {
       const mirror = new Reflector(geo, {
-        textureWidth: 512, textureHeight: 640, color: 0x8a7a6e, clipBias: 0.003,
+        textureWidth: 512, textureHeight: 640, color: 0x6a5e56, clipBias: 0.003,
       });
       mirror.position.z = 0.01;
       g.add(mirror);

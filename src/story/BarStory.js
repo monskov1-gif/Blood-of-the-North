@@ -141,6 +141,7 @@ export class BarStory {
         await sleep(0.8);
       },
       mirrorRelease: () => g.cameraSys.setShot(null, 1.2),
+      escape: () => {}, // handled after the dialogue ends (runMain)
       cocktailArrives: () => this.cocktailCutscene(),
       drink: () => this.drinkCutscene(),
       owenGone: () => {
