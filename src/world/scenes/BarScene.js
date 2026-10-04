@@ -6,7 +6,7 @@ import {
 } from '../../render/textures.js';
 import {
   MaterialLib, bistroTable, bentwoodChair, barStool, candle, wineGlass, tumbler, bottleRow,
-  chandelier, sconce, tableLamp, garland, frame, glow, lightPool,
+  chandelier, sconce, tableLamp, garland, frame, glow, lightPool, wineBottle, ashtray, lightCone,
 } from '../props.js';
 import { Dust, Snow } from '../Particles.js';
 
@@ -92,7 +92,7 @@ export class BarScene {
 
     this.bounds = {
       walk: { minX: -13.2, maxX: 13.3, minZ: -2.3, maxZ: 1.9 },
-      camera: { minX: -8.6, maxX: 9.2 },
+      camera: { minX: -10.2, maxX: 10.6 },
     };
     this.colliders = [];
     this.spawns = { player: { x: -11.6, z: 0.9, facing: 1 } };
@@ -662,7 +662,7 @@ export class BarScene {
 
     // small tables in front of the banquette
     for (const x of [7.6, 10.2, 12.8]) {
-      const t = bistroTable(m, { radius: 0.3, height: 0.7 });
+      const t = bistroTable(m, { radius: 0.42, height: 0.72 });
       t.position.set(x, 0, BACK + 1.35);
       root.add(t);
       const c = candle(m);
@@ -772,7 +772,7 @@ export class BarScene {
     const m = this.mats;
     const root = this.root;
     // Julian & Kayden's table
-    const main = bistroTable(m, { radius: 0.4 });
+    const main = bistroTable(m, { radius: 0.5 });
     main.position.set(1.6, 0, 0.3);
     root.add(main);
     const c = candle(m);
@@ -791,10 +791,10 @@ export class BarScene {
     this.anchors.julianSeat = new THREE.Vector3(0.84, 0, 0.36);
     this.anchors.kaydenSeat = new THREE.Vector3(2.36, 0, 0.36);
     this.anchors.coupeSpot = new THREE.Vector3(1.38, 0.76, 0.42);
-    this.colliders.push({ x: 1.6, z: 0.3, r: 0.95 });
+    this.colliders.push({ x: 1.6, z: 0.3, r: 1.05 });
 
     // left table (patrons talking)
-    const lt = bistroTable(m, { radius: 0.36 });
+    const lt = bistroTable(m, { radius: 0.5 });
     lt.position.set(-9.7, 0, -1.25);
     root.add(lt);
     const lc = candle(m); lc.position.set(-9.7, 0.76, -1.15); root.add(lc); this.flickers.push(lc);
@@ -805,8 +805,19 @@ export class BarScene {
     this.colliders.push({ x: -9.7, z: -1.25, r: 0.95 });
     this.anchors.leftTable = new THREE.Vector3(-9.7, 0, -1.25);
 
+    // a lounge table for two guests
+    const lt2 = bistroTable(m, { radius: 0.45 });
+    lt2.position.set(6.92, 0, -1.1);
+    root.add(lt2);
+    const lc2 = candle(m); lc2.position.set(6.95, 0.765, -1.0); root.add(lc2); this.flickers.push(lc2);
+    const lw1 = wineGlass(m); lw1.position.set(6.7, 0.765, -1.05); root.add(lw1);
+    const lb1 = wineBottle(m, 0x3a0a10); lb1.position.set(7.1, 0.765, -1.2); root.add(lb1);
+    const lc3 = bentwoodChair(m, 1); lc3.position.set(6.2, 0, -1.1); root.add(lc3);
+    const lc4 = bentwoodChair(m, -1); lc4.position.set(7.64, 0, -1.1); root.add(lc4);
+    this.colliders.push({ x: 6.92, z: -1.1, r: 1.05 });
+
     // Owen's table — darker corner, no candle lit
-    const ot = bistroTable(m, { radius: 0.32 });
+    const ot = bistroTable(m, { radius: 0.45 });
     ot.position.set(12.0, 0, -1.6);
     root.add(ot);
     const oc = candle(m, { lit: false }); oc.position.set(11.9, 0.76, -1.5); root.add(oc);
@@ -822,48 +833,27 @@ export class BarScene {
     const m = this.mats;
     const root = this.root;
     // tables and chairs closer to the camera than the walk lane — they occlude characters
-    const spots = [-11.4, -6.5, -2.2, 4.4, 8.6, 12.6];
+    const spots = [-11.6, -7.4, -3.0, 1.8, 6.2, 10.4, 12.9];
+    this.foregroundSeats = [];
     spots.forEach((x, i) => {
-      const z = 2.85 + (i % 2) * 0.35;
-      const t = bistroTable(m, { radius: 0.38 });
+      const z = 2.85 + (i % 2) * 0.3;
+      const t = bistroTable(m, { radius: 0.56 });
       t.position.set(x, 0, z);
       root.add(t);
       const c = candle(m);
-      c.position.set(x + 0.05, 0.76, z - 0.05);
+      c.position.set(x + 0.05, 0.765, z - 0.08);
       root.add(c);
       this.flickers.push(c);
-      if (i % 2 === 0) { const g = wineGlass(m); g.position.set(x - 0.15, 0.76, z); root.add(g); }
-      else { const g = tumbler(m); g.position.set(x + 0.18, 0.76, z + 0.05); root.add(g); }
-      const ch1 = bentwoodChair(m, 1); ch1.position.set(x - 0.68, 0, z + 0.05); ch1.rotation.y = 0.15; root.add(ch1);
-      const ch2 = bentwoodChair(m, -1); ch2.position.set(x + 0.68, 0, z - 0.05); ch2.rotation.y = -0.2; root.add(ch2);
-      if (i % 3 === 1) {
-        const ch3 = bentwoodChair(m, 1); ch3.rotation.y = Math.PI / 2 + 0.3; ch3.position.set(x + 0.1, 0, z + 0.75); root.add(ch3);
-      }
+      // table dressing: bottle, glasses, ashtray, fringed lamp on some tables
+      if (i % 3 === 0) { const l = tableLamp(m, i % 2 ? 0x4a1010 : 0x120a08); l.position.set(x - 0.22, 0.765, z - 0.12); l.scale.setScalar(0.85); root.add(l); }
+      else { const b = wineBottle(m, [0x1e2a14, 0x3a0a10, 0x2a1a0a][i % 3]); b.position.set(x - 0.24, 0.765, z - 0.1); root.add(b); }
+      const g1 = wineGlass(m, i % 2 ? 0x5a0a10 : 0x8a6a20); g1.position.set(x + 0.2, 0.765, z + 0.05); root.add(g1);
+      const g2 = tumbler(m); g2.position.set(x - 0.05, 0.765, z + 0.2); root.add(g2);
+      if (i % 2 === 0) { const a = ashtray(m); a.position.set(x + 0.28, 0.765, z - 0.18); root.add(a); }
+      const ch1 = bentwoodChair(m, 1); ch1.position.set(x - 0.86, 0, z + 0.05); ch1.rotation.y = 0.12; root.add(ch1);
+      const ch2 = bentwoodChair(m, -1); ch2.position.set(x + 0.86, 0, z - 0.05); ch2.rotation.y = -0.15; root.add(ch2);
+      this.foregroundSeats.push({ x: x - 0.86, z: z + 0.05, facing: 1 }, { x: x + 0.86, z: z - 0.05, facing: -1 });
     });
-    // potted palms (foreground silhouettes)
-    for (const x of [-13.3, 0.0, 6.9]) {
-      const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.18, 0.5, 14), m.brass());
-      pot.position.set(x, 0.25, 3.7);
-      root.add(pot);
-      const leafMat = m.get('leaf', { color: 0x14241a, roughness: 0.9, side: THREE.DoubleSide });
-      const leafShape = new THREE.Shape();
-      leafShape.moveTo(0, 0);
-      leafShape.quadraticCurveTo(0.14, 0.45, 0, 1.15);
-      leafShape.quadraticCurveTo(-0.14, 0.45, 0, 0);
-      const leafGeo = new THREE.ShapeGeometry(leafShape, 6);
-      for (let i = 0; i < 11; i++) {
-        const leaf = new THREE.Mesh(leafGeo, leafMat);
-        leaf.position.set(x, 0.45, 3.7);
-        leaf.rotation.set(0, (i / 11) * Math.PI * 2 + Math.random() * 0.3, 0.35 + Math.random() * 0.75, 'YXZ');
-        leaf.scale.setScalar(0.8 + Math.random() * 0.4);
-        root.add(leaf);
-      }
-    }
-    // a heavy column in the extreme foreground
-    const col = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.24, CEIL, 18), m.woodDark());
-    col.position.set(-4.4, CEIL / 2, 4.6);
-    root.add(col);
-    const col2 = col.clone(); col2.position.x = 10.6; root.add(col2);
   }
 
   // ---------------------------------------------------------------- lights
@@ -882,9 +872,14 @@ export class BarScene {
       const chain = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 0.6, 4), this.mats.brass());
       chain.position.set(x, CEIL - 0.3 + 0.0, -0.9);
       root.add(ch, chain);
-      const pl = new THREE.PointLight(0xffb070, i === 1 ? 26 : 20, 0, 1.6);
-      pl.position.set(x, 3.3, -0.9);
-      root.add(pl);
+      // light goes strictly down: a wide spot under each chandelier + a soft visible cone
+      const pl = new THREE.SpotLight(0xffb070, i === 1 ? 34 : 28, 10, 1.12, 0.85, 1.35);
+      pl.position.set(x, 3.4, -0.9);
+      pl.target.position.set(x, 0, -0.9);
+      root.add(pl, pl.target);
+      const cone = lightCone(0xffb070, 3.3, 2.6, 0.22);
+      cone.position.set(x, 3.4 - 1.65, -0.9);
+      root.add(cone);
       return { mesh: ch, light: pl, base: pl.intensity };
     });
 

@@ -1,7 +1,12 @@
-import { paintPortrait, paintSilhouette, hasPortrait } from '../characters/portraits.js';
 import { CHARACTERS } from '../../data/characters.js';
 
 const SLOTS = ['left', 'right', 'right2'];
+const PORTRAIT_DOWN = ['sad', 'tired', 'concerned', 'dizzy', 'pain'];
+
+/** Preloads the painted portraits so the first swap has no flicker. */
+export function preloadPortraits(ids = ['julian', 'kayden', 'waiter']) {
+  for (const id of ids) for (let i = 0; i < 3; i++) { const im = new Image(); im.src = `assets/portraits/${id}_${i}.webp`; }
+}
 const GLITCH = '▓▒░#%&@$¥§¶†‡∆';
 
 const el = (tag, cls, parent, html) => {
@@ -42,9 +47,10 @@ export class DialogueView {
     this.slots = {};
     for (const s of SLOTS) {
       const wrap = el('div', `pt pt-${s}`, pts);
-      const c = el('canvas', 'pt-canvas', wrap);
-      c.width = 640; c.height = 960;
-      this.slots[s] = { wrap, canvas: c, ctx: c.getContext('2d'), id: null, sig: '' };
+      const a = el('img', 'pt-img', wrap);
+      const b = el('img', 'pt-img', wrap);
+      a.alt = b.alt = '';
+      this.slots[s] = { wrap, imgs: [a, b], front: 0, id: null, sig: '' };
     }
     this.fx = el('div', 'vn-fx', vn);
     const box = this.box = el('div', 'vn-box', vn);
@@ -83,7 +89,6 @@ export class DialogueView {
       if (action === 'auto' && this.mode === 'vn') this.toggleAuto();
     });
 
-    this.blinkT = 2; this.flapT = 0; this.mouth = false;
     this.loop();
   }
 
@@ -192,35 +197,30 @@ export class DialogueView {
     }
   }
 
+  /**
+   * Painted portraits (assets/portraits/<id>_<n>.webp):
+   *   0 — neutral, 1 — speaking (gesture, open mouth), 2 — looking down (sad / concerned / unwell).
+   * Changes cross-fade between two stacked images.
+   */
   drawSlot(slot) {
     const id = slot.id;
-    const speaking = this.speaking === id && this.typing;
-    const expr = this.expr[id] || (speaking ? 'talk' : 'neutral');
-    const blink = this.blinking && !['sad', 'pain'].includes(expr);
-    const mouth = speaking && this.mouth;
-    const sig = `${id}|${expr}|${blink}|${mouth}`;
+    const expr = this.expr[id] || 'neutral';
+    const down = PORTRAIT_DOWN.includes(expr);
+    const idx = down ? 2 : (this.speaking === id ? 1 : 0);
+    const sig = `${id}|${idx}`;
+    slot.wrap.classList.toggle('pale', expr === 'dizzy' || expr === 'pain');
     if (slot.sig === sig) return;
     slot.sig = sig;
-    const src = hasPortrait(id) ? paintPortrait(id, { expr, blink, mouth }) : paintSilhouette();
-    slot.ctx.clearRect(0, 0, 640, 960);
-    if (src) slot.ctx.drawImage(src, 0, 0);
+    const next = slot.imgs[1 - slot.front];
+    const cur = slot.imgs[slot.front];
+    next.src = `assets/portraits/${id}_${idx}.webp`;
+    const swap = () => { next.classList.add('on'); cur.classList.remove('on'); slot.front = 1 - slot.front; };
+    if (next.complete && next.naturalWidth) swap(); else next.onload = swap;
   }
 
   loop() {
     const tick = () => {
       const dt = 1 / 30;
-      if (this.mode === 'vn') {
-        this.blinkT -= dt;
-        if (this.blinkT <= 0) {
-          this.blinking = !this.blinking;
-          this.blinkT = this.blinking ? 0.12 : 2.5 + Math.random() * 3;
-          this.refreshCast();
-        }
-        if (this.typing) {
-          this.flapT -= dt;
-          if (this.flapT <= 0) { this.mouth = !this.mouth; this.flapT = 0.08 + Math.random() * 0.07; this.refreshCast(); }
-        } else if (this.mouth) { this.mouth = false; this.refreshCast(); }
-      }
       if (this.distort > 0 && this.typedText) this.renderDistorted();
     };
     setInterval(tick, 1000 / 30);

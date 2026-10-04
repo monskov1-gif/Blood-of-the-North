@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Character2D } from '../characters/Character2D.js';
 import { CHARACTERS } from '../../data/characters.js';
+import { CROWD, STOOLS_X, STOOL_Z, STOOL_LIFT } from '../../data/crowd.js';
 import { DIALOGUES } from '../../data/dialogue/bar.js';
 import { paintCocktail } from '../ui/Overlays.js';
 import { sleep } from './Director.js';
@@ -40,10 +41,18 @@ export class BarStory {
     this.bartender = add('bartender');
     this.waiter2 = add('waiter2');
     this.patronB = add('patronB');
-    this.woman = add('woman');
-    this.patronA = add('patronA');
-    this.leaver = add('patronA', 'leaver');
-    this.leaver.def.selfLight = 0x2a2222;
+    // the crowd (data/crowd.js)
+    this.crowd = CROWD.map((c, i) => {
+      const id = c.id || `crowd${i}`;
+      const ch = new Character2D(atlas, { id, name: 'Посетитель', poses: { idle: c.frame }, speed: 1.1 });
+      ch.crowd = c;
+      this.chars.set(id, ch);
+      this.scene.root.add(ch.root);
+      if (c.block && c.at) this.scene.colliders.push({ x: c.at.x, z: c.at.z, r: 0.3 });
+      return ch;
+    });
+    this.leaver = this.chars.get('leaver');
+    this.wanderer = this.crowd.find((c) => c.crowd.wander);
     this.coupe = this.makeCoupe();
     this.scene.root.add(this.coupe);
     this.resetPositions();
@@ -78,10 +87,9 @@ export class BarStory {
     this.waiter.stand(); this.waiter.placeAt(4.8, -2.15, -1); this.waiter.setPose('idle'); this.waiter.setVisible(true);
     this.bartender.placeAt(-2.6, -4.2, -1); this.bartender.setPose('idle');
     this.bartender.shadow.visible = false;
-    this.patronB.sit({ x: -3.6, z: -2.75 }, 1); this.patronB.setPose('idle');
-    this.woman.sit({ x: -10.42, z: -1.2 }, 1);
-    this.patronA.sit({ x: -8.98, z: -1.2 }, -1);
-    this.leaver.sit({ x: 10.2, z: -3.35 }, -1); this.leaver.setVisible(true);
+    this.patronB.sit({ x: STOOLS_X[1], z: STOOL_Z }, 1); this.patronB.setPose('idle');
+    this.patronB.root.position.y = STOOL_LIFT;
+    this.placeCrowd();
     this.waiter2.stand(); this.waiter2.placeAt(8.8, -2.2, 1); this.waiter2.setVisible(true);
     this.coupe.visible = false;
     this.coupe.userData.liquid.visible = true;
@@ -89,6 +97,27 @@ export class BarStory {
     for (const c of this.chars.values()) { c.timeScale = 1; c.path = null; if (c.state === 'walk') c.state = 'idle'; }
     this.leaverGone = false;
     this.bgCache.clear();
+  }
+
+  placeCrowd() {
+    const fg = this.scene.foregroundSeats || [];
+    for (const ch of this.crowd) {
+      const c = ch.crowd;
+      ch.setVisible(true);
+      ch.root.position.y = 0;
+      if (c.seat) {
+        let p = c.seat;
+        if (c.seat.fg != null) p = fg[c.seat.fg];
+        if (c.seat.stool != null) p = { x: STOOLS_X[c.seat.stool], z: STOOL_Z, y: STOOL_LIFT };
+        if (!p) { ch.setVisible(false); continue; }
+        ch.sit({ x: p.x, z: p.z }, c.facing ?? p.facing ?? 1);
+        ch.root.position.y = p.y || 0;
+      } else {
+        ch.stand();
+        ch.placeAt(c.at.x, c.at.z, c.facing ?? 1);
+        if (c.noShadow) ch.shadow.visible = false;
+      }
+    }
   }
 
   // ------------------------------------------------------------------ interactables
@@ -431,12 +460,25 @@ export class BarStory {
         this.waiter.face(-1);
       }
     })();
+    // a regular wanders between the bar and the lounge
+    (async () => {
+      const W = this.wanderer;
+      if (!W) return;
+      const spots = [{ x: -2.6, z: 0.6 }, { x: 3.0, z: 1.2 }, { x: 5.6, z: 0.4 }, { x: -0.4, z: 1.4 }];
+      let i = 0;
+      while (alive()) {
+        await sleep(6 + Math.random() * 8);
+        if (!alive() || this.g.state.stage === 'escape') return;
+        i = (i + 1) % spots.length;
+        await W.walkTo(spots[i], { speed: 0.9 });
+      }
+    })();
     // a guest leaves after a while (door opens, cold air)
     (async () => {
       await sleep(55);
       if (!alive() || this.leaverGone || this.g.state.stage !== 'explore') return;
       this.g.audio.play('sfx.chair', { volume: 0.5 });
-      await this.leaver.walkTo([{ x: 9.6, z: -2.25 }, { x: 0, z: -2.25 }, { x: -11.0, z: -2.0 }, { x: -12.2, z: -2.6 }], { speed: 1.25 });
+      await this.leaver.walkTo([{ x: 7.0, z: 1.0 }, { x: 0, z: 1.55 }, { x: -10.0, z: 1.2 }, { x: -11.6, z: -1.4 }, { x: -12.2, z: -2.6 }], { speed: 1.25 });
       if (!alive()) return;
       this.g.audio.play('sfx.door', { volume: 0.6 });
       this.leaver.setVisible(false);

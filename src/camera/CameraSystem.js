@@ -8,9 +8,9 @@ import * as THREE from 'three';
 export class CameraSystem {
   constructor() {
     this.camera = new THREE.PerspectiveCamera(32, 16 / 9, 0.1, 80);
-    this.baseHeight = 2.75;
-    this.baseDistance = 11.6;
-    this.lookHeight = 1.35;
+    this.baseHeight = 2.4;
+    this.baseDistance = 8.4;
+    this.lookHeight = 1.28;
     this.lookZ = -0.6;
     this.bounds = { minX: -100, maxX: 100 };
     this.x = 0;
@@ -36,7 +36,7 @@ export class CameraSystem {
     this.camera.aspect = this.aspect;
     // keep a minimum visible width on narrow (portrait) screens
     const baseFov = 32;
-    const minWidth = 7.5; // metres visible at the subject plane
+    const minWidth = 6.2; // metres visible at the subject plane
     const dist = this.baseDistance;
     const hFov = 2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(baseFov) / 2) * this.aspect);
     const width = 2 * dist * Math.tan(hFov / 2);

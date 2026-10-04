@@ -20,7 +20,7 @@ export const CHARACTERS = {
   },
   owen: {
     id: 'owen', name: 'Незнакомец', nameEn: 'STRANGER', portrait: null, color: '#5a5a6a',
-    poses: { idle: 'owen_idle', think: 'owen_think', raise: 'owen_raise' },
+    poses: { idle: 'owen_stand', think: 'owen_stand', raise: 'owen_raise' },
     layer: 1, selfLight: 0x4a4652,
   },
   bartender: {

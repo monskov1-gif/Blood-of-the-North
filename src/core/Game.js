@@ -15,7 +15,7 @@ import { DialogueSystem } from '../dialogue/DialogueSystem.js';
 import { Director } from '../story/Director.js';
 import { Hallucination } from '../fx/Hallucination.js';
 import { HUD } from '../ui/HUD.js';
-import { DialogueView } from '../ui/DialogueView.js';
+import { DialogueView, preloadPortraits } from '../ui/DialogueView.js';
 import { TouchControls } from '../ui/TouchControls.js';
 import { MainMenu, Panels } from '../ui/Menus.js';
 import { Fader, PhoneView, Insert, EndingScreen } from '../ui/Overlays.js';
@@ -52,6 +52,7 @@ export class Game {
   }
 
   async boot() {
+    preloadPortraits();
     this.progress(0.1, 'персонажи…');
     this.atlas = await new SpriteAtlas().load();
     this.progress(0.35, 'бар «Северная Роза»…');

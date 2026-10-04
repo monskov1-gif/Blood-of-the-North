@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { glowTexture, labelTexture, rng } from '../render/textures.js';
+import { glowTexture, labelTexture, rng, canvasTexture } from '../render/textures.js';
 
 /**
  * Reusable prop builders. Every builder returns a THREE.Group positioned at
@@ -70,62 +70,136 @@ export function lightPool(color, w, h, opacity = 0.25) {
 
 // ------------------------------------------------------------------ furniture
 
-export function bistroTable(mats, { radius = 0.36, height = 0.74, top = 'marble' } = {}) {
+// ------------------------------------------------------------------ pixel textures
+// Furniture uses low-resolution, nearest-filtered textures so it sits in the
+// same pixel-art register as the characters instead of looking like smooth CG.
+
+export function pixTex(kind) {
+  return canvasTexture(`pix-${kind}`, kind === 'wood' ? 16 : 32, kind === 'wood' ? 64 : 32, (ctx, w, h) => {
+    const r = rng(kind.length * 17 + 3);
+    const px = (x, y, c) => { ctx.fillStyle = c; ctx.fillRect(x, y, 1, 1); };
+    if (kind === 'wood') {
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const g = Math.sin(x * 1.3 + Math.sin(y * 0.15) * 2) * 0.5 + 0.5;
+        const v = 34 + g * 16 + r() * 6;
+        px(x, y, `rgb(${v + 22},${v * 0.52},${v * 0.3})`);
+      }
+    } else if (kind === 'marble') {
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const n = Math.sin(x * 0.4 + y * 0.25 + Math.sin(y * 0.5) * 2);
+        const vein = Math.abs(n) < 0.12 ? 40 : 0;
+        const v = 70 + r() * 10 + vein;
+        px(x, y, `rgb(${v + 30},${v * 0.3},${v * 0.32})`);
+      }
+    } else if (kind === 'velvet') {
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const tuft = (x % 8 === 4 && y % 8 === 4);
+        const v = tuft ? 40 : 88 + Math.sin(x * 0.8) * 8 + Math.cos(y * 0.8) * 8 + r() * 8;
+        px(x, y, `rgb(${v + 20},${v * 0.14},${v * 0.18})`);
+      }
+    } else if (kind === 'brass') {
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const v = 120 + Math.sin(y * 0.5) * 50 + r() * 14;
+        px(x, y, `rgb(${v + 40},${v * 0.72},${v * 0.32})`);
+      }
+    } else if (kind === 'cloth') {
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const v = 200 + ((x + y) % 4 === 0 ? -14 : 0) + r() * 10;
+        px(x, y, `rgb(${v},${v * 0.94},${v * 0.86})`);
+      }
+    }
+  }, { nearest: true, aniso: 1 });
+}
+
+function pixMat(mats, kind, extra = {}) {
+  const base = {
+    wood: { color: 0xffffff, roughness: 0.42 },
+    marble: { color: 0xffffff, roughness: 0.18, metalness: 0.05 },
+    velvet: { color: 0xffffff, roughness: 0.95 },
+    brass: { color: 0xffffff, roughness: 0.32, metalness: 0.85, emissive: 0x2a1604 },
+    cloth: { color: 0xd8d0c4, roughness: 0.9 },
+  }[kind];
+  return mats.get(`pixmat-${kind}-${JSON.stringify(extra)}`, { map: pixTex(kind), ...base, ...extra });
+}
+
+const lathe = (pts, seg = 20) => new THREE.LatheGeometry(pts.map(([x, y]) => new THREE.Vector2(x, y)), seg);
+
+// ------------------------------------------------------------------ furniture
+
+/** Bistro table: marble top with brass beading, turned pedestal, tripod feet. */
+export function bistroTable(mats, { radius = 0.5, height = 0.76, top = 'marble' } = {}) {
   const g = new THREE.Group();
-  const topMesh = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, 0.035, 28), top === 'marble' ? mats.marble() : mats.woodPolished());
-  topMesh.position.y = height;
-  const rim = new THREE.Mesh(new THREE.TorusGeometry(radius, 0.012, 6, 32), mats.brass());
+  const topMat = top === 'marble' ? pixMat(mats, 'marble') : pixMat(mats, 'wood');
+  const slab = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius * 0.97, 0.045, 44), topMat);
+  slab.position.y = height - 0.02;
+  const brass = pixMat(mats, 'brass');
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(radius, 0.014, 8, 48), brass);
   rim.rotation.x = Math.PI / 2; rim.position.y = height;
-  const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, height, 10), mats.black());
-  stem.position.y = height / 2;
-  const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.25, 0.04, 20), mats.black());
-  foot.position.y = 0.02;
-  g.add(topMesh, rim, stem, foot);
+  const rim2 = new THREE.Mesh(new THREE.TorusGeometry(radius * 0.97, 0.009, 6, 48), brass);
+  rim2.rotation.x = Math.PI / 2; rim2.position.y = height - 0.045;
+  const wood = pixMat(mats, 'wood', { color: 0x7a5a4a });
+  const apron = new THREE.Mesh(new THREE.CylinderGeometry(radius * 0.55, radius * 0.5, 0.06, 28, 1, true), wood);
+  apron.position.y = height - 0.08;
+  const H = height - 0.1;
+  const col = new THREE.Mesh(lathe([
+    [0.0, 0], [0.09, 0], [0.1, 0.03], [0.06, 0.07], [0.045, 0.12], [0.07, 0.2], [0.075, 0.26], [0.05, 0.34],
+    [0.035, 0.5], [0.04, H - 0.12], [0.065, H - 0.08], [0.07, H - 0.03], [0.1, H], [0.0, H],
+  ], 22), wood);
+  col.position.y = 0.04;
+  g.add(slab, rim, rim2, apron, col);
+  // three cabriole feet
+  const footShape = new THREE.Shape();
+  footShape.moveTo(0, 0.0); footShape.quadraticCurveTo(0.12, 0.02, 0.26, 0.0);
+  footShape.lineTo(0.27, 0.035); footShape.quadraticCurveTo(0.14, 0.05, 0.05, 0.16); footShape.lineTo(0, 0.16);
+  const footGeo = new THREE.ExtrudeGeometry(footShape, { depth: 0.04, bevelEnabled: true, bevelSize: 0.01, bevelThickness: 0.01, bevelSegments: 2 });
+  footGeo.translate(0, 0, -0.02);
+  for (let i = 0; i < 3; i++) {
+    const f = new THREE.Mesh(footGeo, wood);
+    f.rotation.y = (i / 3) * Math.PI * 2 + 0.5;
+    g.add(f);
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.022, 8, 6), brass);
+    cap.position.set(Math.cos(-f.rotation.y) * 0.27, 0.02, Math.sin(-f.rotation.y) * 0.27);
+    g.add(cap);
+  }
   g.userData.radius = radius;
   return g;
 }
 
-/** Bentwood (Thonet style) chair. `facing`: +1 faces +x, -1 faces -x. */
+/** Bentwood (Thonet style) chair with tube-bent back and padded seat. `facing`: +1 faces +x. */
 export function bentwoodChair(mats, facing = 1) {
   const g = new THREE.Group();
-  const m = mats.woodDark();
-  const seat = new THREE.Mesh(new THREE.CylinderGeometry(0.21, 0.21, 0.04, 20), mats.velvetDark());
-  seat.position.y = 0.46;
-  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.21, 0.018, 6, 24), m);
-  ring.rotation.x = Math.PI / 2; ring.position.y = 0.44;
-  g.add(seat, ring);
-  const legGeo = new THREE.CylinderGeometry(0.015, 0.012, 0.46, 6);
-  for (const [x, z] of [[0.14, 0.14], [-0.14, 0.14], [0.14, -0.14], [-0.14, -0.14]]) {
-    const leg = new THREE.Mesh(legGeo, m);
-    leg.position.set(x * 1.05, 0.23, z * 1.05);
-    leg.rotation.z = x * 0.25; leg.rotation.x = -z * 0.25;
-    g.add(leg);
+  const wood = pixMat(mats, 'wood', { color: 0x5a4036 });
+  const seat = new THREE.Mesh(lathe([[0, 0], [0.215, 0], [0.225, 0.02], [0.215, 0.05], [0.16, 0.065], [0, 0.07]], 28), pixMat(mats, 'velvet'));
+  seat.position.y = 0.43;
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.218, 0.017, 8, 32), wood);
+  ring.rotation.x = Math.PI / 2; ring.position.y = 0.43;
+  const brace = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.011, 6, 28), wood);
+  brace.rotation.x = Math.PI / 2; brace.position.y = 0.17;
+  g.add(seat, ring, brace);
+  const tube = (pts, r = 0.016) => new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts.map((p) => new THREE.Vector3(...p))), 24, r, 6), wood);
+  const back = -facing;
+  // front legs (splayed)
+  for (const z of [0.13, -0.13]) g.add(tube([[0.13 * facing, 0.43, z], [0.15 * facing, 0.2, z * 1.1], [0.17 * facing, 0, z * 1.2]]));
+  // rear legs continuing into the bent back hoop
+  for (const z of [0.12, -0.12]) {
+    g.add(tube([[0.2 * back, 0, z * 1.25], [0.16 * back, 0.22, z * 1.1], [0.15 * back, 0.43, z], [0.17 * back, 0.6, z * 0.95], [0.2 * back, 0.78, z * 0.7], [0.21 * back, 0.86, 0]]));
   }
-  // bent back hoop
-  const back = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.017, 6, 24, Math.PI), m);
-  back.position.set(-0.18 * facing, 0.75, 0);
-  back.rotation.y = Math.PI / 2;
-  back.scale.set(1, 1.5, 1);
-  const post1 = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.34, 6), m);
-  post1.position.set(-0.19 * facing, 0.62, 0.17);
-  const post2 = post1.clone(); post2.position.z = -0.17;
-  const loop = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.012, 6, 16), m);
-  loop.position.set(-0.19 * facing, 0.64, 0); loop.rotation.y = Math.PI / 2;
-  g.add(back, post1, post2, loop);
+  // inner loop of the back
+  g.add(tube([[0.16 * back, 0.47, 0.08], [0.19 * back, 0.62, 0.1], [0.2 * back, 0.72, 0], [0.19 * back, 0.62, -0.1], [0.16 * back, 0.47, -0.08]], 0.011));
   return g;
 }
 
 export function barStool(mats) {
   const g = new THREE.Group();
-  const seat = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.19, 0.11, 22), mats.velvet());
+  const seat = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.19, 0.11, 22), pixMat(mats, 'velvet'));
   seat.position.y = 0.78;
-  const studs = new THREE.Mesh(new THREE.TorusGeometry(0.195, 0.008, 4, 30), mats.brass());
+  const studs = new THREE.Mesh(new THREE.TorusGeometry(0.195, 0.008, 4, 30), pixMat(mats, 'brass'));
   studs.rotation.x = Math.PI / 2; studs.position.y = 0.74;
-  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.74, 10), mats.black());
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.74, 10), pixMat(mats, 'wood', { color: 0x3a2a24 }));
   pole.position.y = 0.37;
-  const foot = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.014, 6, 24), mats.brass());
+  const foot = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.014, 6, 24), pixMat(mats, 'brass'));
   foot.rotation.x = Math.PI / 2; foot.position.y = 0.3;
-  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 0.04, 18), mats.black());
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 0.04, 18), pixMat(mats, 'wood', { color: 0x3a2a24 }));
   base.position.y = 0.02;
   g.add(seat, studs, pole, foot, base);
   return g;
@@ -257,8 +331,8 @@ export function chandelier(mats) {
     cr.scale.y = 2;
     g.add(cr);
   }
-  const halo = glow(0xffb36a, 2.4, 0.55);
-  halo.position.y = 0.05;
+  const halo = glow(0xffb36a, 1.15, 0.42);
+  halo.position.y = 0.0;
   g.add(halo);
   g.userData.halo = halo;
   return g;
@@ -342,4 +416,57 @@ export function frame(mats, w, h, texture, { gold = true, depth = 0.05, border =
     g.add(canvas);
   }
   return g;
+}
+
+/** Wine bottle (foreground dressing). */
+export function wineBottle(mats, color = 0x1e2a14) {
+  const m = mats.get(`wineBottle-${color}`, { color, roughness: 0.12, metalness: 0.1, emissive: color, emissiveIntensity: 0.25, transparent: true, opacity: 0.92 });
+  const b = new THREE.Mesh(lathe([[0, 0], [0.038, 0], [0.04, 0.02], [0.04, 0.2], [0.03, 0.24], [0.014, 0.27], [0.013, 0.33], [0.016, 0.335], [0, 0.335]], 16), m);
+  const label = new THREE.Mesh(new THREE.CylinderGeometry(0.0405, 0.0405, 0.08, 16, 1, true), mats.get('bottleLabelPix', { map: pixTex('cloth'), color: 0xc8b890, roughness: 0.8 }));
+  label.position.y = 0.1;
+  const g = new THREE.Group();
+  g.add(b, label);
+  return g;
+}
+
+/** Ashtray with a smouldering cigarette. */
+export function ashtray(mats) {
+  const g = new THREE.Group();
+  const bowl = new THREE.Mesh(lathe([[0, 0], [0.06, 0], [0.065, 0.02], [0.05, 0.025], [0, 0.018]], 16), mats.glass());
+  const cig = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.07, 6), mats.get('cig', { color: 0xe8e0d0 }));
+  cig.rotation.z = Math.PI / 2 - 0.15; cig.position.set(0.03, 0.03, 0);
+  const ember = new THREE.Mesh(new THREE.SphereGeometry(0.005, 6, 6), mats.emissive(0xff5020, 6));
+  ember.position.set(0.065, 0.035, 0);
+  g.add(bowl, cig, ember);
+  return g;
+}
+
+/** Downward cone of light under a chandelier (fake volumetrics): fades with
+ *  height and towards the silhouette edges, so it reads as haze, not a shape. */
+export function lightCone(color, height, radius, opacity = 0.06) {
+  const m = new THREE.ShaderMaterial({
+    uniforms: { uColor: { value: new THREE.Color(color) }, uOpacity: { value: opacity } },
+    vertexShader: /* glsl */`
+      varying float vH; varying vec3 vN; varying vec3 vV;
+      void main() {
+        vH = uv.y;
+        vec4 wp = modelMatrix * vec4(position, 1.0);
+        vN = normalize(mat3(modelMatrix) * normal);
+        vV = normalize(cameraPosition - wp.xyz);
+        gl_Position = projectionMatrix * viewMatrix * wp;
+      }`,
+    fragmentShader: /* glsl */`
+      uniform vec3 uColor; uniform float uOpacity;
+      varying float vH; varying vec3 vN; varying vec3 vV;
+      void main() {
+        float facing = abs(dot(normalize(vN), normalize(vV)));
+        float edge = pow(facing, 2.5);
+        float vert = smoothstep(0.0, 0.85, vH) * (1.0 - smoothstep(0.92, 1.0, vH));
+        gl_FragColor = vec4(uColor * uOpacity * edge * vert, 1.0);
+      }`,
+    transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
+  });
+  const cone = new THREE.Mesh(new THREE.CylinderGeometry(0.25, radius, height, 48, 1, true), m);
+  cone.renderOrder = 4;
+  return cone;
 }

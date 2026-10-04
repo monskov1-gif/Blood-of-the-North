@@ -1,4 +1,5 @@
 import { el, wait } from './dom.js';
+import { VERSION } from '../version.js';
 
 export class Fader {
   constructor(root) { this.el = el('div', 'fader', root); }
@@ -178,7 +179,7 @@ export class EndingScreen {
   async show(state) {
     const e = this.el = el('div', 'ending', this.root);
     const t = el('div', 't', e, 'BLOOD <em>OF THE</em> NORTH');
-    const d = el('div', 'd', e, 'DEMO COMPLETE · ДЕМО ЗАВЕРШЕНО');
+    const d = el('div', 'd', e, `DEMO v${VERSION} COMPLETE · ДЕМО ЗАВЕРШЕНО`);
     const f = state.flags;
     const found = state.interacted.size;
     const stats = el('div', 'stats', e, [

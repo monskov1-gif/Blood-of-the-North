@@ -1,5 +1,6 @@
 import { el, ICONS } from './dom.js';
 import { CHARACTERS } from '../../data/characters.js';
+import { VERSION } from '../version.js';
 
 const STAGE_LABEL = {
   explore: 'Бар «Северная Роза»',
@@ -21,13 +22,13 @@ export class MainMenu {
     this.audio = audio;
     this.saves = saves;
     const m = this.el = el('div', 'mainmenu hidden', root);
-    el('div', 'mm-title', m, '<h1>BLOOD <em>OF THE</em><br>NORTH</h1><div class="sub">ДЕМО · ПРОЛОГ · YUKON</div>');
+    el('div', 'mm-title', m, `<h1>BLOOD <em>OF THE</em><br>NORTH</h1><div class="sub">ДЕМО v${VERSION} · ПРОЛОГ · YUKON</div>`);
     this.dossier = el('div', 'dossier', m);
     const ring = this.ring = el('div', 'ring', m);
     ring.innerHTML = ringSVG();
     this.pointer = ring.querySelector('.pointer');
     this.items = el('div', 'mm-items', ring);
-    el('div', 'mm-foot', m, 'v0.1 DEMO · ПРОЦЕДУРНАЯ ГРАФИКА И ЗВУК');
+    el('div', 'mm-foot', m, `DEMO v${VERSION}`);
     this.entries = [];
   }
 
@@ -53,9 +54,12 @@ export class MainMenu {
       b.addEventListener('mouseenter', () => this.point(i));
       b.addEventListener('focus', () => this.point(i));
       b.addEventListener('click', () => {
-        if (b.disabled) return;
+        if (b.disabled || this.pending) return;
+        this.point(i, true);
         this.audio.play('ui.select');
-        this.bus.emit('menu', d.act);
+        this.pending = true;
+        // the clock hand swings to the item first, then the item fires
+        setTimeout(() => { this.pending = false; this.bus.emit('menu', d.act); }, 500);
       });
       return { ...d, b, ang };
     });
@@ -209,7 +213,7 @@ export class Panels {
   closeAll() { while (this.stack.length) this.closeTop(); }
 
   pause({ inGame = true } = {}) {
-    const p = this.frame('Пауза', 'PAUSE');
+    const p = this.frame('Пауза', `PAUSE · DEMO v${VERSION}`);
     const list = el('div', 'menu-list', p);
     const item = (ru, en, fn, disabled) => {
       const b = el('button', '', list, `${ru}<small>${en}</small>`);
@@ -295,7 +299,7 @@ export class Panels {
   about() {
     const p = this.frame('Об игре', 'ABOUT');
     el('div', '', p, `<p style="font-size:18px;line-height:1.5">Blood of the North — визуальная новелла о следователе из Уайтхорса, Юкон. Это демо-пролог: один вечер в баре «Северная Роза».</p>
-      <p style="font-size:16px;line-height:1.5">3D-окружение, 2D-персонажи, процедурные портреты, фоны, текстуры, музыка и звук — всё генерируется кодом в браузере.</p>
+      <p style="font-size:16px;line-height:1.5">3D-окружение и 2D-персонажи. Окружение, фоны диалогов, текстуры, музыка и звук генерируются кодом в браузере.</p><p style="font-size:14px">Версия демо: v${VERSION}</p>
       <div class="note">Демо содержит сцены изменённого сознания (мерцание, искажения картинки и звука). Силу эффектов можно снизить в настройках.</div>`);
   }
 }

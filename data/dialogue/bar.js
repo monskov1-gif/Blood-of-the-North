@@ -4,7 +4,7 @@
  * Node fields
  *   speaker   julian | kayden | waiter | bartender | owen | thought (Julian's inner voice) | narrator
  *   text      the line
- *   expr      { characterId: expression } — portrait changes (see portraits.js EXPRESSIONS)
+ *   expr      { characterId: expression } — portrait: neutral/smile/serious… or sad/tired/concerned/dizzy/pain (looking down)
  *   pose      { characterId: pose } — 3D sprite pose changes
  *   if        condition string (flags), node is skipped when false
  *   set       { flag: value } applied when the node is shown

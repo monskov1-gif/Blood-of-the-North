@@ -5,11 +5,12 @@ Usage: python3 tools/build_sprites.py <raw_dir> <out_dir>
 Besides the hero frames it derives extra characters by palette work
 (Owen, bartender, patrons) and draws small pixel props (coupe glass).
 """
-import sys, json, colorsys
+import sys, json, colorsys, os
 import numpy as np
 from PIL import Image
 
 RAW, OUT = sys.argv[1], sys.argv[2]
+ALIASES = {}
 
 
 def load(name):
@@ -49,7 +50,7 @@ def opaque(a):
 
 # ---------------------------------------------------------------- derivations
 
-def make_owen(src):
+def make_owen(src, seated=False):
     a = load(src)
     s, v = hsv(a)
     y = rows(a); x = cols(a); op = opaque(a)
@@ -57,7 +58,7 @@ def make_owen(src):
     skin = op & warm & (v > 0.5) & (s > 0.3)
     face_zone = (y > 12) & (y < 32)
     # remove the moustache: dark pixels in the lower face that sit between skin pixels
-    for yy in range(21, 29):
+    for yy in (range(14, 26) if seated else range(21, 29)):
         for xx in range(a.shape[1]):
             if not op[yy, xx] or skin[yy, xx]:
                 continue
@@ -67,7 +68,7 @@ def make_owen(src):
             if up and (dn or right) and v[yy, xx] < 0.45:
                 a[yy, xx, :3] = [150, 112, 98]
                 skin[yy, xx] = True
-    coat = op & ~skin & (v > 0.22) & (s > 0.18) & (y > 26)
+    coat = op & ~skin & (v > 0.22) & (s > 0.18) & (y > (22 if seated else 26))
     a = regrade(a, coat, (70, 72, 84), value_scale=0.55)
     s2, v2 = hsv(a)
     a = regrade(a, skin, (226, 205, 198), value_scale=1.05, keep_luma=0.75)
@@ -277,9 +278,98 @@ def seated(a):
     return out
 
 
-for name in ['julian_idle', 'julian_talk', 'julian_think', 'kayden_idle', 'kayden_talk', 'kayden_think',
-             'owen_idle', 'owen_think', 'owen_raise', 'patron_a', 'patron_b', 'patron_b_talk', 'woman']:
+# legacy generated seated poses (kept for the remaining derived characters)
+for name in ['patron_a', 'patron_b', 'patron_b_talk', 'woman']:
     frames[name + '_sit'] = seated(frames[name])
+
+# painted seated poses supplied for the heroes (tools/process_art.py)
+ALIASES = {}
+for hero in ['julian', 'kayden', 'waiter']:
+    frames[f'{hero}_seat'] = load(f'{hero}_seat')
+for pose in ['idle', 'talk', 'think']:
+    ALIASES[f'julian_{pose}_sit'] = 'julian_seat'
+    ALIASES[f'kayden_{pose}_sit'] = 'kayden_seat'
+# Owen: the seated gentleman from the crowd sheet, re-dressed in black and paled
+def noir(a):
+    a = a.copy()
+    s_, v = hsv(a)
+    op = opaque(a)
+    rgb = a[..., :3]
+    warm = rgb[..., 0] > rgb[..., 2] + 18
+    skin = op & warm & (v > 0.52) & (s_ > 0.12) & (s_ < 0.55)
+    cloth = op & ~skin & (v < 0.55)
+    a = regrade(a, cloth, (52, 52, 64), value_scale=0.62, keep_luma=0.9)
+    a = regrade(a, skin, (232, 214, 210), value_scale=1.0, keep_luma=0.55)
+    return a
+
+
+frames['owen_seat'] = noir(load('sit_suit'))
+seat_raise = frames['owen_seat'].copy()
+g = coupe(True)
+hy, hx = 44, seat_raise.shape[1] - 30
+for yy in range(g.shape[0]):
+    for xx in range(g.shape[1]):
+        if g[yy, xx, 3] > 0 and 0 <= hx + xx < seat_raise.shape[1]:
+            seat_raise[hy + yy, hx + xx] = g[yy, xx]
+frames['owen_raise_seat'] = seat_raise
+frames['owen_stand'] = noir(load('npc_smoker_front'))
+for pose in ['idle', 'think']:
+    ALIASES[f'owen_{pose}_sit'] = 'owen_seat'
+ALIASES['owen_raise_sit'] = 'owen_raise_seat'
+ALIASES['owen_stand_sit'] = 'owen_seat'
+
+# crowd (painted sheets → pixel art)
+import glob as _glob
+for f in sorted(_glob.glob(f'{RAW}/raw_npc_*.png')) + sorted(_glob.glob(f'{RAW}/raw_sit_*.png')):
+    n = os.path.basename(f)[4:-4]
+    frames[n] = load(n)
+
+# ---------------------------------------------------------------- crowd variants
+def variant(a, hue, sat=1.0, val=1.0, head=0.16):
+    """Re-dyes clothing (non-skin pixels) by rotating hue; skin and near-greys kept."""
+    a = a.copy()
+    rgb = a[..., :3] / 255.0
+    mx, mn = rgb.max(-1), rgb.min(-1)
+    d = mx - mn
+    h = np.zeros_like(mx)
+    m = d > 1e-5
+    r_, g_, b_ = rgb[..., 0], rgb[..., 1], rgb[..., 2]
+    idx = m & (mx == r_); h[idx] = ((g_ - b_)[idx] / d[idx]) % 6
+    idx = m & (mx == g_); h[idx] = (b_ - r_)[idx] / d[idx] + 2
+    idx = m & (mx == b_); h[idx] = (r_ - g_)[idx] / d[idx] + 4
+    h = h / 6
+    sv = np.where(mx > 0, d / np.maximum(mx, 1e-5), 0)
+    v = mx
+    op = a[..., 3] > 0
+    skin = op & (h < 0.11) & (sv > 0.18) & (sv < 0.6) & (v > 0.5)
+    rows = np.indices(op.shape)[0]
+    cloth = op & ~skin & (rows > head * op.shape[0])
+    h2 = np.where(cloth, (h + hue) % 1.0, h)
+    s2 = np.where(cloth, np.clip(sv * sat + (0.12 if sat > 1 else 0) * cloth, 0, 1), sv)
+    v2 = np.where(cloth, np.clip(v * val, 0, 1), v)
+    i = np.floor(h2 * 6).astype(int) % 6
+    f = h2 * 6 - np.floor(h2 * 6)
+    p_, q_, t_ = v2 * (1 - s2), v2 * (1 - f * s2), v2 * (1 - (1 - f) * s2)
+    out = np.zeros_like(rgb)
+    for k, (R, G, B) in enumerate([(v2, t_, p_), (q_, v2, p_), (p_, v2, t_), (p_, q_, v2), (t_, p_, v2), (v2, p_, q_)]):
+        sel = i == k
+        out[..., 0][sel] = R[sel]; out[..., 1][sel] = G[sel]; out[..., 2][sel] = B[sel]
+    a[..., :3] = np.where(op[..., None], out * 255, a[..., :3])
+    return a
+
+
+VARIANTS = {
+    'sit_glasses': (0.55, 1.1, 0.8), 'sit_green': (0.62, 1.0, 0.9), 'sit_soldier': (0.85, 0.6, 0.8),
+    'sit_burgundy': (0.45, 0.8, 0.9), 'sit_smoker': (0.6, 0.6, 0.85), 'sit_maid': (0.0, 0.0, 1.0),
+    'sit_hat': (0.95, 1.2, 0.8), 'sit_fur': (0.1, 1.0, 0.85),
+    'npc_cap_back': (0.55, 0.5, 0.8), 'npc_cap_side': (0.55, 0.5, 0.8), 'npc_bluecoat_front': (0.5, 1.0, 0.8),
+    'npc_glasses_front': (0.6, 0.8, 0.8), 'npc_glasses_back': (0.6, 0.8, 0.8), 'npc_green_side': (0.85, 1.0, 0.85),
+    'npc_fedora_back': (0.6, 0.25, 0.6), 'npc_vest_side': (0.4, 0.8, 0.9), 'npc_vest_back': (0.4, 0.8, 0.9),
+    'npc_fur_side': (0.9, 1.2, 0.9), 'npc_butler_side': (0.0, 1.0, 1.0),
+}
+for n, (hshift, sat, val) in VARIANTS.items():
+    if n in frames:
+        frames[n + '_v'] = variant(frames[n], hshift, sat, val, head=0.26 if n.startswith('sit_') else 0.16)
 
 # ---------------------------------------------------------------- walk cycle
 WALK_HIP = 112
@@ -308,14 +398,16 @@ def walk(a, amp, front_dark):
     return out
 
 
-for name in ['julian_idle', 'kayden_idle', 'waiter_idle', 'waiter2', 'owen_idle', 'patron_a', 'patron_b', 'woman', 'bartender_idle']:
+for name in ['julian_idle', 'kayden_idle', 'waiter_idle', 'waiter2', 'owen_idle', 'patron_a', 'patron_b', 'woman', 'bartender_idle',
+             'npc_cap_side', 'npc_glasses_side', 'npc_vest_side', 'npc_fedora_side']:
+    if name not in frames: continue
     frames[name + '_walk1'] = walk(frames[name], 7, False)
     frames[name + '_walk2'] = walk(frames[name], 7, True)
 
 # simple shelf packing, 2px padding
 PAD = 2
 order = sorted(frames, key=lambda n: -frames[n].shape[0])
-W = 1024
+W = 2048
 x = y = rowh = 0
 meta = {}
 for n in order:
@@ -335,5 +427,7 @@ atlas = np.zeros((H, W, 4), np.uint8)
 for n, m in meta.items():
     atlas[m['y']:m['y'] + m['h'], m['x']:m['x'] + m['w']] = frames[n].clip(0, 255).astype(np.uint8)
 Image.fromarray(atlas, 'RGBA').save(f'{OUT}/characters.png', optimize=True)
+for alias, target in ALIASES.items():
+    meta[alias] = meta[target]
 json.dump(dict(size=[W, H], frames=meta), open(f'{OUT}/characters.json', 'w'), indent=1)
 print('atlas', W, H, len(meta))

@@ -1,4 +1,4 @@
-# Blood of the North — демо (пролог)
+# Blood of the North — демо (пролог) · v0.02
 
 Визуальная новелла / narrative adventure. Демо-сцена «Северная Роза»: бар на окраине
 Уайтхорса (Юкон). 3D-окружение + полностью 2D-персонажи с глубиной, исследование,
@@ -37,6 +37,11 @@
 
 Параметры URL для тестирования: `?quality=low` / `?quality=high`.
 
+## Версия
+
+Текущая версия демо — в `src/version.js` (показывается в главном меню, паузе, на экране загрузки
+и в финале). Правило: каждая правка кода повышает версию на 0.01 (0.02 → 0.03 → …).
+
 ## Архитектура
 
 ```
@@ -48,16 +53,17 @@ src/render/              Renderer (пост-обработка: bloom, зерн�
 src/camera/              CameraSystem — фиксированная боковая камера, «шоты» для катсцен
 src/world/               сцены (BarScene — геометрия, свет, частицы), Navigation, props
 src/characters/          Character2D (2D-спрайт внутри 3D, depth buffer), PlayerController,
-                         SpriteAtlas, portraits.js (процедурные портреты)
+                         SpriteAtlas
 src/interaction/         InteractionSystem — точки интереса с подсказкой
 src/dialogue/            DialogueSystem — данные, флаги, выборы, чекпоинты, журнал
 src/story/               Director (команды), BarStory (сцена бара: катсцены, NPC, финал)
 src/fx/                  Hallucination — 6 фаз отравления
 src/audio/               AudioManager (шины, глушение, плейсхолдеры), MusicEngine, sounds.js
 src/ui/                  HUD, экран диалогов (VN), меню, телефон, финал, сенсорное управление
-data/                    персонажи и диалоги (data/dialogue/bar.js — весь текст сцены)
+data/                    персонажи, толпа (crowd.js) и диалоги (dialogue/bar.js — весь текст сцены)
 assets/sprites/          атлас пиксельных спрайтов (+ json с кадрами)
-tools/                   пайплайн спрайтов: extract_sprites.py, build_sprites.py, raw/
+assets/portraits/        портреты для экрана диалога: <id>_0 нейтральный, _1 говорит, _2 взгляд вниз
+tools/                   пайплайн арта: extract_sprites.py, process_art.py, build_sprites.py, raw/
 ```
 
 ### Как расширять
@@ -73,6 +79,9 @@ tools/                   пайплайн спрайтов: extract_sprites.py, 
   подключить настоящий файл, добавьте `url: 'assets/audio/…ogg'` — код сцены не меняется.
 * **Спрайты** — `python3 tools/build_sprites.py tools/raw assets/sprites` пересобирает атлас
   (сидячие позы, шаги, перекраски NPC генерируются автоматически).
-* **Портреты** — `src/characters/portraits.js`; превью: `tools/preview/portraits.html`.
+* **Портреты** — файлы `assets/portraits/<id>_<0|1|2>.webp`; выбор кадра — `DialogueView.drawSlot`.
+* **Толпа** — `data/crowd.js`: кто, где сидит/стоит, куда смотрит.
+* **Новый арт** — `python3 tools/process_art.py <папка с листами> .` вырезает фон, делает портреты
+  и пиксельные спрайты (1 px = 1 см), затем `build_sprites.py` пересобирает атлас.
 
-Всё визуальное (текстуры, фоны диалогов, портреты, коктейль) и весь звук генерируются кодом.
+Окружение, текстуры, фоны диалогов, иллюстрация коктейля и весь звук генерируются кодом; персонажи и портреты — из предоставленного арта.
