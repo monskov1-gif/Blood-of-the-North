@@ -6,9 +6,10 @@ import {
 } from '../../render/textures.js';
 import {
   MaterialLib, bistroTable, bentwoodChair, barStool, candle, wineGlass, tumbler, bottleRow,
-  chandelier, sconce, tableLamp, garland, frame, glow, lightPool, wineBottle, ashtray, lightCone,
+  chandelier, sconce, tableLamp, garland, frame, glow, lightPool, wineBottle, ashtray, lightCone, column,
 } from '../props.js';
 import { Dust, Snow } from '../Particles.js';
+import { applyLightingState, buildMorningProps, updateMorning } from './BarMorning.js';
 
 /**
  * "Northern Rose" — the bar on the outskirts of Whitehorse.
@@ -29,6 +30,7 @@ const BACK = -5;
 const X0 = -14, X1 = 14;
 const CEIL = 4.4;
 const WIN = { x: -8.95, w: 2.3, h: 2.0, sill: 1.25 };
+const DOOR = { x: -12.2, w: 1.28, h: 2.44 };
 
 const FloorReflectionShader = {
   uniforms: {
@@ -109,6 +111,7 @@ export class BarScene {
     this.buildMidTables();
     this.buildLighting();
     this.buildAtmosphere();
+    buildMorningProps(this);
     r.traverse((o) => { if (o.isMesh) o.matrixAutoUpdate = true; });
     return r;
   }
@@ -152,6 +155,10 @@ export class BarScene {
     hole.moveTo(WIN.x - WIN.w / 2, WIN.sill); hole.lineTo(WIN.x - WIN.w / 2, WIN.sill + WIN.h);
     hole.lineTo(WIN.x + WIN.w / 2, WIN.sill + WIN.h); hole.lineTo(WIN.x + WIN.w / 2, WIN.sill); hole.lineTo(WIN.x - WIN.w / 2, WIN.sill);
     wallShape.holes.push(hole);
+    const dhole = new THREE.Path();
+    dhole.moveTo(DOOR.x - DOOR.w / 2, 0); dhole.lineTo(DOOR.x - DOOR.w / 2, DOOR.h);
+    dhole.lineTo(DOOR.x + DOOR.w / 2, DOOR.h); dhole.lineTo(DOOR.x + DOOR.w / 2, 0); dhole.lineTo(DOOR.x - DOOR.w / 2, 0);
+    wallShape.holes.push(dhole);
     const wall = new THREE.Mesh(new THREE.ShapeGeometry(wallShape), wallMat);
     wall.position.set(0, 0, BACK);
     this.root.add(wall);
@@ -164,16 +171,21 @@ export class BarScene {
     panelTex.needsUpdate = true;
     panelTex.repeat.set(24, 1);
     const panelMat = m.get('panel', { map: panelTex, roughness: 0.4 });
-    const wains = new THREE.Mesh(new THREE.BoxGeometry(X1 - X0, 1.15, 0.06), panelMat);
-    wains.position.set(0, 0.575, BACK + 0.03);
-    this.root.add(wains);
-    const rail = new THREE.Mesh(new THREE.BoxGeometry(X1 - X0, 0.08, 0.1), m.woodPolished());
-    rail.position.set(0, 1.18, BACK + 0.05);
+    // wainscot, chair rail and skirting — interrupted at the front door
+    const spans = [[X0, DOOR.x - DOOR.w / 2 - 0.08], [DOOR.x + DOOR.w / 2 + 0.08, X1]];
+    for (const [a0, a1] of spans) {
+      const len = a1 - a0, mid = (a0 + a1) / 2;
+      const wains = new THREE.Mesh(new THREE.BoxGeometry(len, 1.15, 0.06), panelMat);
+      wains.position.set(mid, 0.575, BACK + 0.03);
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(len, 0.08, 0.1), m.woodPolished());
+      rail.position.set(mid, 1.18, BACK + 0.05);
+      const skirting = new THREE.Mesh(new THREE.BoxGeometry(len, 0.14, 0.09), m.woodDark());
+      skirting.position.set(mid, 0.07, BACK + 0.07);
+      this.root.add(wains, rail, skirting);
+    }
     const crown = new THREE.Mesh(new THREE.BoxGeometry(X1 - X0, 0.22, 0.2), m.woodDark());
     crown.position.set(0, CEIL - 0.11, BACK + 0.1);
-    const skirting = new THREE.Mesh(new THREE.BoxGeometry(X1 - X0, 0.14, 0.09), m.woodDark());
-    skirting.position.set(0, 0.07, BACK + 0.07);
-    this.root.add(rail, crown, skirting);
+    this.root.add(crown);
 
     // side walls (seen in perspective at the ends)
     for (const x of [X0, X1]) {
@@ -230,21 +242,28 @@ export class BarScene {
       b.position.set(x, y, 0);
       doorFrame.add(b);
     }
+    const hinge = new THREE.Group();          // door leaf swings around its left edge
+    hinge.position.set(-0.63, 0, 0);
     const door = new THREE.Mesh(new THREE.BoxGeometry(1.26, 2.42, 0.06), m.wood());
-    door.position.set(0, 1.21, -0.02);
+    door.position.set(0.63, 1.21, -0.02);
     const paneMat = m.get('coldPane', { color: 0x0, emissive: 0x6f8fc0, emissiveIntensity: 0.7, roughness: 0.2 });
     for (const [x, y] of [[-0.28, 1.85], [0.28, 1.85], [-0.28, 1.25], [0.28, 1.25]]) {
       const p = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.5), paneMat);
-      p.position.set(x, y, 0.02);
-      doorFrame.add(p);
+      p.position.set(x + 0.63, y, 0.02);
+      hinge.add(p);
     }
     const handle = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 8), m.brass());
-    handle.position.set(0.5, 1.05, 0.06);
+    handle.position.set(0.5 + 0.63, 1.05, 0.06);
+    hinge.add(door, handle);
+    this.doorHinge = hinge;
     const transom = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.3), paneMat);
     transom.position.set(0, 2.72, -0.03);
-    doorFrame.add(door, handle, transom);
+    doorFrame.add(hinge, transom);
     doorFrame.position.set(doorX, 0, BACK + 0.11);
     root.add(doorFrame);
+    this.doorOutside = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 3.0), null);
+    this.doorOutside.position.set(doorX + 0.4, 1.4, BACK - 1.6);
+    root.add(this.doorOutside);
     const doorGlow = lightPool(0x7fa0d8, 2.4, 1.6, 0.18);
     doorGlow.rotation.x = -Math.PI / 2;
     doorGlow.position.set(doorX, 0.01, BACK + 1.0);
@@ -284,7 +303,9 @@ export class BarScene {
 
     // window with the snowy street outside
     const winX = WIN.x, winW = WIN.w, winH = WIN.h, sill = WIN.sill;
-    const outside = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 3.2), new THREE.MeshBasicMaterial({ map: streetTexture(), color: 0x9fb4d8 }));
+    this.outsideMat = new THREE.MeshBasicMaterial({ map: streetTexture('night'), color: 0xb4c4e0 });
+    const outside = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 3.0), this.outsideMat);
+    this.doorOutside.material = this.outsideMat;
     outside.position.set(winX, sill + winH / 2 + 0.1, BACK - 1.4);
     root.add(outside);
     // wall cut: build the wall around the window opening as a dark reveal
@@ -350,8 +371,10 @@ export class BarScene {
       map: beamTexture(), color: 0x86a4d6, transparent: true, opacity: 0.11, blending: THREE.AdditiveBlending,
       depthWrite: false, side: THREE.DoubleSide,
     });
+    this.beams = [];
     for (let i = 0; i < 3; i++) {
       const b = new THREE.Mesh(new THREE.PlaneGeometry(0.75, 5), beamMat);
+      this.beams.push(b);
       b.position.set(winX - 0.6 + i * 0.6, 1.25, BACK + 1.8);
       b.rotation.set(-1.0, 0, 0.12 - i * 0.05);
       root.add(b);
@@ -854,6 +877,12 @@ export class BarScene {
       const ch2 = bentwoodChair(m, -1); ch2.position.set(x + 0.86, 0, z - 0.05); ch2.rotation.y = -0.15; root.add(ch2);
       this.foregroundSeats.push({ x: x - 0.86, z: z + 0.05, facing: 1 }, { x: x + 0.86, z: z - 0.05, facing: -1 });
     });
+    // carved columns in the extreme foreground (depth framing)
+    for (const x of [-5.2, 8.3]) {
+      const c = column(m, CEIL, 0.19);
+      c.position.set(x, 0, 4.7);
+      root.add(c);
+    }
   }
 
   // ---------------------------------------------------------------- lights
@@ -937,6 +966,9 @@ export class BarScene {
 
   // ---------------------------------------------------------------- runtime
 
+  /** 'evening' | 'morning' — switches the real light setup (see BarMorning.js). */
+  setTimeOfDay(state) { applyLightingState(this, state); }
+
   /** Called by the hallucination system: 0..1 how "wrong" the room is. */
   setUnreality(u) { this.unreality = u; }
 
@@ -966,6 +998,7 @@ export class BarScene {
       this.lights.backbar.forEach((l) => l.color.setHSL(0.07 - u * 0.08 + Math.sin(t + hue) * 0.02 * u, 1, 0.55));
       this.lights.lounge.forEach((l) => l.color.setHSL(0.98 - u * 0.05, 0.9, 0.6));
     }
+    if (this.morning) { updateMorning(this, dt); return; }
     // jukebox hue cycle
     const jb = this.jukebox;
     jb.hue = (jb.hue + dt * 0.03) % 1;

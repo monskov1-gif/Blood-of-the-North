@@ -4,6 +4,7 @@ import { el, ICONS } from './dom.js';
 const OBJECTIVES = {
   kayden: { ru: 'Кайден ждёт за столиком у стойки', en: 'JOIN KAYDEN' },
   air: { ru: 'Воздух. Дойти до двери', en: 'GET OUTSIDE' },
+  morning: { ru: 'Что здесь произошло?', en: 'WHAT HAPPENED HERE' },
 };
 
 /** Exploration overlay: objective, interaction marker, phone & menu buttons, toasts. */

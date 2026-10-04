@@ -37,7 +37,7 @@ export class PlayerController {
     this.vx += (tx - this.vx) * Math.min(1, dt * resp);
     this.vz += (tz - this.vz) * Math.min(1, dt * resp);
     if (Math.abs(this.vx) < 0.01 && Math.abs(this.vz) < 0.01 && !this.impair) { this.vx = 0; this.vz = 0; }
-    if (c.state === 'collapse' || c.seated || c.path) { c.root.userData.vx = 0; return; }
+    if (c.state === 'collapse' || c.state === 'rise' || c.isDead || c.seated || c.path) { c.root.userData.vx = 0; return; }
     const p = this.nav.clamp(c.position.x + this.vx * dt, c.position.z + this.vz * dt);
     const realVx = (p.x - c.position.x) / Math.max(dt, 1e-4);
     const realVz = (p.z - c.position.z) / Math.max(dt, 1e-4);

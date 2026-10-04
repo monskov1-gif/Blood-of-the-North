@@ -470,3 +470,44 @@ export function lightCone(color, height, radius, opacity = 0.06) {
   cone.renderOrder = 4;
   return cone;
 }
+
+/** Fluted foreground column with moulded base and capital (dark wood + brass). */
+export function column(mats, height, radius = 0.2) {
+  const g = new THREE.Group();
+  const wood = pixMat(mats, 'wood', { color: 0x5a3c30, roughness: 0.35 });
+  const dark = pixMat(mats, 'wood', { color: 0x3a2620, roughness: 0.4 });
+  const brass = pixMat(mats, 'brass');
+  const R = radius;
+  // plinth + base mouldings
+  const plinth = new THREE.Mesh(new THREE.BoxGeometry(R * 3, 0.16, R * 3), dark);
+  plinth.position.y = 0.08;
+  const base = new THREE.Mesh(lathe([[0, 0], [R * 1.4, 0], [R * 1.4, 0.05], [R * 1.25, 0.09], [R * 1.3, 0.14], [R * 1.08, 0.2], [R * 1.12, 0.24], [R, 0.3], [0, 0.3]], 40), wood);
+  base.position.y = 0.16;
+  // fluted shaft (flutes carved by displacing the cylinder radius)
+  const shaftH = height - 0.46 - 0.5;
+  const geo = new THREE.CylinderGeometry(R * 0.92, R, shaftH, 96, 8);
+  const pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), z = pos.getZ(i);
+    const a = Math.atan2(z, x);
+    const k = 1 - 0.07 * Math.max(0, Math.cos(a * 20));
+    pos.setX(i, x * k); pos.setZ(i, z * k);
+  }
+  geo.computeVertexNormals();
+  const shaft = new THREE.Mesh(geo, wood);
+  shaft.position.y = 0.46 + shaftH / 2;
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(R * 0.96, 0.018, 8, 40), brass);
+  ring.rotation.x = Math.PI / 2; ring.position.y = 0.46 + shaftH * 0.33;
+  // capital: necking, echinus flare, abacus
+  const capY = 0.46 + shaftH;
+  const cap = new THREE.Mesh(lathe([[0, 0], [R * 0.95, 0], [R * 1.0, 0.04], [R * 0.95, 0.07], [R * 1.05, 0.1], [R * 1.45, 0.24], [R * 1.5, 0.28], [0, 0.28]], 40), wood);
+  cap.position.y = capY;
+  const capRing = new THREE.Mesh(new THREE.TorusGeometry(R * 1.0, 0.02, 8, 40), brass);
+  capRing.rotation.x = Math.PI / 2; capRing.position.y = capY + 0.05;
+  const abacus = new THREE.Mesh(new THREE.BoxGeometry(R * 3.4, 0.12, R * 3.4), dark);
+  abacus.position.y = capY + 0.34;
+  const top = new THREE.Mesh(new THREE.BoxGeometry(R * 3.0, height - capY - 0.4, R * 3.0), dark);
+  top.position.y = capY + 0.4 + (height - capY - 0.4) / 2;
+  g.add(plinth, base, shaft, ring, cap, capRing, abacus, top);
+  return g;
+}

@@ -84,8 +84,26 @@ def save_portrait(rgba, name, height=1100):
     print('portrait', name, img.size)
 
 
+def face_dir(img):
+    """+1 if the figure looks right, -1 if left (skin centroid vs head centroid)."""
+    a = np.asarray(img).astype(float)
+    h = a.shape[0]
+    band = a[: int(h * 0.22)]
+    op = band[..., 3] > 0
+    r, g, b = band[..., 0], band[..., 1], band[..., 2]
+    skin = op & (r > g + 8) & (g > b) & (r > 120)
+    if skin.sum() < 6 or op.sum() < 20:
+        return 0
+    xs = np.indices(op.shape)[1]
+    return 1 if xs[skin].mean() > xs[op].mean() else -1
+
+
 def pixelize(rgba, scale, flip=False, colors=40):
     """Downscale (premultiplied box filter) → hard alpha → limited palette."""
+    rgba = rgba.copy()
+    k = max(1, round(0.55 / scale))
+    solid = nd.binary_erosion(rgba[..., 3] > 200, iterations=k)
+    rgba[..., 3] = np.where(solid, rgba[..., 3], 0)
     h, w = rgba.shape[:2]
     tw, th = max(1, round(w * scale)), max(1, round(h * scale))
     pm = rgba.copy()
@@ -102,6 +120,13 @@ def pixelize(rgba, scale, flip=False, colors=40):
     for _ in range(2):
         nb = nd.convolve(alpha.astype(int), np.ones((3, 3), int), mode='constant') - alpha
         alpha &= ~(alpha & (nb <= 5) & (rgb.sum(2) > 560))
+    # boundary pixels much lighter than the figure next to them are fringe, not figure
+    lum = rgb.sum(2)
+    for _ in range(2):
+        nb = nd.convolve(alpha.astype(int), np.ones((3, 3), int), mode='constant') - alpha
+        edge = alpha & (nb <= 6)
+        inner_mean = nd.uniform_filter(np.where(alpha, lum, 0), 5) / np.maximum(nd.uniform_filter(alpha.astype(float), 5), 1e-3)
+        alpha &= ~(edge & (lum > inner_mean + 90))
     q = Image.fromarray(np.clip(rgb, 0, 255).astype(np.uint8), 'RGB').quantize(
         colors=colors, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE).convert('RGB')
     out = np.dstack([np.asarray(q), alpha.astype(np.uint8) * 255])
@@ -113,6 +138,10 @@ def pixelize(rgba, scale, flip=False, colors=40):
 
 
 def save_raw(img, name):
+    # convention: every profile / seated frame looks to the right (+x)
+    if any(t in name for t in ('_side', 'sit_', '_seat')) and 'back' not in name:
+        if face_dir(img) < 0:
+            img = img.transpose(Image.FLIP_LEFT_RIGHT)
     img.save(os.path.join(RAW, f'raw_{name}.png'))
     print('sprite', name, img.size)
 
@@ -174,3 +203,21 @@ comps.sort(key=lambda c: c[1][1].start)
 SEAT22 = 132 / 660.0
 for (cid, s), n in zip(comps, ['sit_hat', 'sit_suit', 'sit_fur']):
     save_raw(pixelize(figure(a, lab, cid), SEAT22, flip=True), n)
+
+# ------------------------------------------------------------------ Owen (23: seated views, 24: portraits)
+a = load('24.jpg')
+lab, comps = components(a)
+comps.sort(key=lambda c: c[1][1].start)
+for k, (cid, s_) in enumerate(comps):
+    save_portrait(figure(a, lab, cid), f'owen_{k}')
+a = load('23.jpg')
+lab, comps = components(a)
+comps.sort(key=lambda c: c[1][1].start)
+views = ['owen_seat', 'owen_seat_front', 'owen_seat_back']
+for (cid, s_), n in zip(comps, views):
+    f = figure(a, lab, cid)
+    img = pixelize(f, 132 / f.shape[0], flip=(n != 'owen_seat_front'))
+    if n == 'owen_seat_back':
+        img.save(os.path.join(RAW, f'raw_{n}.png')); print('sprite', n, img.size)
+    else:
+        save_raw(img, n)

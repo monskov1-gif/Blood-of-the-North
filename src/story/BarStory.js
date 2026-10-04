@@ -5,6 +5,7 @@ import { CROWD, STOOLS_X, STOOL_Z, STOOL_LIFT } from '../../data/crowd.js';
 import { DIALOGUES } from '../../data/dialogue/bar.js';
 import { paintCocktail } from '../ui/Overlays.js';
 import { sleep } from './Director.js';
+import { installMorning } from './MorningSequence.js';
 
 /**
  * Scene logic for the prologue in the "Northern Rose" bar:
@@ -58,32 +59,41 @@ export class BarStory {
     this.resetPositions();
   }
 
+  /** The cocktail on the table: a 2D pixel sprite (reads better than a tiny 3D glass). */
   makeCoupe() {
+    const atlas = this.g.atlas;
+    const tex = atlas.texture.clone();
+    tex.needsUpdate = true;
+    const mat = new THREE.MeshLambertMaterial({
+      map: tex, emissiveMap: tex, emissive: new THREE.Color(0x9a8a84), alphaTest: 0.5, side: THREE.DoubleSide,
+    });
+    mat.userData.noLightingState = true;
+    const geo = new THREE.PlaneGeometry(1, 1);
+    geo.translate(0, 0.5, 0);
+    const mesh = new THREE.Mesh(geo, mat);
     const g = new THREE.Group();
-    const glass = new THREE.MeshStandardMaterial({ color: 0xdde6f0, transparent: true, opacity: 0.35, roughness: 0.05, depthWrite: false });
-    const bowl = new THREE.Mesh(new THREE.SphereGeometry(0.06, 16, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2.4), glass);
-    bowl.rotation.x = Math.PI; bowl.position.y = 0.15; bowl.scale.y = 0.7;
-    const liquid = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.02, 0.03, 16), new THREE.MeshStandardMaterial({ color: 0x5a0610, emissive: 0x4a0408, emissiveIntensity: 0.6, roughness: 0.1 }));
-    liquid.position.y = 0.135;
-    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.11, 6), glass);
-    stem.position.y = 0.06;
-    const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.004, 14), glass);
-    const cherry = new THREE.Mesh(new THREE.SphereGeometry(0.014, 10, 8), new THREE.MeshStandardMaterial({ color: 0x6a0010, emissive: 0x300006, roughness: 0.2 }));
-    cherry.position.set(0.04, 0.17, 0);
-    g.add(bowl, liquid, stem, foot, cherry);
-    g.userData.liquid = liquid;
-    g.userData.cherry = cherry;
+    g.add(mesh);
+    const setFrame = (name) => {
+      const f = atlas.frame(name);
+      const [W, H] = atlas.size;
+      tex.offset.set(f.x / W, 1 - (f.y + f.h) / H);
+      tex.repeat.set(f.w / W, f.h / H);
+      mesh.scale.set(f.w * 0.0075, f.h * 0.0075, 1);
+    };
+    g.userData.setEmpty = (empty) => setFrame(empty ? 'prop_coupe_big_empty' : 'prop_coupe_big');
+    g.userData.setEmpty(false);
     g.visible = false;
     return g;
   }
 
   resetPositions() {
+    this.resetMorning?.();
     const a = this.scene.anchors;
     const J = this.julian, K = this.kayden;
     J.stand(); J.state = 'idle'; J.fall = 0; J.dizzy = 0; J.setPose('idle'); J.setVisible(true);
     J.placeAt(this.scene.spawns.player.x, this.scene.spawns.player.z, 1);
     K.sit(a.kaydenSeat, -1); K.setPose('idle'); K.setVisible(true);
-    this.owen.sit(a.owenSeat, -1); this.owen.setPose('think'); this.owen.setVisible(true);
+    this.owen.sit(a.owenSeat, -1); this.owen.setPose('idle'); this.owen.setVisible(true);
     this.waiter.stand(); this.waiter.placeAt(4.8, -2.15, -1); this.waiter.setPose('idle'); this.waiter.setVisible(true);
     this.bartender.placeAt(-2.6, -4.2, -1); this.bartender.setPose('idle');
     this.bartender.shadow.visible = false;
@@ -92,8 +102,7 @@ export class BarStory {
     this.placeCrowd();
     this.waiter2.stand(); this.waiter2.placeAt(8.8, -2.2, 1); this.waiter2.setVisible(true);
     this.coupe.visible = false;
-    this.coupe.userData.liquid.visible = true;
-    this.coupe.userData.cherry.visible = true;
+    this.coupe.userData.setEmpty(false);
     for (const c of this.chars.values()) { c.timeScale = 1; c.path = null; if (c.state === 'walk') c.state = 'idle'; }
     this.leaverGone = false;
     this.bgCache.clear();
@@ -165,9 +174,10 @@ export class BarStory {
         await sleep(1.2);
       },
       lookAtOwen: async () => {
-        g.cameraSys.setShot({ x: 10.2, y: 1.9, z: 3.0, lookX: 12.6, lookY: 1.2, lookZ: -1.6, fov: 30 }, 2.2);
+        g.cameraSys.setShot({ x: 12.0, y: 2.0, z: 8.4, lookX: 12.0, lookY: 1.2, lookZ: -1.6, fov: 21 }, 0.9);
         this.julian.faceTowards(this.owen.position.x);
-        await sleep(0.8);
+        await sleep(1.4);
+        this.owen.setPose('think'); // …and now he is looking this way
       },
       mirrorRelease: () => g.cameraSys.setShot(null, 1.2),
       escape: () => {}, // handled after the dialogue ends (runMain)
@@ -276,10 +286,13 @@ export class BarStory {
     }
     W.setPose('idle');
     // the stranger
-    g.cameraSys.setShot({ x: 9.6, y: 1.75, z: 3.4, lookX: 12.4, lookY: 1.15, lookZ: -1.6, fov: 28 }, 1.6);
-    await sleep(1.6);
+    // the camera physically travels along the room to him (side-on, no rotation)
+    g.cameraSys.setShot({ x: 11.8, y: 2.0, z: 8.4, lookX: 11.8, lookY: 1.2, lookZ: -1.6, fov: 21 }, 0.75);
+    this.owen.setPose('think');
+    await sleep(2.6);
     if (S !== this.session) return;
     this.owen.setPose('raise');
+    g.pflash.show('assets/portraits/owen_2.webp', { ms: 3600, side: 'right' });
     for (const n of Object.values(DIALOGUES.owenNod.nodes)) {
       if (!g.state.test(n.if)) continue;
       await g.view.showLine({ speaker: n.speaker, text: n.text, read: false, mode: 'bark' });
@@ -288,6 +301,7 @@ export class BarStory {
     }
     this.owen.setPose('think');
     g.state.set('noticed_owen_cocktail', true);
+    await sleep(0.4);
     g.cameraSys.setShot({ x: 1.6, y: 2.1, z: 7.6, lookX: 1.6, lookY: 1.05, lookZ: 0, fov: 30 }, 1.2);
     await sleep(0.6);
     if (S !== this.session) return;
@@ -315,8 +329,7 @@ export class BarStory {
     await g.insert.show(paintCocktail(), 'Тёмно-красный, почти чёрный. Вишня на шпажке.', 3400);
     if (S !== this.session) return;
     this.julian.setPose('idle');
-    this.coupe.userData.liquid.visible = false;
-    this.coupe.userData.cherry.visible = false;
+    this.coupe.userData.setEmpty(true);
     this.coupe.visible = true;
     g.audio.play('sfx.glass_set');
     g.state.setStage('talk2');
@@ -342,9 +355,10 @@ export class BarStory {
     this.julian.dizzy = 1;
     this.kayden.setPose('think');
     // he is there, by the door — just for a moment
-    this.owen.stand();
-    this.owen.placeAt(-11.4, -1.5, 1);
-    this.owen.setPose('idle');
+    this.windowGuest = this.crowd.find((c) => c.crowd.seat && c.crowd.seat.x === -8.98);
+    this.windowGuest?.setVisible(false);
+    this.owen.sit({ x: -8.98, z: -1.2 }, 1);
+    this.owen.setPose('look');
     this.owen.setVisible(true);
     g.cameraSys.setShot(null, 0.8);
     g.cameraSys.snap();
@@ -395,11 +409,16 @@ export class BarStory {
     await sleep(0.8);
     if (S !== this.session) return;
     g.audio.play('inner.heartbeat', { volume: 0.25 });
-    await sleep(2.4);
+    await sleep(2.6);
     if (S !== this.session) return;
-    g.saves.unblock('escape');
-    g.saves.clear('auto');
-    g.showEnding();
+    // the heartbeat slows down… then only the wind. The morning.
+    g.audio.play('inner.heartbeat', { volume: 0.15 });
+    await sleep(3.2);
+    if (S !== this.session) return;
+    g.audio.play('sfx.wind_gust');
+    await sleep(2.0);
+    if (S !== this.session) return;
+    await this.toMorning();
   }
 
   // ------------------------------------------------------------------ dialogue backgrounds
@@ -492,6 +511,7 @@ export class BarStory {
 
   update(dt) {
     const g = this.g;
+    this.updateMorning(dt);
     const J = this.julian;
     // Kayden calls out when Julian gets close the first time
     if (g.state.stage === 'explore' && !g.state.get('kayden_called') && J.position.x > -3.5) {
@@ -506,7 +526,6 @@ export class BarStory {
         if (c === J || c === this.owen) continue;
         if (Math.random() < dt * 0.6) c.faceTowards(J.position.x);
       }
-      this.owen.faceTowards(J.position.x);
       if (J.position.x < -4.4 || this.escapeT > 26) this.collapse();
     }
   }
@@ -528,6 +547,22 @@ export class BarStory {
     const st = g.state.stage;
     if (data?.leaverGone) { this.leaver.setVisible(false); this.leaverGone = true; }
     const a = this.scene.anchors;
+    if (st === 'morning' || st === 'police' || st === 'ended') {
+      this.setupMorning();
+      g.state.setStage('morning');
+      this.julian.setLife('alive');
+      this.julian.stand();
+      this.julian.placeAt(data?.player?.x ?? 0, data?.player?.z ?? 0.9, data?.player?.facing ?? 1);
+      this.julian.dizzy = 0.15;
+      g.hud.show(true);
+      g.player.enabled = true;
+      g.cameraSys.setShot(null, 1);
+      g.cameraSys.snap();
+      await g.fader.to(false, 1500);
+      if (st !== 'morning') this.policeArrival();
+      else if (g.state.get('kaydenDeathDiscovered')) this.checkPolice();
+      return;
+    }
     if (st === 'explore') {
       this.julian.placeAt(data?.player?.x ?? this.scene.spawns.player.x, data?.player?.z ?? 0.6, data?.player?.facing ?? 1);
       g.hud.show(true);
@@ -544,16 +579,17 @@ export class BarStory {
     g.cameraSys.snap();
     if (g.state.get('drank_cocktail')) {
       this.coupe.position.copy(a.coupeSpot);
-      this.coupe.userData.liquid.visible = false;
-      this.coupe.userData.cherry.visible = false;
+      this.coupe.userData.setEmpty(true);
       this.coupe.visible = true;
     }
     if (g.state.get('owen_left')) this.owen.setVisible(false);
     const phase = g.state.get('phase', 1);
     g.hallucination.setPhase(st === 'escape' || st === 'ended' ? Math.min(4, phase) : phase);
     await g.fader.to(false, 1200);
-    if (st === 'escape' || st === 'ended') { await this.escape(); return; }
+    if (st === 'escape') { await this.escape(); return; }
     const cp = g.dialogue.checkpoint;
     await this.runMain(cp?.dialogue === 'main' ? cp.node : undefined);
   }
 }
+
+installMorning(BarStory);

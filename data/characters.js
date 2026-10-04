@@ -19,9 +19,17 @@ export const CHARACTERS = {
     speed: 1.2,
   },
   owen: {
-    id: 'owen', name: 'Незнакомец', nameEn: 'STRANGER', portrait: null, color: '#5a5a6a',
-    poses: { idle: 'owen_stand', think: 'owen_stand', raise: 'owen_raise' },
+    id: 'owen', name: 'Незнакомец', nameEn: 'STRANGER', portrait: 'owen', color: '#5a5a6a',
+    poses: { idle: 'owen_back', think: 'owen_profile', raise: 'owen_front_raise', look: 'owen_front' },
     layer: 1, selfLight: 0x4a4652,
+  },
+  officer: {
+    id: 'officer', name: 'Полицейский', nameEn: 'OFFICER', color: '#3a4a7a',
+    poses: { idle: 'officer_a', aim: 'officer_a_aim' }, speed: 1.6,
+  },
+  officer2: {
+    id: 'officer2', name: 'Полицейский', nameEn: 'OFFICER', color: '#3a4a7a',
+    poses: { idle: 'officer_b', aim: 'officer_b_aim' }, speed: 1.5,
   },
   bartender: {
     id: 'bartender', name: 'Бармен', nameEn: 'BARTENDER', color: '#8a3030',

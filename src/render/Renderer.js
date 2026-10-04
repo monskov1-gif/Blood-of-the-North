@@ -27,7 +27,7 @@ export class Renderer {
 
     this.base = {
       grain: 0.055, vignette: 0.5, ca: 0.0, blur: 0, exposure: 1, distort: 0, saturation: 0.9,
-      ghost: 0, wave: 0, fade: 0, scan: 0.25, redPulse: 0, bloom: 0.55,
+      ghost: 0, wave: 0, fade: 0, scan: 0.25, redPulse: 0, bloom: 0.55, tint: [1.04, 0.98, 0.92],
     };
     this.layers = new Map();
     this.time = 0;
@@ -78,7 +78,13 @@ export class Renderer {
 
   compose() {
     const out = { ...this.base };
-    for (const l of this.layers.values()) for (const k in l) out[k] = (out[k] ?? 0) + l[k];
+    out.tint = [...this.base.tint];
+    for (const l of this.layers.values()) {
+      for (const k in l) {
+        if (k === 'tint') { out.tint = out.tint.map((v, i) => v + l.tint[i]); continue; }
+        out[k] = (out[k] ?? 0) + l[k];
+      }
+    }
     const fx = this.settings.get('effects');
     // accessibility: effects slider scales the disturbing parts only
     for (const k of ['ca', 'blur', 'distort', 'ghost', 'wave', 'redPulse']) out[k] *= fx;
@@ -102,7 +108,8 @@ export class Renderer {
     u.uFade.value = Math.min(1, Math.max(0, p.fade));
     u.uScan.value = p.scan;
     u.uRedPulse.value = p.redPulse;
-    this.bloom.strength = p.bloom;
+    u.uTint.value = p.tint;
+    this.bloom.strength = Math.max(0, p.bloom);
     this.composer.render(dt);
   }
 

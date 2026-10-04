@@ -75,77 +75,137 @@ export class PhoneView {
   get isOpen() { return !!this.wrap; }
 }
 
-/** Painted close-up of the cocktail (procedural, based on the reference). */
+/** Photo-like close-up of the cocktail (procedural; based on the reference photo). */
 export function paintCocktail() {
-  const W = 600, H = 750;
+  const W = 800, H = 1000;
   const c = document.createElement('canvas');
   c.width = W; c.height = H;
   const ctx = c.getContext('2d');
-  // cream backdrop with soft vignette
-  ctx.fillStyle = '#ece3cf'; ctx.fillRect(0, 0, W, H);
-  const v = ctx.createRadialGradient(W / 2, H * 0.45, 100, W / 2, H / 2, 520);
-  v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(90,60,30,0.25)');
-  ctx.fillStyle = v; ctx.fillRect(0, 0, W, H);
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const rad = (x, y, r0, r1, stops) => { const g = ctx.createRadialGradient(x, y, r0, x, y, r1); stops.forEach(([o, col]) => g.addColorStop(o, col)); return g; };
+  const lin = (x0, y0, x1, y1, stops) => { const g = ctx.createLinearGradient(x0, y0, x1, y1); stops.forEach(([o, col]) => g.addColorStop(o, col)); return g; };
+
+  // --- background: dark bar, out of focus (bokeh), polished table
+  ctx.fillStyle = lin(0, 0, 0, H, [[0, '#120806'], [0.55, '#1e0d08'], [0.62, '#2a120a'], [1, '#0a0403']]);
+  ctx.fillRect(0, 0, W, H);
+  for (let i = 0; i < 46; i++) {
+    const x = rnd() * W, y = rnd() * H * 0.55, r = 20 + rnd() * 60;
+    const hue = rnd() < 0.75 ? `255,${150 + rnd() * 60 | 0},${60 + rnd() * 40 | 0}` : `255,${60 + rnd() * 40 | 0},${50 | 0}`;
+    ctx.fillStyle = rad(x, y, r * 0.6, r, [[0, `rgba(${hue},${0.05 + rnd() * 0.1})`], [0.85, `rgba(${hue},${0.05 + rnd() * 0.05})`], [1, `rgba(${hue},0)`]]);
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  }
+  // table surface with soft reflection band
+  const tableY = H * 0.78;
+  ctx.fillStyle = lin(0, tableY - 40, 0, H, [[0, 'rgba(60,24,12,0)'], [0.1, 'rgba(70,28,14,0.9)'], [1, 'rgba(18,6,3,1)']]);
+  ctx.fillRect(0, tableY - 40, W, H);
+  ctx.fillStyle = 'rgba(255,170,90,0.06)';
+  ctx.fillRect(0, tableY + 4, W, 3);
+
   const cx = W / 2;
-  // foot
-  ctx.fillStyle = 'rgba(210,210,214,0.55)';
-  ctx.beginPath(); ctx.ellipse(cx, 660, 120, 22, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.strokeStyle = 'rgba(120,120,130,0.6)'; ctx.lineWidth = 2; ctx.stroke();
-  ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.beginPath(); ctx.ellipse(cx - 30, 655, 50, 6, 0, 0, Math.PI * 2); ctx.fill();
-  // stem
-  const sg = ctx.createLinearGradient(cx - 8, 0, cx + 8, 0);
-  sg.addColorStop(0, 'rgba(150,150,160,0.7)'); sg.addColorStop(0.5, 'rgba(250,250,255,0.9)'); sg.addColorStop(1, 'rgba(140,140,150,0.7)');
-  ctx.fillStyle = sg;
-  ctx.beginPath(); ctx.moveTo(cx - 14, 420); ctx.quadraticCurveTo(cx - 5, 450, cx - 6, 640); ctx.lineTo(cx + 6, 640); ctx.quadraticCurveTo(cx + 5, 450, cx + 14, 420); ctx.fill();
-  // bowl (coupe)
-  const top = 230, rx = 190;
-  ctx.save();
+  const rimY = 330, rx = 230, ry = 34, bowlDepth = 210;
+  const stemTop = rimY + bowlDepth - 6, footY = tableY + 10;
+
+  // --- caustic: red light thrown on the table by the drink
+  ctx.fillStyle = rad(cx + 40, footY + 30, 10, 220, [[0, 'rgba(220,30,40,0.55)'], [0.4, 'rgba(160,10,24,0.25)'], [1, 'rgba(80,0,10,0)']]);
+  ctx.beginPath(); ctx.ellipse(cx + 40, footY + 30, 240, 46, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(0,0,0,0.45)';
+  ctx.beginPath(); ctx.ellipse(cx - 30, footY + 8, 150, 18, 0, 0, Math.PI * 2); ctx.fill();
+
+  // --- foot
+  ctx.fillStyle = lin(cx - 130, 0, cx + 130, 0, [[0, 'rgba(200,190,185,0.35)'], [0.5, 'rgba(255,245,240,0.15)'], [1, 'rgba(200,190,185,0.4)']]);
+  ctx.beginPath(); ctx.ellipse(cx, footY, 130, 22, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,240,230,0.55)'; ctx.lineWidth = 2; ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.ellipse(cx, footY, 128, 20, 0, Math.PI * 0.95, Math.PI * 1.35); ctx.stroke();
+
+  // --- stem (refracts the background: darker core, bright edges)
+  ctx.fillStyle = lin(cx - 10, 0, cx + 10, 0, [[0, 'rgba(255,240,230,0.7)'], [0.3, 'rgba(90,40,30,0.5)'], [0.6, 'rgba(255,220,200,0.35)'], [1, 'rgba(255,240,230,0.65)']]);
+  ctx.beginPath();
+  ctx.moveTo(cx - 18, stemTop); ctx.quadraticCurveTo(cx - 6, stemTop + 40, cx - 7, footY - 12);
+  ctx.lineTo(cx + 7, footY - 12); ctx.quadraticCurveTo(cx + 6, stemTop + 40, cx + 18, stemTop); ctx.fill();
+  ctx.fillStyle = 'rgba(200,30,40,0.35)'; ctx.fillRect(cx - 2, stemTop + 10, 4, footY - stemTop - 30);
+
+  // --- bowl path
   const bowl = new Path2D();
-  bowl.moveTo(cx - rx, top);
-  bowl.bezierCurveTo(cx - rx, top + 170, cx - 60, top + 200, cx, top + 200);
-  bowl.bezierCurveTo(cx + 60, top + 200, cx + rx, top + 170, cx + rx, top);
-  bowl.closePath();
+  bowl.moveTo(cx - rx, rimY);
+  bowl.bezierCurveTo(cx - rx, rimY + bowlDepth * 0.75, cx - 70, rimY + bowlDepth, cx, rimY + bowlDepth);
+  bowl.bezierCurveTo(cx + 70, rimY + bowlDepth, cx + rx, rimY + bowlDepth * 0.75, cx + rx, rimY);
+  bowl.ellipse(cx, rimY, rx, ry, 0, 0, Math.PI, false);
+  ctx.save();
   ctx.clip(bowl);
-  // liquid: deep red with depth
-  const lq = ctx.createLinearGradient(0, top + 40, 0, top + 200);
-  lq.addColorStop(0, '#6e0a14'); lq.addColorStop(0.5, '#8a1420'); lq.addColorStop(1, '#4a040c');
-  ctx.fillStyle = lq; ctx.fillRect(0, top + 40, W, 200);
-  const glowG = ctx.createRadialGradient(cx - 20, top + 150, 5, cx, top + 150, 160);
-  glowG.addColorStop(0, 'rgba(230,60,60,0.55)'); glowG.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = glowG; ctx.fillRect(0, top, W, 220);
-  // foam band
-  const fg = ctx.createLinearGradient(0, top + 22, 0, top + 46);
-  fg.addColorStop(0, '#d8b8a0'); fg.addColorStop(1, '#a8705a');
-  ctx.fillStyle = fg; ctx.fillRect(0, top + 20, W, 26);
-  // condensation dots
-  for (let i = 0; i < 220; i++) {
-    const x = cx - rx + Math.random() * rx * 2, y = top + 50 + Math.random() * 150;
-    ctx.fillStyle = `rgba(255,220,220,${Math.random() * 0.25})`;
-    ctx.beginPath(); ctx.arc(x, y, Math.random() * 2.5, 0, Math.PI * 2); ctx.fill();
+  // liquid body: deep red, lit from behind-left
+  const liqTop = rimY + 26;
+  ctx.fillStyle = lin(0, liqTop, 0, rimY + bowlDepth, [[0, '#7c0a16'], [0.45, '#8f1220'], [1, '#3a0208']]);
+  ctx.fillRect(0, liqTop, W, bowlDepth);
+  ctx.fillStyle = rad(cx - 40, rimY + 120, 10, 210, [[0, 'rgba(255,90,90,0.75)'], [0.35, 'rgba(220,40,50,0.45)'], [1, 'rgba(60,0,10,0)']]);
+  ctx.fillRect(0, liqTop, W, bowlDepth);
+  // refraction of the bokeh inside the drink
+  for (let i = 0; i < 14; i++) {
+    const x = cx - rx + rnd() * rx * 2, y = liqTop + 30 + rnd() * 120;
+    ctx.fillStyle = rad(x, y, 2, 18, [[0, 'rgba(255,190,120,0.35)'], [1, 'rgba(255,190,120,0)']]);
+    ctx.beginPath(); ctx.ellipse(x, y, 22, 10, 0, 0, Math.PI * 2); ctx.fill();
+  }
+  // darker edges (glass thickness)
+  ctx.strokeStyle = 'rgba(30,0,4,0.55)'; ctx.lineWidth = 26; ctx.stroke(bowl);
+  // foam meniscus with bubbles
+  ctx.fillStyle = lin(0, liqTop - 18, 0, liqTop + 16, [[0, '#e8cdb8'], [0.6, '#c9957c'], [1, '#8a3a30']]);
+  ctx.beginPath(); ctx.ellipse(cx, liqTop, rx - 14, ry - 6, 0, 0, Math.PI * 2); ctx.fill();
+  for (let i = 0; i < 420; i++) {
+    const a = rnd() * Math.PI * 2, rr = Math.sqrt(rnd());
+    const x = cx + Math.cos(a) * (rx - 16) * rr, y = liqTop + Math.sin(a) * (ry - 8) * rr;
+    const br = 0.6 + rnd() * 2.6;
+    ctx.fillStyle = `rgba(255,240,228,${0.25 + rnd() * 0.5})`;
+    ctx.beginPath(); ctx.arc(x, y, br, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(120,60,40,0.25)'; ctx.lineWidth = 0.6; ctx.stroke();
+  }
+  // condensation droplets
+  for (let i = 0; i < 260; i++) {
+    const x = cx - rx + 10 + rnd() * (rx * 2 - 20), y = liqTop + 24 + rnd() * (bowlDepth - 40);
+    const r = 1 + rnd() * rnd() * 6;
+    ctx.fillStyle = 'rgba(40,0,6,0.35)'; ctx.beginPath(); ctx.arc(x + r * 0.3, y + r * 0.4, r, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,170,170,0.3)'; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.beginPath(); ctx.arc(x - r * 0.35, y - r * 0.35, Math.max(0.6, r * 0.3), 0, Math.PI * 2); ctx.fill();
   }
   ctx.restore();
-  // glass rim + highlight
-  ctx.strokeStyle = 'rgba(160,160,170,0.8)'; ctx.lineWidth = 2.5;
-  ctx.beginPath(); ctx.ellipse(cx, top, rx, 16, 0, 0, Math.PI * 2); ctx.stroke();
-  ctx.stroke(bowl);
-  ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 5;
-  ctx.beginPath(); ctx.moveTo(cx - rx + 18, top + 20); ctx.bezierCurveTo(cx - rx + 14, top + 110, cx - 110, top + 160, cx - 70, top + 180); ctx.stroke();
-  // pick + cherry
-  ctx.strokeStyle = '#9a9aa4'; ctx.lineWidth = 3;
-  ctx.beginPath(); ctx.moveTo(cx + 20, top - 18); ctx.lineTo(cx + 260, top - 8); ctx.stroke();
-  ctx.beginPath(); ctx.arc(cx + 18, top - 18, 6, 0, Math.PI * 2); ctx.stroke();
-  const ch = ctx.createRadialGradient(cx + 132, top - 30, 4, cx + 140, top - 16, 34);
-  ch.addColorStop(0, '#c43040'); ch.addColorStop(0.4, '#6a0a14'); ch.addColorStop(1, '#2a0206');
-  ctx.fillStyle = ch;
-  ctx.beginPath(); ctx.arc(cx + 140, top - 14, 30, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = 'rgba(255,255,255,0.75)'; ctx.beginPath(); ctx.ellipse(cx + 128, top - 28, 7, 4, -0.5, 0, Math.PI * 2); ctx.fill();
-  ctx.strokeStyle = '#7a1018'; ctx.lineWidth = 4; ctx.lineCap = 'round';
-  ctx.beginPath(); ctx.moveTo(cx + 142, top - 42); ctx.bezierCurveTo(cx + 150, top - 110, cx + 160, top - 150, cx + 180, top - 190); ctx.stroke();
-  // film grain
+  // glass above the liquid (thin, transparent)
+  ctx.strokeStyle = 'rgba(255,245,235,0.6)'; ctx.lineWidth = 2.2;
+  ctx.beginPath(); ctx.ellipse(cx, rimY, rx, ry, 0, 0, Math.PI * 2); ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,255,255,0.95)'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.ellipse(cx, rimY, rx, ry, 0, Math.PI * 1.05, Math.PI * 1.45); ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,240,230,0.45)'; ctx.lineWidth = 2; ctx.stroke(bowl);
+  // specular streaks
+  ctx.fillStyle = lin(cx - rx + 20, 0, cx - rx + 60, 0, [[0, 'rgba(255,255,255,0)'], [0.5, 'rgba(255,255,255,0.75)'], [1, 'rgba(255,255,255,0)']]);
+  ctx.beginPath();
+  ctx.moveTo(cx - rx + 22, rimY + 16); ctx.bezierCurveTo(cx - rx + 26, rimY + 110, cx - 150, rimY + 170, cx - 110, rimY + 192);
+  ctx.lineTo(cx - 100, rimY + 182); ctx.bezierCurveTo(cx - 140, rimY + 150, cx - rx + 52, rimY + 100, cx - rx + 46, rimY + 18); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.beginPath(); ctx.ellipse(cx + rx - 60, rimY + 70, 6, 40, -0.4, 0, Math.PI * 2); ctx.fill();
+
+  // --- cocktail pick (metal) and cherry
+  ctx.strokeStyle = lin(cx - 40, 0, cx + 330, 0, [[0, '#8a8a92'], [0.5, '#f0f0f6'], [1, '#6a6a72']]);
+  ctx.lineWidth = 5; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(cx - 40, rimY - 22); ctx.lineTo(cx + 320, rimY - 6); ctx.stroke();
+  ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(cx - 50, rimY - 26, 11, 0, Math.PI * 2); ctx.stroke();
+  const chx = cx + 170, chy = rimY - 24, chr = 42;
+  ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.ellipse(chx + 10, rimY + 4, 40, 9, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = rad(chx - 14, chy - 16, 4, chr * 1.1, [[0, '#e0505e'], [0.25, '#9a0e22'], [0.7, '#4a0210'], [1, '#1a0006']]);
+  ctx.beginPath(); ctx.arc(chx, chy, chr, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = rad(chx + 20, chy + 22, 2, 30, [[0, 'rgba(255,60,60,0.45)'], [1, 'rgba(255,60,60,0)']]);
+  ctx.beginPath(); ctx.arc(chx, chy, chr, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.95)'; ctx.beginPath(); ctx.ellipse(chx - 16, chy - 18, 10, 6, -0.6, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.beginPath(); ctx.ellipse(chx + 18, chy - 6, 4, 9, 0.3, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = lin(0, chy - 200, 0, chy - 30, [[0, '#3a0a0a'], [1, '#7a1a14']]);
+  ctx.lineWidth = 6;
+  ctx.beginPath(); ctx.moveTo(chx + 2, chy - 36); ctx.bezierCurveTo(chx + 10, chy - 110, chx + 24, chy - 160, chx + 52, chy - 220); ctx.stroke();
+
+  // --- photographic finish: vignette + grain + slight warm grade
+  ctx.fillStyle = rad(W / 2, H * 0.48, H * 0.25, H * 0.75, [[0, 'rgba(0,0,0,0)'], [1, 'rgba(0,0,0,0.65)']]);
+  ctx.fillRect(0, 0, W, H);
   const img = ctx.getImageData(0, 0, W, H);
   for (let i = 0; i < img.data.length; i += 4) {
-    const n = (Math.random() - 0.5) * 14;
-    img.data[i] += n; img.data[i + 1] += n; img.data[i + 2] += n;
+    const n = (rnd() - 0.5) * 16;
+    img.data[i] += n + 3; img.data[i + 1] += n; img.data[i + 2] += n - 2;
   }
   ctx.putImageData(img, 0, 0);
   return c;
@@ -178,15 +238,17 @@ export class EndingScreen {
 
   async show(state) {
     const e = this.el = el('div', 'ending', this.root);
-    const t = el('div', 't', e, 'BLOOD <em>OF THE</em> NORTH');
+    const t = el('div', 't', e, '<span class="title-lockup"><span class="w">BLOOD</span><span class="of">of the</span><span class="w">NORTH</span></span>');
     const d = el('div', 'd', e, `DEMO v${VERSION} COMPLETE · ДЕМО ЗАВЕРШЕНО`);
     const f = state.flags;
     const found = state.interacted.size;
     const stats = el('div', 'stats', e, [
-      `Осмотрено мест: ${found} из 14.`,
+      `Осмотрено мест: ${found} из 26.`,
       f.noticed_owen ? 'Вы заметили незнакомца до того, как он заметил вас.' : 'Незнакомец остался для вас просто лицом в толпе.',
       f.mirror_anomaly ? 'Вы видели, что зеркало его не отражает.' : '',
       f.heard_voicemail ? 'Вы прослушали голосовое Лиззи.' : '',
+      f.saw_wounds ? 'Вы видели проколы на шее.' : '',
+      f.memory_flash ? 'Вы почти вспомнили, что было в бокале.' : '',
     ].filter(Boolean).join(' '));
     const btns = el('div', 'btns', e);
     const cont = el('button', '', btns, 'Продолжить<small>ГЛАВА 1 · СКОРО</small>');
@@ -205,4 +267,24 @@ export class EndingScreen {
   }
 
   hide() { this.el?.remove(); this.el = null; }
+}
+
+/** A painted portrait sliding in over the 3D scene (cutscene close-ups, memory flashes). */
+export class PortraitFlash {
+  constructor(root) {
+    this.el = el('div', 'pflash', root);
+    this.img = el('img', '', this.el);
+    this.img.alt = '';
+  }
+
+  async show(src, { ms = 2600, side = 'right', flash = false } = {}) {
+    this.img.src = src;
+    this.el.className = `pflash ${side}${flash ? ' memory' : ''}`;
+    await new Promise((r) => (this.img.complete ? r() : (this.img.onload = r)));
+    void this.el.offsetWidth;
+    this.el.classList.add('show');
+    await wait(ms);
+    this.el.classList.remove('show');
+    await wait(600);
+  }
 }

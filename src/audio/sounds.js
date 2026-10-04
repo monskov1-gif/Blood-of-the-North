@@ -94,7 +94,105 @@ export const SOUND_DEFS = {
     loop: (am, out) => noiseBed(am, out, { freq: 380, q: 0.6, vol: 0.5, wobble: 0.9, rate: 0.08 }),
   },
 
+  // ---------------------------------------------------------------- morning
+  'amb.room': {
+    bus: 'ambience', volume: 0.5,
+    loop(am, out) {
+      const c = am.ctx;
+      const o = c.createOscillator(); o.type = 'sine'; o.frequency.value = 58;
+      const o2 = c.createOscillator(); o2.type = 'sine'; o2.frequency.value = 117;
+      const g = c.createGain(); g.gain.value = 0.05;
+      o.connect(g); o2.connect(g); g.connect(out);
+      o.start(); o2.start();
+      const bed = noiseBed(am, out, { type: 'lowpass', freq: 220, q: 0.4, vol: 0.25, wobble: 0.2, rate: 0.04 });
+      return () => { o.stop(); o2.stop(); bed(); };
+    },
+  },
+  'amb.morning': {
+    bus: 'ambience', volume: 0.8,
+    loop(am, out) {
+      let alive = true;
+      const tick = () => {
+        if (!alive) return;
+        const t = am.ctx.currentTime + 0.05;
+        const r = Math.random();
+        if (r < 0.3) { // creak
+          const o = am.ctx.createOscillator(); o.type = 'sawtooth';
+          o.frequency.setValueAtTime(140 + Math.random() * 80, t); o.frequency.linearRampToValueAtTime(110 + Math.random() * 60, t + 0.6);
+          const f = am.ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 700; f.Q.value = 8;
+          const g = am.ctx.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.05, t + 0.2); g.gain.linearRampToValueAtTime(0, t + 0.7);
+          o.connect(f).connect(g).connect(out); o.start(t); o.stop(t + 0.75);
+        } else if (r < 0.65) { // water drop
+          tone(am, out, t, { freq: 1400 + Math.random() * 500, slide: 700, dur: 0.12, vol: 0.06 });
+        } else if (r < 0.75) { // a shard of glass settling
+          clink(am, out, t, 0.03);
+        }
+        setTimeout(tick, 1800 + Math.random() * 4500);
+      };
+      tick();
+      return () => { alive = false; };
+    },
+  },
+  'inner.breath': {
+    bus: 'inner', volume: 0.55,
+    loop(am, out) {
+      let alive = true;
+      const cycle = () => {
+        if (!alive) return;
+        const t = am.ctx.currentTime + 0.02;
+        noise(am, out, t, { freq: 700, q: 0.8, dur: 1.1, vol: 0.18, attack: 0.5 });
+        noise(am, out, t + 1.4, { freq: 520, q: 0.8, dur: 1.4, vol: 0.13, attack: 0.25 });
+        setTimeout(cycle, 3300 + Math.random() * 600);
+      };
+      cycle();
+      return () => { alive = false; };
+    },
+  },
+  'amb.siren': {
+    bus: 'ambience', volume: 0.6,
+    loop(am, out) {
+      const c = am.ctx;
+      const o = c.createOscillator(); o.type = 'sawtooth';
+      const lfo = c.createOscillator(); lfo.type = 'triangle'; lfo.frequency.value = 0.55;
+      const lg = c.createGain(); lg.gain.value = 260;
+      o.frequency.value = 900;
+      lfo.connect(lg).connect(o.frequency);
+      const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 1600;
+      const g = c.createGain(); g.gain.value = 0.18;
+      o.connect(f).connect(g).connect(out);
+      o.start(); lfo.start();
+      return () => { o.stop(); lfo.stop(); };
+    },
+  },
+
   // ---------------------------------------------------------------- sfx
+  'sfx.cardoor': {
+    volume: 0.7,
+    synth: (am, out, t) => {
+      tone(am, out, t, { freq: 90, slide: 50, dur: 0.18, vol: 0.6 });
+      noise(am, out, t, { type: 'lowpass', freq: 900, dur: 0.15, vol: 0.5 });
+      tone(am, out, t + 0.02, { type: 'square', freq: 2200, dur: 0.02, vol: 0.05 });
+    },
+  },
+  'sfx.shouts': {
+    volume: 0.6,
+    synth: (am, out, t) => {
+      for (let i = 0; i < 6; i++) noise(am, out, t + i * 0.22 + Math.random() * 0.1, { freq: 500 + Math.random() * 400, q: 5, dur: 0.18, vol: 0.25, attack: 0.02 });
+    },
+  },
+  'sfx.door_bang': {
+    volume: 0.9,
+    synth: (am, out, t) => {
+      tone(am, out, t, { freq: 70, slide: 35, dur: 0.5, vol: 0.8 });
+      noise(am, out, t, { type: 'lowpass', freq: 600, dur: 0.35, vol: 0.6 });
+      noise(am, out, t + 0.05, { freq: 300, sweep: 1400, q: 0.8, dur: 1.4, vol: 0.25, attack: 0.3 });
+    },
+  },
+  'sfx.wind_gust': {
+    volume: 0.6,
+    synth: (am, out, t) => noise(am, out, t, { freq: 260, sweep: 900, q: 0.6, dur: 2.6, vol: 0.35, attack: 0.8 }),
+  },
+
   'sfx.step': {
     volume: 0.5,
     synth: (am, out, t) => {
@@ -218,6 +316,20 @@ export const SOUND_DEFS = {
   'ui.select': {
     bus: 'ui', volume: 0.4,
     synth: (am, out, t) => { tone(am, out, t, { freq: 660, dur: 0.12, vol: 0.12 }); tone(am, out, t + 0.05, { freq: 990, dur: 0.18, vol: 0.08 }); },
+  },
+  // clock hand being wound to a new item: ratchet ticks + a soft clunk (opts.rate = tick count)
+  'ui.clock': {
+    bus: 'ui', volume: 0.5,
+    synth: (am, out, t, opts = {}) => {
+      const n = opts.rate || 4;
+      for (let i = 0; i < n; i++) {
+        const tt = t + i * (0.36 / n) + Math.random() * 0.008;
+        noise(am, out, tt, { type: 'highpass', freq: 3200, dur: 0.018, vol: 0.32, attack: 0.001 });
+        tone(am, out, tt, { freq: 2600 + (i % 2) * 400, dur: 0.03, vol: 0.05, type: 'square' });
+      }
+      tone(am, out, t + 0.42, { freq: 180, slide: 120, dur: 0.09, vol: 0.18 });
+      noise(am, out, t + 0.42, { type: 'bandpass', freq: 1200, q: 2, dur: 0.06, vol: 0.2 });
+    },
   },
   'ui.advance': { bus: 'ui', volume: 0.2, synth: (am, out, t) => tone(am, out, t, { freq: 1200, dur: 0.04, vol: 0.06, type: 'triangle' }) },
   'ui.open': { bus: 'ui', volume: 0.35, synth: (am, out, t) => noise(am, out, t, { freq: 1500, q: 1, dur: 0.25, vol: 0.15, attack: 0.05 }) },

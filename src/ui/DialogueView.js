@@ -283,6 +283,9 @@ export class DialogueView {
     this.typedText = '';
     this.typing = true;
     target.textContent = '';
+    // a previous distorted line must not leave the blur on
+    target.classList.remove('distort');
+    target.style.removeProperty('--blur');
     const fast = (this.skip || this.input.skipHeld) && line.read;
     const cps = fast ? 400 : 22 + this.settings.get('textSpeed') * 70;
     let i = 0;

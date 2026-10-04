@@ -18,7 +18,7 @@ import { HUD } from '../ui/HUD.js';
 import { DialogueView, preloadPortraits } from '../ui/DialogueView.js';
 import { TouchControls } from '../ui/TouchControls.js';
 import { MainMenu, Panels } from '../ui/Menus.js';
-import { Fader, PhoneView, Insert, EndingScreen } from '../ui/Overlays.js';
+import { Fader, PhoneView, Insert, EndingScreen, PortraitFlash } from '../ui/Overlays.js';
 import { el } from '../ui/dom.js';
 import { SCENES } from '../world/scenes/index.js';
 import { DIALOGUES } from '../../data/dialogue/index.js';
@@ -52,7 +52,7 @@ export class Game {
   }
 
   async boot() {
-    preloadPortraits();
+    preloadPortraits(['julian', 'kayden', 'waiter', 'owen']);
     this.progress(0.1, 'персонажи…');
     this.atlas = await new SpriteAtlas().load();
     this.progress(0.35, 'бар «Северная Роза»…');
@@ -78,6 +78,7 @@ export class Game {
     this.hud = new HUD({ root, bus: this.bus, input: this.input, state: this.state });
     this.touch = new TouchControls({ root, input: this.input, bus: this.bus, settings: this.settings });
     this.insert = new Insert(root);
+    this.pflash = new PortraitFlash(root);
     this.phone = new PhoneView({ root, bus: this.bus, audio: this.audio, state: this.state });
     this.ending = new EndingScreen({ root, bus: this.bus, audio: this.audio });
 
@@ -301,7 +302,7 @@ export class Game {
       this.player.update(canMove ? dt : dt);
       for (const c of this.characters.values()) c.update(dt);
       if (this.mode === 'play') {
-        this.interactions.enabled = this.player.enabled && !this.blocked && this.state.stage === 'explore';
+        this.interactions.enabled = this.player.enabled && !this.blocked && (this.state.stage === 'explore' || this.state.stage === 'morning');
         this.interactions.update(this.story.julian);
         this.story.update(dt);
       } else {

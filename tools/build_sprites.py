@@ -182,9 +182,6 @@ for name in ['julian_idle', 'julian_talk', 'julian_think',
              'waiter_idle', 'waiter_talk', 'waiter_hands']:
     frames[name] = load(name)
 
-frames['owen_idle'] = make_owen('kayden_idle')
-frames['owen_think'] = make_owen('kayden_think')
-frames['owen_raise'] = make_owen('kayden_talk')
 frames['patron_a'] = make_patron_from_julian()
 frames['patron_b'] = make_patron_from_kayden('kayden_idle')
 frames['patron_b_talk'] = make_patron_from_kayden('kayden_talk')
@@ -195,23 +192,90 @@ frames['waiter2'] = make_waiter2()
 frames['prop_coupe'] = coupe(True)
 frames['prop_coupe_empty'] = coupe(False)
 
-# Owen raises a glass: put a coupe in the extended hand
-raise_ = frames['owen_raise']
-op = raise_[..., 3] > 0
-ys, xs = np.where(op[60:110] & (np.indices(op[60:110].shape)[1] > raise_.shape[1] - 14))
-if len(ys):
-    hy = 60 + int(ys.min()); hx = int(xs.max()) - 8
-    g = coupe(True)
-    for yy in range(g.shape[0]):
-        for xx in range(g.shape[1]):
-            if g[yy, xx, 3] > 0:
-                ty, tx = hy - 12 + yy, hx + xx
-                if 0 <= ty < raise_.shape[0]:
-                    if tx >= raise_.shape[1]:
-                        pad = tx - raise_.shape[1] + 1
-                        raise_ = np.pad(raise_, ((0, 0), (0, pad), (0, 0)))
-                    raise_[ty, tx] = g[yy, xx]
-    frames['owen_raise'] = raise_
+# police officers for the morning: Kayden's uniform sprite, re-dressed, no moustache, other hair
+def make_officer(src, hair, coat=(38, 48, 78)):
+    a = load(src)
+    s_, v = hsv(a)
+    y = rows(a); op = opaque(a)
+    warm = (a[..., 0] > a[..., 2] + 25)
+    skin = op & warm & (v > 0.5) & (s_ > 0.3)
+    for yy in range(21, 29):
+        for xx in range(a.shape[1]):
+            if not op[yy, xx] or skin[yy, xx]:
+                continue
+            up = skin[max(0, yy - 3):yy, xx].any()
+            dn = skin[yy + 1:yy + 4, xx].any()
+            right = skin[yy, xx + 1:xx + 3].any() if xx + 1 < a.shape[1] else False
+            if up and (dn or right) and v[yy, xx] < 0.45:
+                a[yy, xx, :3] = [150, 112, 98]
+                skin[yy, xx] = True
+    jacket = op & ~skin & (v > 0.22) & (s_ > 0.18) & (y > 26)
+    a = regrade(a, jacket, coat, value_scale=0.8)
+    hairm = op & ~skin & (y < 22)
+    a = regrade(a, hairm, hair, value_scale=1.0, keep_luma=0.75)
+    return a
+
+
+def add_gun(a):
+    a = a.copy()
+    op = a[..., 3] > 0
+    # the extended hand: right-most opaque pixels between rows 70 and 100
+    band = op[70:100]
+    ys, xs = np.where(band)
+    if not len(xs):
+        return a
+    hx = int(xs.max()); hy = 70 + int(ys[xs.argmax()])
+    pad = 12
+    a = np.pad(a, ((0, 0), (0, pad), (0, 0)))
+    gun = [(0, 0), (0, 1), (0, 2), (0, 3), (0, 4), (0, 5), (0, 6), (0, 7), (-1, 1), (-1, 2), (-1, 3), (-1, 4), (-1, 5), (-1, 6), (1, 1), (2, 1), (3, 1), (1, 2), (2, 2)]
+    for dy, dx in gun:
+        yy, xx = hy + dy - 1, hx + dx + 1
+        if 0 <= yy < a.shape[0] and xx < a.shape[1]:
+            a[yy, xx] = [24, 24, 28, 255]
+    a[hy - 2, hx + 2] = [90, 90, 100, 255]
+    return a
+
+
+frames['officer_a'] = make_officer('kayden_idle', (60, 44, 34))
+frames['officer_a_aim'] = add_gun(make_officer('kayden_talk', (60, 44, 34)))
+frames['officer_b'] = make_officer('kayden_idle', (176, 140, 90), coat=(30, 34, 44))
+frames['officer_b_aim'] = add_gun(make_officer('kayden_talk', (176, 140, 90), coat=(30, 34, 44)))
+
+# readable 2D cocktail for the table (drawn large, then reduced to pixel art)
+def big_coupe(full=True, W=26, H=34, S=8):
+    from PIL import ImageDraw
+    img = Image.new('RGBA', (W * S, H * S), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    cx = W * S // 2
+    rim_y, bowl_h, rx = 7 * S, 9 * S, 11 * S
+    glass = (215, 225, 235, 150)
+    edge = (235, 240, 248, 235)
+    # bowl
+    d.chord([cx - rx, rim_y - bowl_h, cx + rx, rim_y + bowl_h], 0, 180, fill=glass, outline=edge, width=S)
+    if full:
+        d.chord([cx - rx + S, rim_y - bowl_h + S, cx + rx - S, rim_y + bowl_h - S], 0, 180, fill=(112, 10, 24, 255))
+        d.rectangle([cx - rx + S, rim_y, cx + rx - S, rim_y + S], fill=(214, 168, 150, 255))  # foam line
+        d.ellipse([cx - 4 * S, rim_y + 2 * S, cx + 2 * S, rim_y + 5 * S], fill=(170, 30, 44, 255))  # glow
+    d.line([cx - rx, rim_y, cx + rx, rim_y], fill=edge, width=S)
+    # stem and foot
+    d.rectangle([cx - S // 2, rim_y + bowl_h - S, cx + S // 2, (H - 3) * S], fill=edge)
+    d.ellipse([cx - 7 * S, (H - 4) * S, cx + 7 * S, (H - 1) * S], fill=glass, outline=edge, width=S)
+    # highlight
+    d.line([cx - rx + 2 * S, rim_y + S, cx - rx + 4 * S, rim_y + 5 * S], fill=(255, 255, 255, 220), width=S)
+    if full:
+        # pick + cherry
+        d.line([cx - 2 * S, rim_y - 2 * S, cx + rx + 2 * S, rim_y - S], fill=(170, 170, 185, 255), width=S)
+        d.ellipse([cx + 4 * S, rim_y - 6 * S, cx + 10 * S, rim_y], fill=(110, 6, 22, 255), outline=(60, 0, 10, 255), width=S // 2)
+        d.ellipse([cx + 5 * S, rim_y - 5 * S, cx + 7 * S, rim_y - 3 * S], fill=(240, 140, 150, 255))
+        d.line([cx + 8 * S, rim_y - 6 * S, cx + 11 * S, rim_y - 12 * S], fill=(90, 10, 16, 255), width=S)
+    small = img.resize((W, H), Image.BOX)
+    a = np.asarray(small).astype(float)
+    a[..., 3] = np.where(a[..., 3] > 70, np.clip(a[..., 3] * 1.3, 0, 255), 0)
+    return a
+
+
+frames['prop_coupe_big'] = big_coupe(True)
+frames['prop_coupe_big_empty'] = big_coupe(False)
 
 # ---------------------------------------------------------------- seated poses
 HIP, KNEE = 96, 134
@@ -303,20 +367,18 @@ def noir(a):
     return a
 
 
-frames['owen_seat'] = noir(load('sit_suit'))
-seat_raise = frames['owen_seat'].copy()
+# Owen: painted seated views supplied for him (profile / front / back)
+frames['owen_profile'] = load('owen_seat')
+frames['owen_front'] = load('owen_seat_front')
+frames['owen_back'] = load('owen_seat_back')
+raise_ = frames['owen_front'].copy()
 g = coupe(True)
-hy, hx = 44, seat_raise.shape[1] - 30
+hy, hx = 50, raise_.shape[1] // 2 + 6
 for yy in range(g.shape[0]):
     for xx in range(g.shape[1]):
-        if g[yy, xx, 3] > 0 and 0 <= hx + xx < seat_raise.shape[1]:
-            seat_raise[hy + yy, hx + xx] = g[yy, xx]
-frames['owen_raise_seat'] = seat_raise
-frames['owen_stand'] = noir(load('npc_smoker_front'))
-for pose in ['idle', 'think']:
-    ALIASES[f'owen_{pose}_sit'] = 'owen_seat'
-ALIASES['owen_raise_sit'] = 'owen_raise_seat'
-ALIASES['owen_stand_sit'] = 'owen_seat'
+        if g[yy, xx, 3] > 0 and 0 <= hx + xx < raise_.shape[1]:
+            raise_[hy + yy, hx + xx] = g[yy, xx]
+frames['owen_front_raise'] = raise_
 
 # crowd (painted sheets → pixel art)
 import glob as _glob
@@ -398,8 +460,8 @@ def walk(a, amp, front_dark):
     return out
 
 
-for name in ['julian_idle', 'kayden_idle', 'waiter_idle', 'waiter2', 'owen_idle', 'patron_a', 'patron_b', 'woman', 'bartender_idle',
-             'npc_cap_side', 'npc_glasses_side', 'npc_vest_side', 'npc_fedora_side']:
+for name in ['julian_idle', 'kayden_idle', 'waiter_idle', 'waiter2', 'patron_a', 'patron_b', 'woman', 'bartender_idle',
+             'npc_cap_side', 'npc_glasses_side', 'npc_vest_side', 'npc_fedora_side', 'officer_a', 'officer_b']:
     if name not in frames: continue
     frames[name + '_walk1'] = walk(frames[name], 7, False)
     frames[name + '_walk2'] = walk(frames[name], 7, True)

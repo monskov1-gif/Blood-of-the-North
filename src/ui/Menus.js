@@ -7,6 +7,8 @@ const STAGE_LABEL = {
   talk1: 'Разговор с Кайденом',
   talk2: 'После коктейля',
   escape: 'Воздух…',
+  morning: 'Утро. Место преступления',
+  police: 'Утро. Полиция',
   ended: 'Конец демо',
 };
 
@@ -22,7 +24,7 @@ export class MainMenu {
     this.audio = audio;
     this.saves = saves;
     const m = this.el = el('div', 'mainmenu hidden', root);
-    el('div', 'mm-title', m, `<h1>BLOOD <em>OF THE</em><br>NORTH</h1><div class="sub">ДЕМО v${VERSION} · ПРОЛОГ · YUKON</div>`);
+    el('div', 'mm-title', m, `<h1><span class="title-lockup"><span class="w">BLOOD</span><span class="of">of the</span><span class="w">NORTH</span></span></h1><div class="sub">ДЕМО v${VERSION} · ПРОЛОГ · YUKON</div>`);
     this.dossier = el('div', 'dossier', m);
     const ring = this.ring = el('div', 'ring', m);
     ring.innerHTML = ringSVG();
@@ -55,8 +57,8 @@ export class MainMenu {
       b.addEventListener('focus', () => this.point(i));
       b.addEventListener('click', () => {
         if (b.disabled || this.pending) return;
-        this.point(i, true);
-        this.audio.play('ui.select');
+        this.point(i);
+        setTimeout(() => this.audio.play('ui.select'), 420);
         this.pending = true;
         // the clock hand swings to the item first, then the item fires
         setTimeout(() => { this.pending = false; this.bus.emit('menu', d.act); }, 500);
@@ -104,8 +106,11 @@ export class MainMenu {
     if (this.sel === i) return;
     this.sel = i;
     this.entries.forEach((e, k) => e.b.classList.toggle('sel', k === i));
+    const prev = this.ang ?? this.entries[i].ang;
+    this.ang = this.entries[i].ang;
     this.pointer.style.transform = `rotate(${this.entries[i].ang}deg)`;
-    if (!silent) this.audio.play('ui.hover');
+    // the clock mechanism: one tick per few degrees of travel, then a soft clunk
+    if (!silent) this.audio.play('ui.clock', { volume: 1, rate: Math.min(6, Math.max(2, Math.round(Math.abs(this.ang - prev) / 6))) });
   }
 
   renderDossier(save) {

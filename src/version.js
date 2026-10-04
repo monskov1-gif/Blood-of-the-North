@@ -1,2 +1,2 @@
 /** Demo build version — bumped by one step (0.01) with every code revision. */
-export const VERSION = '0.02';
+export const VERSION = '0.03';
