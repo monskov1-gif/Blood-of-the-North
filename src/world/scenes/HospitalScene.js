@@ -912,14 +912,18 @@ export class HospitalScene extends LocationBase {
     this.cy(0.2, 0.2, 0.02, 10, this.mat('steelDark'), -4.7, 0.02, -6.0);
     // upper cabinets with glass doors and bottles
     const cab = this.mat('hCabinetW');
-    this.bx(1.5, 0.6, 0.32, cab, -4.85, 2.15, -6.6);
+    this.bx(1.5, 0.6, 0.03, cab, -4.85, 2.15, -6.73);
+    for (const y of [1.86, 2.44]) this.bx(1.5, 0.03, 0.32, cab, -4.85, y, -6.6);
+    for (const x of [-5.59, -4.85, -4.11]) this.bx(0.03, 0.6, 0.32, cab, x, 2.15, -6.6);
+    this.bx(1.5, 0.3, 0.3, cab, -4.85, 0.45, -6.62);
+    this.bx(1.52, 0.03, 0.34, this.mat('hWorkTop'), -4.85, 0.615, -6.6);
     this.box(0.7, 0.5, 0.01, this.mat('hGlass'), -5.22, 2.15, -6.43);
     this.box(0.7, 0.5, 0.01, this.mat('hGlass'), -4.48, 2.15, -6.43);
     const r = rng(19);
     for (let i = 0; i < 12; i++) {
       const x = -5.5 + i * 0.11 + r() * 0.02;
       const hh = 0.08 + r() * 0.1;
-      this.cy(0.025, 0.025, hh, 8, this.matV('hBottles', { color: 0xffffff, roughness: 0.3 }), x, (i < 6 ? 1.92 : 2.18) + hh / 2, -6.55, { color: [0xd8a040, 0xe8e8e8, 0x6a9ad0, 0xa04020, 0xf0f0f0][(r() * 5) | 0] });
+      this.cy(0.025, 0.025, hh, 8, this.matV('hBottles', { color: 0xffffff, roughness: 0.3 }), x, (i < 6 ? 1.875 : 2.165) + hh / 2, -6.6, { color: [0xd8a040, 0xe8e8e8, 0x6a9ad0, 0xa04020, 0xf0f0f0][(r() * 5) | 0] });
     }
     this.bx(1.4, 0.015, 0.28, cab, -4.85, 2.16, -6.58);
     // left wall: sharps, gloves, BP cuff; right wall: eye chart, instrument tray
