@@ -377,7 +377,7 @@ const paintTex = (key, base, chip) => ptex(key, 16, 16, (ctx, W, Hh, r) => {
 });
 
 const woolTex = () => ptex('wool', 16, 32, (ctx, W, Hh, r) => {
-  paint(ctx, W, Hh, (x, y) => { const v = ((x + y) % 3 === 0 ? -6 : 0) + ((x - y + 64) % 5 === 0 ? 5 : 0) + (r() - 0.5) * 8; return [46 + v, 44 + v, 50 + v]; });
+  paint(ctx, W, Hh, (x, y) => { const v = ((x + y) % 3 === 0 ? -6 : 0) + ((x - y + 64) % 5 === 0 ? 5 : 0) + (r() - 0.5) * 8; return [72 + v, 62 + v, 58 + v]; });
 });
 
 const manilaTex = () => ptex('manila', 16, 16, (ctx, W, Hh, r) => {
@@ -496,7 +496,7 @@ export class InterrogationScene extends LocationBase {
       red.box(0.012, 0.025, 6.8, s * (SIDE - 0.034), 0.81, 0.4);
     }
     chan.mesh(this.mat('panicChan', { color: 0x15181a, roughness: 0.6 }), root);
-    red.mesh(this.mat('panicRed', { color: 0x8a1414, roughness: 0.5, emissive: 0x220202 }), root);
+    red.mesh(this.mat('panicRed', { color: 0x5a1010, roughness: 0.5, emissive: 0x080000 }), root);
 
     // acoustic panels on the side walls (perforated, stained)
     const acTex = ptex('acoustic', 32, 32, (ctx, W, Hh, r) => {
@@ -581,8 +581,7 @@ export class InterrogationScene extends LocationBase {
         ctx.fillStyle = `rgba(12,12,14,${0.25 + r() * 0.35})`;
         for (let a = a0; a < a0 + len; a += 0.05) ctx.fillRect((32 + Math.cos(a) * rad) | 0, (32 + Math.sin(a) * rad) | 0, 1, 1);
       }
-      for (let i = 0; i < 30; i++) { ctx.fillStyle = 'rgba(190,196,196,0.25)'; ctx.fillRect(16 + r() * 32, 16 + r() * 32, 2, 1); }
-    });
+          });
     this.decal('scuffs', scuffTex, 1.1, 1.1, -0.62, 0.007, -1.0, { floor: true });
     this.decal('scuffs', scuffTex, 1.1, 1.1, 1.66, 0.007, -1.0, { floor: true, rz: 2.1 });
     const drainTex = ptex('drain', 32, 32, (ctx, W, Hh, r) => {
@@ -647,9 +646,9 @@ export class InterrogationScene extends LocationBase {
         if (a > 0) { ctx.fillStyle = `rgba(150,160,160,${a})`; ctx.fillRect(x, y, 1, 1); }
       }
       // wiped arcs
-      for (let k = 0; k < 4; k++) {
+      for (let k = 0; k < 3; k++) {
         const cx = 15 + r() * 66, cy = 10 + r() * 16, rad = 8 + r() * 10;
-        for (let a = 3.4; a < 5.9; a += 0.04) { ctx.fillStyle = 'rgba(190,200,200,0.1)'; ctx.fillRect((cx + Math.cos(a) * rad) | 0, (cy + Math.sin(a) * rad * 0.6 + 6) | 0, 2, 1); }
+        for (let a = 3.6; a < 5.6; a += 0.09) { if (r() < 0.5) continue; ctx.fillStyle = 'rgba(190,200,200,0.05)'; ctx.fillRect((cx + Math.cos(a) * rad) | 0, (cy + Math.sin(a) * rad * 0.6 + 6) | 0, 1, 1); }
       }
       // palm and finger prints low on the glass
       for (const [cx, cy] of [[30, 28], [58, 30], [64, 24]]) {
@@ -665,14 +664,13 @@ export class InterrogationScene extends LocationBase {
     // fake reflection: the lit table along the bottom, the lamp cone, a hot spot at the top
     const reflTex = canvasTexture('ir-refl', 128, 48, (ctx, w, h) => {
       ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, h);
-      let g;
       const tx = (0.5 - (MX - 1.6)) / 3.2 * w; // table centre in mirror px
-      g = ctx.createLinearGradient(0, h - 14, 0, h);
-      g.addColorStop(0, 'rgba(160,170,180,0)'); g.addColorStop(0.6, 'rgba(160,170,180,0.55)'); g.addColorStop(1, 'rgba(160,170,180,0.1)');
-      ctx.save(); ctx.beginPath(); ctx.ellipse(tx, h - 5, 30, 8, 0, 0, 6.3); ctx.clip(); ctx.fillStyle = g; ctx.fillRect(0, 0, w, h); ctx.restore();
+      let g = ctx.createRadialGradient(tx, h - 6, 2, tx, h - 6, 34);
+      g.addColorStop(0, 'rgba(170,180,190,0.5)'); g.addColorStop(1, 'rgba(170,180,190,0)');
+      ctx.save(); ctx.scale(1, 0.3); ctx.fillStyle = g; ctx.fillRect(0, (h - 40) / 0.3, w, 120 / 0.3); ctx.restore();
       g = ctx.createLinearGradient(0, 0, 0, h);
-      g.addColorStop(0, 'rgba(200,210,230,0.35)'); g.addColorStop(1, 'rgba(200,210,230,0)');
-      ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(tx - 5, 0); ctx.lineTo(tx + 5, 0); ctx.lineTo(tx + 26, h - 8); ctx.lineTo(tx - 26, h - 8); ctx.fill();
+      g.addColorStop(0, 'rgba(200,210,230,0.22)'); g.addColorStop(0.8, 'rgba(200,210,230,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(tx - 4, 0); ctx.lineTo(tx + 4, 0); ctx.lineTo(tx + 22, h); ctx.lineTo(tx - 22, h); ctx.fill();
       g = ctx.createRadialGradient(tx, 2, 0, tx, 2, 10); g.addColorStop(0, 'rgba(255,255,255,0.9)'); g.addColorStop(1, 'rgba(255,255,255,0)');
       ctx.fillStyle = g; ctx.fillRect(0, 0, w, 14);
       // two diagonal sheen bands
@@ -738,7 +736,7 @@ export class InterrogationScene extends LocationBase {
       note(4, 4, 9, 11, '#d8d6cc'); note(16, 6, 8, 10, '#e0d890'); note(28, 3, 11, 13, '#d8d6cc'); note(8, 18, 10, 10, '#c8c8c0'); note(33, 18, 9, 9, '#a8b0b8');
       ctx.strokeStyle = 'rgba(170,20,20,0.9)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(8, 4); ctx.lineTo(33, 3); ctx.lineTo(37, 18); ctx.stroke();
     });
-    this.plane(1.2, 0.8, this.mat('obsCork', { map: cork, roughness: 1 }), 0.45, 1.6, OB + 0.03);
+    this.plane(1.2, 0.8, this.mat('obsCork', { map: cork, color: 0x6a6a6a, roughness: 1 }), 0.45, 1.6, OB + 0.03);
     this.anchors.observers = [{ x: -0.3, z: BACK - 1.4 }, { x: 1.2, z: BACK - 1.5 }];
   }
 
@@ -848,7 +846,7 @@ export class InterrogationScene extends LocationBase {
     root.add(hour);
     const guard = new Batch();
     guard.add(new THREE.TorusGeometry(0.205, 0.006, 4, 24), 2.7, 2.25, BACK + 0.07);
-    for (let i = 0; i < 4; i++) guard.box(0.41, 0.006, 0.006, 2.7, 2.25, BACK + 0.075, 0, 0, i * Math.PI / 4);
+    for (const gx of [-0.1, 0, 0.1]) guard.box(0.006, 0.4 - Math.abs(gx) * 1.2, 0.006, 2.7 + gx, 2.25, BACK + 0.075);
     guard.mesh(this.darkSteel, root);
     this.anchors.clock = new THREE.Vector3(2.7, 2.25, BACK + 0.1);
 
@@ -874,7 +872,7 @@ export class InterrogationScene extends LocationBase {
     rad.box(0.86, 0.04, 0.08, 2.805, 0.68, BACK + 0.12);
     rad.box(0.86, 0.04, 0.08, 2.805, 0.16, BACK + 0.12);
     for (const x of [2.44, 3.18]) rad.box(0.04, 0.12, 0.04, x, 0.06, BACK + 0.12);
-    rad.mesh(this.mat('irRadiator', { map: paintTex('radpaint', [176, 168, 146], '#6e4a2a'), roughness: 0.75 }), root);
+    rad.mesh(this.mat('irRadiator', { map: paintTex('radpaint', [176, 168, 146], '#6e4a2a'), color: 0x8c887c, roughness: 0.75 }), root);
     const pipe = new Batch();
     pipe.rod(0.016, [3.3, 0.0, BACK + 0.12], [3.3, 0.22, BACK + 0.12]).rod(0.016, [3.3, 0.22, BACK + 0.12], [3.22, 0.22, BACK + 0.12]);
     pipe.cyl(0.03, 0.05, 2.36, 0.62, BACK + 0.12, 0, 0, Math.PI / 2, 8);
@@ -908,7 +906,7 @@ export class InterrogationScene extends LocationBase {
     const root = this.root;
     const steel = this.steelMat;
     // table: scuffed steel top, rolled edge, apron, legs bolted to the floor
-    const top = this.mat('irTable', { map: tableTex(), color: 0xc8ccd0, roughness: 0.45, metalness: 0.35 });
+    const top = this.mat('irTable', { map: tableTex(), color: 0x9a9ea4, roughness: 0.5, metalness: 0.35 });
     this.box(1.6, 0.05, 0.9, top, 0.5, 0.76, -1.0);
     const fr = new Batch();
     fr.box(1.62, 0.03, 0.02, 0.5, 0.765, -0.55); fr.box(1.62, 0.03, 0.02, 0.5, 0.765, -1.45);
@@ -931,7 +929,7 @@ export class InterrogationScene extends LocationBase {
     this.colliders.push({ box: { minX: -0.35, maxX: 1.35, minZ: -1.5, maxZ: -0.5 } });
 
     // chairs (Julian's is bolted down and has an ankle ring)
-    const seatMat = this.mat('irSeat', { map: paintTex('seat', [64, 70, 74], '#9aa0a4'), roughness: 0.6, metalness: 0.2 });
+    const seatMat = this.mat('irSeat', { map: paintTex('seat', [64, 70, 74], '#30363a'), roughness: 0.6, metalness: 0.2 });
     const chair = (x, ry, bolted) => {
       const g = new THREE.Group();
       const b = new Batch();
@@ -966,7 +964,7 @@ export class InterrogationScene extends LocationBase {
 
     // case folders, an open file, photos face-down, notepad and pen
     const manila = this.mat('irManila', { map: manilaTex(), color: 0xffffff, roughness: 0.9 });
-    const paper = this.mat('irPaper', { color: 0xdcdcd2, roughness: 1 });
+    const paper = this.mat('irPaper', { color: 0xa8a8a0, roughness: 1 });
     const stack = new THREE.Group();
     for (let i = 0; i < 3; i++) {
       const f = this.box(0.33, 0.012, 0.24, manila, (i - 1) * 0.008, 0.006 + i * 0.014, (i % 2) * 0.01, stack);
@@ -984,12 +982,12 @@ export class InterrogationScene extends LocationBase {
       for (let y = 3; y < Hh - 2; y += 2) ctx.fillRect(2, y, 5 + r() * 9, 1);
       ctx.fillStyle = '#1a1a1a'; ctx.fillRect(10, 3, 4, 5); // mugshot box
     });
-    const sheetMat = this.mat('irSheet', { map: sheetTex, roughness: 1 });
+    const sheetMat = this.mat('irSheet', { map: sheetTex, color: 0xb0b0a8, roughness: 1 });
     this.plane(0.21, 0.26, sheetMat, -0.12, 0.006, 0, 0, openFile).rotation.set(-Math.PI / 2, 0, 0.04);
     this.plane(0.21, 0.26, sheetMat, 0.12, 0.007, 0, 0, openFile).rotation.set(-Math.PI / 2, 0, -0.05);
     openFile.position.set(1.0, TOP, -0.78); openFile.rotation.y = 0.18;
     root.add(openFile);
-    const photoMat = this.mat('irPhoto', { map: photoBackTex(), roughness: 0.6 });
+    const photoMat = this.mat('irPhoto', { map: photoBackTex(), color: 0xa8a8a0, roughness: 0.6 });
     [[0.38, -0.8, 0.25], [0.47, -0.77, -0.1], [0.56, -0.82, -0.42]].forEach(([x, z, r], i) => {
       const ph = this.plane(0.1, 0.15, photoMat, x, TOP + 0.002 + i * 0.001, z);
       ph.rotation.set(-Math.PI / 2, 0, r);
@@ -1079,8 +1077,6 @@ export class InterrogationScene extends LocationBase {
     // a hard pool on the table and floor
     const pool = lightPool(0xe8eeff, 2.8, 2.2, 0.12);
     pool.rotation.x = -Math.PI / 2; pool.position.set(0.5, 0.013, -1.0); root.add(pool);
-    const tablePool = lightPool(0xfff8f0, 1.5, 0.9, 0.12);
-    tablePool.rotation.x = -Math.PI / 2; tablePool.position.set(0.5, TOP + 0.003, -1.0); root.add(tablePool);
     // dust turning slowly in the beam
     this.beamDust = new BeamDust(new THREE.Vector3(0.5, 2.15, -1.0), 1.3, 0.25, 0.9, this.low ? 70 : 170);
     root.add(this.beamDust.points);
@@ -1143,7 +1139,7 @@ export class InterrogationScene extends LocationBase {
     spare.mesh(steel, fg2);
     this.box(0.44, 0.04, 0.42, this.mat('irSeat', {}), 0.45, 0.47, 0, fg2);
     this.box(0.03, 0.3, 0.4, this.mat('irSeat', {}), 0.675, 0.83, 0, fg2).rotation.z = -0.08;
-    fg2.position.set(1.95, 0, 2.2);
+    fg2.position.set(1.62, 0, 2.35);
     fg2.rotation.y = -0.3;
     root.add(fg2);
     this.foregroundGroups.push(fg2);
