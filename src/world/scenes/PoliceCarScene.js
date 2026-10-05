@@ -378,7 +378,7 @@ export class PoliceCarScene extends LocationBase {
     this.B(5.2, 0.08, 1.8, body, 0.2, 0.25, -0.6);
     this.B(2.5, 0.012, 1.7, mat, -1.05, FLOOR + 0.006, -0.6);
     this.B(1.9, 0.012, 1.7, mat, 1.45, FLOOR + 0.006, -0.6);
-    this.B(0.3, 0.06, 1.7, body, 0.32, FLOOR + 0.03, -0.6); // transmission hump base under the partition
+    this.B(0.3, 0.04, 1.2, this.mat('carDark', { color: 0x141518, roughness: 0.7 }), 0.32, FLOOR + 0.02, -0.8); // partition footing
     // roof: headliner + steel + paint, cut face toward the camera
     this.B(5.0, 0.04, 1.8, head, 0.2, 1.71, -0.6);
     this.B(5.0, 0.03, 1.82, body, 0.2, 1.745, -0.6);
@@ -447,9 +447,9 @@ export class PoliceCarScene extends LocationBase {
     const steel = this.mat('steel', { color: 0x9aa0a6, metalness: 0.9, roughness: 0.3 });
 
     // one-piece molded plastic bench: pan, lip, pedestal, backrest, side wings
-    this.B(1.35, 0.1, 1.5, bench, -1.25, 0.54, -0.62);
-    this.B(0.07, 0.14, 1.5, bench, -0.56, 0.52, -0.62).rotation.z = -0.2;
-    this.B(1.2, 0.22, 1.45, dark, -1.3, 0.4, -0.65);
+    this.B(1.35, 0.1, 1.0, bench, -1.25, 0.54, -0.92);
+    this.B(0.07, 0.14, 1.0, bench, -0.56, 0.52, -0.92).rotation.z = -0.2;
+    this.B(1.2, 0.22, 0.95, dark, -1.3, 0.4, -0.94);
     const back = this.B(0.1, 0.8, 1.5, bench, -1.93, 0.98, -0.62);
     back.rotation.z = 0.12;
     this.B(0.14, 0.06, 1.5, bench, -1.98, 1.4, -0.62).rotation.z = 0.12;
@@ -457,7 +457,7 @@ export class PoliceCarScene extends LocationBase {
     this.B(1.1, 0.04, 0.08, bench, -1.25, 0.6, -0.9);
     // seat-belt buckles + limp belt on the far side, hanging from the C pillar
     const belt = this.mat('belt', { color: 0x1c1e22, roughness: 0.9 });
-    for (const z of [-0.95, -0.12]) { this.B(0.05, 0.04, 0.03, dark, -1.55, 0.61, z); this.B(0.02, 0.012, 0.03, steel, -1.52, 0.633, z); }
+    for (const z of [-1.1, -0.5]) { this.B(0.05, 0.04, 0.03, dark, -1.55, 0.61, z); this.B(0.02, 0.012, 0.03, steel, -1.52, 0.633, z); }
     const sb = this.B(0.045, 0.85, 0.008, belt, -1.82, 1.15, FAR + 0.08);
     sb.rotation.z = -0.32;
     this.B(0.05, 0.03, 0.02, steel, -1.68, 0.76, FAR + 0.09);
@@ -529,7 +529,7 @@ export class PoliceCarScene extends LocationBase {
     const chrome = this.mat('chromeDull', { color: 0xb0b6bc, metalness: 0.8, roughness: 0.35 });
 
     // seats: driver (near) and passenger (far)
-    for (const [z, near] of [[-0.3, true], [-1.0, false]]) {
+    for (const [z, near] of [[-0.44, true], [-1.08, false]]) {
       this.B(0.62, 0.14, 0.55, seat, 1.15, 0.55, z);
       this.B(0.62, 0.05, 0.08, seat, 1.15, 0.64, z - 0.24); // far bolster
       this.B(0.5, 0.18, 0.5, dark, 1.15, 0.39, z);
@@ -546,10 +546,10 @@ export class PoliceCarScene extends LocationBase {
     this.B(0.26, 0.004, 0.2, this.mat('paperYellow', { color: 0xe8d890, roughness: 0.95 }), 0.03, 0.004, 0.01, clip).rotation.y = 0.08;
     this.B(0.04, 0.02, 0.1, chrome, -0.13, 0.015, 0, clip);
     for (let i = 0; i < 5; i++) this.B(0.18, 0.002, 0.008, dark, 0.03, 0.013, -0.07 + i * 0.03, clip);
-    clip.position.set(1.15, 0.635, -1.0); clip.rotation.set(0, 0.25, 0.04);
+    clip.position.set(1.15, 0.635, -1.08); clip.rotation.set(0, 0.25, 0.04);
     root.add(clip);
     const fl = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.026, 0.3, 8), this.mat('maglite', { color: 0x16181c, roughness: 0.4, metalness: 0.6 }));
-    fl.rotation.z = Math.PI / 2; fl.rotation.y = 0.5; fl.position.set(1.3, 0.645, -1.18); root.add(fl);
+    fl.rotation.z = Math.PI / 2; fl.rotation.y = 0.5; fl.position.set(1.3, 0.645, -1.26); root.add(fl);
 
     // front door card: armrest, chrome handle, switch pack, map pocket with papers, speaker
     this.B(1.95, 0.64, 0.05, trim, 1.25, 0.65, FAR + 0.025);
@@ -683,7 +683,7 @@ export class PoliceCarScene extends LocationBase {
     // sky + the low winter sun behind cloud
     const sky = new THREE.Mesh(new THREE.PlaneGeometry(160, 60), new THREE.MeshBasicMaterial({ map: skyTex(), depthWrite: false }));
     sky.position.set(0, 14, -70); root.add(sky);
-    const sun = glow(0xffd8b0, 22, 0.35); sun.position.set(-14, 5, -66); root.add(sun);
+    const sun = glow(0xffd8b0, 16, 0.28); sun.position.set(14, 10, -66); root.add(sun);
     layer(mountainTex(), 140, 22, 0, 6.5, -55, 2, 0.25, 0xc8d0dc);
     layer(treeTex(), 60, 9, 0, 3.4, -24, 4, 1.8, 0xb8c2cc);
     const town = layer(townTex(), 26, 13, 0, 6.2, -10, 2, 3.6, 0xd4d8de);
@@ -831,14 +831,14 @@ export class PoliceCarScene extends LocationBase {
 
   buildLighting() {
     const root = this.root;
-    const hemi = new THREE.HemisphereLight(0x9aabc2, 0x1a1c20, 1.5);
+    const hemi = new THREE.HemisphereLight(0x9aabc2, 0x1a1c20, 1.15);
     const day = new THREE.DirectionalLight(0xd0dcef, 0.9);
     day.position.set(-1, 4, 3);
     // window light spilling onto the rear bench (Julian) and the driver
-    const fill = new THREE.PointLight(0xc4d2e8, 7, 3.6, 1.3);
-    fill.position.set(-1.0, 1.55, -0.7);
+    const fill = new THREE.PointLight(0xc4d2e8, 4.5, 3.6, 1.3);
+    fill.position.set(-0.7, 1.45, 0.5);
     const front = new THREE.PointLight(0xc4d2e8, 4, 3.2, 1.4);
-    front.position.set(1.15, 1.55, -0.9);
+    front.position.set(1.15, 1.3, -0.5);
     const dash = new THREE.PointLight(0x5a9ac8, 3, 2.2, 1.6);
     dash.position.set(1.85, 1.3, -0.45);
     root.add(hemi, day, fill, front, dash);
@@ -900,8 +900,8 @@ export class PoliceCarScene extends LocationBase {
       const k = this.sweepRun / 1.4;
       this.sweep.position.x = 3.0 - k * 6.0;
       this.sweep.material.opacity = Math.sin(Math.min(1, k) * Math.PI) * 0.22;
-      this.lights.fill.intensity = 7 + Math.sin(Math.min(1, k) * Math.PI) * 2.5 * Math.max(0, 1 - Math.abs(this.sweep.position.x + 1.1));
-      if (k >= 1) { this.sweepRun = -1; this.sweep.material.opacity = 0; this.lights.fill.intensity = 7; }
+      this.lights.fill.intensity = 4.5 + Math.sin(Math.min(1, k) * Math.PI) * 2.5 * Math.max(0, 1 - Math.abs(this.sweep.position.x + 1.1));
+      if (k >= 1) { this.sweepRun = -1; this.sweep.material.opacity = 0; this.lights.fill.intensity = 4.5; }
     }
     // wheels, engine/road vibration, steering corrections
     for (const w of this.wheels) w.rotation.z -= dt * v / 0.34;
