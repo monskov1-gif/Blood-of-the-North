@@ -262,7 +262,7 @@ export class HospitalScene extends LocationBase {
     const bed = this.bed(bedX, bedZ);
     const mon = this.monitor(bedX - 1.45, 1.45, BACK - 2.9);
     const iv = this.ivStand(bedX - 1.25, BACK - 1.3, patient ? 0x8a0010 : 0xdde8f0);
-    this.officeChair(x1 - 0.5, BACK - 1.0, -0.6);
+    this.officeChair(x1 - 0.45, BACK - 3.0, -0.9);
     const sink = new THREE.Group();
     this.box(0.5, 0.12, 0.4, this.mat('sink', { color: 0xf0f2f2 }), 0, 0.85, 0, sink);
     this.box(0.04, 0.2, 0.04, this.mat('steel', { color: 0x9aa0a6, metalness: 0.9, roughness: 0.3 }), 0, 1.0, -0.15, sink);

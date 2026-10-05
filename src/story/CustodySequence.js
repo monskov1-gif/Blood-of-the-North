@@ -100,9 +100,11 @@ const methods = {
   lieInBed(spot, dir = -1) {
     const J = this.julian;
     J.stand();
-    J.placeAt(spot.x + 0.95, spot.z, 1);
+    // the sprite lies in the screen plane, so put it on the near edge of the
+    // mattress — otherwise the bed itself hides him
+    J.placeAt(spot.x + 0.95, spot.z + 0.5, 1);
     J.lieDown(dir);
-    J.root.position.y = 0.66;
+    J.root.position.y = 0.62;
     J.shadow.visible = false;
   },
 
