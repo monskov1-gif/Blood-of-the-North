@@ -410,14 +410,14 @@ export class BarStory {
     await sleep(0.8);
     if (S !== this.session) return;
     g.audio.play('inner.heartbeat', { volume: 0.25 });
-    await sleep(2.6);
+    await sleep(1.6);
     if (S !== this.session) return;
     // the heartbeat slows down… then only the wind. The morning.
     g.audio.play('inner.heartbeat', { volume: 0.15 });
-    await sleep(3.2);
+    await sleep(1.8);
     if (S !== this.session) return;
     g.audio.play('sfx.wind_gust');
-    await sleep(2.0);
+    await sleep(0.8);
     if (S !== this.session) return;
     await this.toMorning();
   }

@@ -358,6 +358,9 @@ export class PoliceCarScene extends LocationBase {
     this.anchors.window = new THREE.Vector3(-1.1, 1.25, -1.4);
     this.anchors.cuffs = new THREE.Vector3(-0.95, 0.95, -0.2);
     this.anchors.outsideFront = new THREE.Vector3(1.2, 1.25, -1.4);
+    // painted VN backdrop: from the back seat, past the cage to the dash and the road
+    this.shots = { car: { pos: [-1.6, 1.25, 0.15], look: [0.9, 1.1, -0.9], fov: 62 } };
+    this.vnHide = [];
     this.anchors.cage = new THREE.Vector3(0.52, 1.25, -0.2);
     this.anchors.radio = new THREE.Vector3(2.05, 1.1, -0.95);
     return this.root;

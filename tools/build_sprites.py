@@ -458,6 +458,40 @@ CAST = {
 }
 frames.update(CAST)
 
+# ---------------------------------------------------------------- v0.06 painted batch (tools/process_art2.py)
+V06 = ['cop_blond_idle', 'cop_blond_aim', 'cop_red_idle', 'cop_red_aim', 'quinn_idle', 'quinn_aim',
+       'nurse_red', 'nurse_red_wave', 'medic_m', 'medic_m_wave', 'doctor_f', 'doctor_f_wave',
+       'nurse_white', 'nurse_white_wave', 'nurse_blue', 'nurse_blue_wave', 'wyatt_seat',
+       'lie_glasses', 'lie_green', 'lie_soldier', 'lie_burgundy', 'lie_vest', 'lie_maid',
+       'lie_julian', 'lie_kayden', 'lie_waiter']
+for n in V06:
+    frames[n] = load(n)
+# Wyatt standing (he only came seated): the blond constable, greyed at the temples
+frames['wyatt_stand'] = frames['cop_blond_idle'] * 0.55 + grey_hair(frames['cop_blond_idle'], 0.1) * 0.45
+frames['wyatt_stand'][..., 3] = frames['cop_blond_idle'][..., 3]
+if os.path.exists(f'{RAW}/raw_quinn_drive.png'):
+    frames['quinn_drive'] = load('quinn_drive')
+else:
+    # until her driving sheet is processed: her upper body over the seated legs of
+    # Wyatt's sprite (same uniform trousers and boots), scaled to her height
+    def quinn_seated():
+        up = frames['quinn_idle'][:96]
+        legs = frames['wyatt_seat'][66:]
+        lh, lw = legs.shape[:2]
+        k = 0.8
+        legs = np.asarray(Image.fromarray(legs.clip(0, 255).astype(np.uint8), 'RGBA').resize(
+            (round(lw * k), round(lh * k)), Image.NEAREST)).astype(float)
+        lh, lw = legs.shape[:2]
+        ox = 7  # her back over the back of the seat
+        W_ = max(up.shape[1], ox + lw)
+        out = np.zeros((96 + lh, W_, 4), float)
+        out[96:96 + lh, ox:ox + lw] = legs
+        top = up
+        m = top[..., 3] > 0
+        out[:96, :top.shape[1]][m] = top[m]
+        return out
+    frames['quinn_drive'] = quinn_seated()
+
 # ---------------------------------------------------------------- walk cycle
 WALK_HIP = 112
 
@@ -486,7 +520,8 @@ def walk(a, amp, front_dark):
 
 
 for name in ['julian_idle', 'kayden_idle', 'waiter_idle', 'waiter2', 'patron_a', 'patron_b', 'woman', 'bartender_idle',
-             'npc_cap_side', 'npc_glasses_side', 'npc_vest_side', 'npc_fedora_side', 'officer_a', 'officer_b', 'doctor_side', 'nurse_side']:
+             'npc_cap_side', 'npc_glasses_side', 'npc_vest_side', 'npc_fedora_side', 'officer_a', 'officer_b', 'doctor_side', 'nurse_side',
+             'cop_blond_idle', 'cop_red_idle', 'quinn_idle', 'wyatt_stand', 'nurse_red', 'medic_m', 'doctor_f', 'nurse_white', 'nurse_blue']:
     if name not in frames: continue
     frames[name + '_walk1'] = walk(frames[name], 7, False)
     frames[name + '_walk2'] = walk(frames[name], 7, True)

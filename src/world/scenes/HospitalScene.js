@@ -611,6 +611,9 @@ export class HospitalScene extends LocationBase {
 
     this.dustFx = this.dust(new THREE.Box3(new THREE.Vector3(-22, 0.3, -3.5), new THREE.Vector3(22, 2.8, 2)), 300);
     this.setState('day');
+    // painted VN backdrop: ward 209 seen from the corridor
+    this.shots = { ward: { pos: [18.4, 1.6, -1.4], look: [18.8, 1.15, -6.8], fov: 56 } };
+    this.vnHide = [];
     return root;
   }
 

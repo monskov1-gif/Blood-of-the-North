@@ -48,6 +48,7 @@ const methods = {
       ch.setVisible(true);
       if (b.pose === 'lying') {
         ch.stand();
+        ch.setLieFrame(b.lie);
         ch.placeAt(b.x, b.z, b.dir);
         ch.root.position.y = 0;
         ch.setPose('idle');
@@ -154,25 +155,30 @@ const methods = {
     g.cameraSys.setShot({ x: JULIAN_WAKE.x + 0.6, y: 0.55, z: JULIAN_WAKE.z + 2.6, lookX: JULIAN_WAKE.x - 0.4, lookY: 0.2, lookZ: JULIAN_WAKE.z - 0.4, fov: 42 }, 2);
     g.cameraSys.snap();
     g.renderer.setLayer('wake', { blur: 1.4, vignette: 0.5, exposure: -0.3 });
-    await sleep(2.5);
+    // auto-advancing thoughts (no tap needed) while the image comes back
+    const think = async (id) => {
+      for (const n of Object.values(g.dialogue.dialogues[id].nodes)) {
+        if (S !== this.session) return;
+        g.dialogue.history.push({ speaker: n.speaker, text: n.text });
+        if (n.set) for (const [k, v] of Object.entries(n.set)) g.state.set(k, v);
+        await g.view.flash(n.speaker, n.text, 1500 + n.text.length * 40);
+      }
+    };
+    await sleep(0.6);
     if (S !== this.session) return;
     g.audio.play('inner.heartbeat', { volume: 0.3 });
-    await sleep(1.6);
     const ring = g.audio.loop('inner.ring', { volume: 0.6, fade: 3 });
-    await g.dialogue.start('m_wake');
+    // the image comes back slowly (floor first) while the first thoughts surface
+    await Promise.all([g.fader.to(false, 3000), think('m_wake')]);
     if (S !== this.session) return;
-    // the image comes back slowly: floor first
-    await g.fader.to(false, 5200);
-    if (S !== this.session) return;
-    await sleep(1.0);
     ring?.stop(5);
     // getting up: the camera tilts with him, the picture swims
     g.cameraSys.setShot({ x: JULIAN_WAKE.x + 0.3, y: 1.6, z: JULIAN_WAKE.z + 5.2, lookX: JULIAN_WAKE.x - 0.2, lookY: 0.9, lookZ: JULIAN_WAKE.z, fov: 36 }, 0.6);
     g.cameraSys.sway = 0.35;
-    await this.julian.riseUp(4.2);
+    await this.julian.riseUp(3.4);
     if (S !== this.session) return;
     g.renderer.clearLayer('wake');
-    await g.dialogue.start('m_wake2');
+    await think('m_wake2');
     if (S !== this.session) return;
     g.cameraSys.setShot(null, 0.6);
     g.hud.show(true);
@@ -369,13 +375,15 @@ const methods = {
     this.policeStarted = true;
     g.state.setStage('police');
     g.saves.block('police');
+    // a cutscene from the first second: no walking, no action button
     g.interactions.enabled = false;
+    g.player.enabled = false;
+    g.hud.show(false);
+    g.keyScene = true;
     // a distant siren; he freezes
     const siren = g.audio.loop('amb.siren', { volume: 0.05, fade: 2 });
     await sleep(1.5);
     if (S !== this.session) return;
-    g.player.enabled = false;
-    g.hud.show(false);
     this.julian.face(-1);
     await g.view.flash('thought', 'Сирена.', 2200);
     siren?.setVolume(0.35, 4);
@@ -413,6 +421,14 @@ const methods = {
     J.setPose('idle');
     await g.view.flash('officer2', 'Отойдите от тел! Руки — так, чтобы я их видел!', 2600);
     if (S !== this.session) return;
+    // Quinn recognises him
+    const Q = offs[2];
+    Q.setPose('idle');
+    await g.view.flash('quinn', 'Джул?.. Господи. Джул, это ты?', 2200);
+    await g.view.flash('officer2', 'Торрес, держи дистанцию. Он среди тел — значит, подозреваемый.', 2600);
+    Q.setPose('aim');
+    await g.view.flash('quinn', '…Я знаю. Знаю.', 1600);
+    if (S !== this.session) return;
     // he looks at Kayden. Then at them. He does not understand.
     J.face(1);
     await sleep(1.4);
@@ -433,6 +449,7 @@ const methods = {
     await g.view.flash('officer', 'Вы задержаны до выяснения обстоятельств. Всё, что скажете…', 2800);
     await g.view.flash('julian', 'Я детектив Рид. Я… я не знаю, что здесь случилось.', 2600);
     await g.view.flash('officer2', 'Вот и разберёмся. В машину его.', 2000);
+    await g.view.flash('quinn', 'Я повезу. Сама.', 1600);
     g.state.set('police_arrived', true);
     g.state.set('arrested', true);
     if (S !== this.session) return;
@@ -444,6 +461,7 @@ const methods = {
     await sleep(1.8);
     g.audio.setMasterVolume(1, 0.1);
     g.saves.unblock('police');
+    g.keyScene = false;
     J.setPose('idle');
     if (S !== this.session) return;
     await this.startCar();
@@ -451,7 +469,7 @@ const methods = {
 
   spawnOfficers() {
     if (!this.officers) {
-      this.officers = ['officer', 'officer2', 'officer'].map((key, i) => {
+      this.officers = ['officer', 'officer2', 'quinn'].map((key, i) => {
         const ch = new Character2D(this.g.atlas, { ...CHARACTERS[key], id: `${key}_${i}` });
         this.chars.set(ch.id, ch);
         this.scene.root.add(ch.root);

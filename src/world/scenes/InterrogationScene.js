@@ -438,6 +438,9 @@ export class InterrogationScene extends LocationBase {
     this.buildLamp();
     this.buildForeground();
     this.buildLights();
+    // painted VN backdrop: across the table to the one-way mirror
+    this.shots = { interrogation: { pos: [-1.4, 1.45, 1.6], look: [0.8, 1.25, -2.8], fov: 52 } };
+    this.vnHide = [];
     return root;
   }
 

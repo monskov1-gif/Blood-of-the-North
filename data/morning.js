@@ -6,18 +6,18 @@
  * Staff (bartenders, waiters) survived — they are not in the room.
  */
 export const BODIES = [
-  { frame: 'npc_cap_back', pose: 'lying', x: -4.3, z: -2.0, dir: 1 },
-  { frame: 'npc_butler_front', pose: 'lying', x: -12.05, z: -0.55, dir: -1 },
-  { frame: 'npc_green_side_v', pose: 'lying', x: -9.25, z: -0.3, dir: 1 },
-  { frame: 'npc_bluecoat_front', pose: 'lying', x: 10.55, z: -0.85, dir: -1 },
-  { frame: 'npc_vest_back', pose: 'lying', x: 1.75, z: -2.05, dir: -1 },
-  { frame: 'npc_fur_front', pose: 'lying', x: -6.2, z: -1.05, dir: 1 },
+  // painted lying bodies (lie: atlas frame); most of the dead are on the floor
+  { frame: 'npc_cap_back', pose: 'lying', lie: 'lie_soldier', x: -4.3, z: -2.0, dir: 1 },
+  { frame: 'npc_butler_front', pose: 'lying', lie: 'lie_waiter', x: -12.05, z: -0.55, dir: -1 },
+  { frame: 'npc_green_side_v', pose: 'lying', lie: 'lie_green', x: -9.25, z: -0.3, dir: 1 },
+  { frame: 'npc_bluecoat_front', pose: 'lying', lie: 'lie_glasses', x: 10.55, z: -0.85, dir: -1 },
+  { frame: 'npc_vest_back', pose: 'lying', lie: 'lie_vest', x: 1.75, z: -2.05, dir: -1 },
+  { frame: 'npc_fur_front', pose: 'lying', lie: 'lie_burgundy', x: -6.2, z: -1.05, dir: 1 },
+  { frame: 'sit_maid', pose: 'lying', lie: 'lie_maid', x: 12.4, z: 0.5, dir: -1 },
+  // a few still in their seats
   { frame: 'sit_smoker', pose: 'slumped' },
-  { frame: 'sit_burgundy', pose: 'slumped' },
-  { frame: 'sit_fur_v', pose: 'slumped' },
-  { frame: 'sit_glasses', pose: 'slumped' },
   { frame: 'sit_hat', pose: 'slumped' },
-  { frame: 'sit_maid_v', pose: 'slumped' },
+  { frame: 'sit_fur_v', pose: 'slumped' },
 ];
 
 // Kayden fell by the table where they talked. Feet towards the room, head by

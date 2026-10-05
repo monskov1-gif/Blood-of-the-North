@@ -53,7 +53,7 @@ export class Game {
   }
 
   async boot() {
-    preloadPortraits(['julian', 'kayden', 'waiter', 'owen']);
+    preloadPortraits(['julian', 'kayden', 'waiter', 'owen', 'quinn', 'wyatt', 'nurse']);
     this.progress(0.1, 'персонажи…');
     this.atlas = await new SpriteAtlas().load();
     this.progress(0.35, 'бар «Северная Роза»…');
@@ -268,7 +268,7 @@ export class Game {
   updateControl() {
     const blocked = this.panels.open || this.phone.isOpen || this.dialogue.busy || this.mode !== 'play';
     this.blocked = blocked;
-    this.touch.show(this.mode === 'play' && !this.dialogue.busy && this.hud.visible && !this.panels.open);
+    this.touch.show(this.mode === 'play' && !this.dialogue.busy && this.hud.visible && !this.panels.open && this.player.enabled);
   }
 
   resize() {

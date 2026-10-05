@@ -217,6 +217,7 @@ const methods = {
     driver.sit({ x: w.anchors.driverSeat.x, z: w.anchors.driverSeat.z }, 1);
     driver.root.position.y = w.anchors.driverSeat.y;
     this.driver = driver;
+    w.vnHide = [driver.root]; // the painted VN backdrop shows the cabin, she is on the portrait
     w.bottle.visible = false;
     this.setAmbience(['amb.car']);
     g.audio.music('none', 1);
@@ -243,7 +244,7 @@ const methods = {
       { id: 'car_window', label: 'Окно', at: at(-1.4), radius: 0.4, anchor: w.anchors.window, run: say('car_window') },
       { id: 'car_cuffs', label: 'Наручники', at: at(-0.75), radius: 0.3, anchor: w.anchors.cuffs, run: say('car_cuffs') },
       { id: 'car_cage', label: 'Решётка', at: at(0.5), radius: 0.35, anchor: w.anchors.cage, run: say('car_cage') },
-      { id: 'car_driver', label: 'Констебль', at: at(1.2), radius: 0.35, anchor: new THREE.Vector3(1.2, 1.6, -0.1), run: () => this.carTalk() },
+      { id: 'car_driver', label: 'Куинн', at: at(1.2), radius: 0.35, anchor: new THREE.Vector3(1.2, 1.6, -0.1), run: () => this.carTalk() },
       { id: 'car_radio', label: 'Рация', at: at(2.05), radius: 0.3, anchor: w.anchors.radio, run: say('car_radio') },
     ];
   },
@@ -391,6 +392,7 @@ const methods = {
     dawson.sit({ x: w.anchors.officerSeat.x, z: w.anchors.officerSeat.z }, -1);
     dawson.setPose('sit');
     this.dawson = dawson;
+    w.vnHide = [dawson.root];
     // the watchers behind the one-way mirror
     const obs = w.anchors.observers.map((p, i) => {
       const o = this.castIn(w, i ? 'sergeant' : 'investigator', `observer${i}`);
@@ -528,7 +530,10 @@ const methods = {
     psy.placeAt(4.4, -2.25, -1);
     const nurse = this.castIn(w, 'nurse');
     nurse.placeAt(-10, -1.5, 1);
-    this.hospCast = { doc, psy, nurse, patient };
+    // a second nurse behind the station counter, busy with charts
+    const nurse2 = this.castIn(w, 'nurse2');
+    nurse2.placeAt(6.2, -3.55, -1);
+    this.hospCast = { doc, psy, nurse, nurse2, patient };
     this.setAmbience(['amb.hospital_day']);
     w.onBeat = (m) => { if (m === w.wardA.mon && Math.abs(J.position.x - m.halo.getWorldPosition(new THREE.Vector3()).x) < 6) g.audio.play('sfx.beep', { volume: 0.35 }); };
     g.cameraSys.setShot({ x: 18.6, y: 1.7, z: 1.4, lookX: 18.6, lookY: 0.9, lookZ: -6.0, fov: 42 }, 1);
@@ -596,8 +601,9 @@ const methods = {
     const J = this.julian;
     this.lieInBed(w.wardA.bedSpot);
     w.wardA.mon.bpm = 50; w.wardA.mon.flat = false;
-    for (const c of ['doc', 'psy', 'nurse']) this.hospCast?.[c]?.setVisible(false);
-    const kow = this.castIn(w, 'investigator');
+    for (const c of ['doc', 'psy', 'nurse', 'nurse2']) this.hospCast?.[c]?.setVisible(false);
+    const kow = this.castIn(w, 'quinn');
+    w.vnHide = [kow.root];
     kow.placeAt(16.9, -1.5, 1);
     this.setAmbience(['amb.hospital_day']);
     g.renderer.setLayer('evening', { exposure: -0.12, tint: [0.06, 0.0, -0.06], saturation: -0.1 });
@@ -642,8 +648,9 @@ const methods = {
     w.wardA.iv.userData.tube.visible = true;
     const patient = this.castIn(w, 'patient');
     this.lieInBed.call({ julian: patient }, w.wardB.bedSpot);
-    for (const c of ['doc', 'psy', 'nurse']) this.hospCast?.[c]?.setVisible(false);
-    this.custodyCast.get('investigator')?.setVisible(false);
+    for (const c of ['doc', 'psy', 'nurse', 'nurse2']) this.hospCast?.[c]?.setVisible(false);
+    this.custodyCast.get('quinn')?.setVisible(false);
+    if (g.world) g.world.vnHide = [];
     this.setAmbience(['amb.hospital_night']);
     const mon = w.wardA.mon;
     mon.bpm = 46; mon.flat = false;
