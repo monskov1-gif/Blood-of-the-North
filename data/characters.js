@@ -55,6 +55,7 @@ export const CHARACTERS = {
   doctor2: { id: 'doctor2', name: 'Доктор Бэйли', nameEn: 'DR. BAILEY', poses: { idle: 'doctor_f', wave: 'doctor_f_wave' }, speed: 1.1 },
   nurse: { id: 'nurse', name: 'Медсестра Грир', nameEn: 'NURSE GREER', portrait: 'nurse', poses: { idle: 'nurse_red', talk: 'nurse_red_wave', wave: 'nurse_red_wave' }, speed: 1.2 },
   nurseNight: { id: 'nurseNight', name: 'Медсестра', nameEn: 'NURSE', poses: { idle: 'nurse_blue', wave: 'nurse_blue_wave' }, speed: 1.05 },
+  medic: { id: 'medic', name: 'Фельдшер', nameEn: 'MEDIC', poses: { idle: 'nurse_white', wave: 'nurse_white_wave' }, speed: 1.1 },
   nurse2: { id: 'nurse2', name: 'Медсестра', nameEn: 'NURSE', poses: { idle: 'nurse_white', wave: 'nurse_white_wave' }, speed: 1.15 },
   patient: { id: 'patient', name: 'Пациентка', nameEn: 'PATIENT', poses: { idle: 'patient_old' } },
   bartender: {

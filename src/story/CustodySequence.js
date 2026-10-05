@@ -148,6 +148,12 @@ const methods = {
         await sleep(1.4);
         this.julian.setPose('idle');
       },
+      reattach: () => {
+        const w = g.world;
+        g.audio.play('sfx.cuffs', { volume: 0.3 });
+        if (w.wardA) { w.wardA.iv.userData.tube.visible = true; w.wardA.mon.flat = false; w.wardA.mon.bpm = 64; }
+        g.audio.loops.get('sfx.flatline')?.stop(0.3);
+      },
       drinkWater: async () => {
         g.audio.play('sfx.water');
         this.julian.setPose('think');
@@ -295,7 +301,7 @@ const methods = {
     chef.placeAt(-7.9, -2.75, 1);
     const tommy = this.castIn(w, 'dishwasher');
     tommy.placeAt(-3.5, -2.8, -1);
-    const nurse = this.castIn(w, 'nurse');
+    const nurse = this.castIn(w, 'medic');
     nurse.placeAt(10.1, -5.4, -1);
     nurse.shadow.visible = false;
     this.stationCast = { sg, noah, leo, chef, tommy, nurse };
@@ -849,13 +855,11 @@ const methods = {
     await nurse.walkTo([{ x: 16.9, z: -2.0 }, { x: 16.9, z: -4.6 }, { x: w.wardA.bedSpot.x + 1.6, z: w.wardA.bedSpot.z + 0.9 }], { speed: 2.4 });
     if (S !== this.session) return;
     nurse.face(-1);
-    const lines = g.dialogue.dialogues.n_nurse;
-    if (!(await this.lines(lines.slice(0, 2)))) return;
-    // she reattaches everything
-    g.audio.play('sfx.cuffs', { volume: 0.3 });
-    w.wardA.iv.userData.tube.visible = true;
-    w.wardA.mon.flat = false; w.wardA.mon.bpm = 64;
-    if (!(await this.lines(lines.slice(2)))) return;
+    w.vnHide = [nurse.root];
+    // she reattaches everything mid-conversation (cmd 'reattach')
+    await g.dialogue.start('n_nurse_vn');
+    if (S !== this.session) return;
+    w.vnHide = [];
     g.state.set('hospital_nurse_returned', true);
     await nurse.walkTo([{ x: 16.9, z: -4.6 }, { x: 16.9, z: -1.6 }, { x: 9, z: -1.4 }], { speed: 1.4 });
     nurse.setVisible(false);

@@ -203,10 +203,10 @@ export const DIALOGUES = {
   st_blood: {
     mode: 'bark',
     nodes: {
-      a: { speaker: 'nurse', text: 'Рукав. Кулачок. Сейчас будет неприятно.' },
+      a: { speaker: 'medic', text: 'Рукав. Кулачок. Сейчас будет неприятно.' },
       b: { speaker: 'thought', text: 'Игла входит в вену. Кровь в пробирке тёмная, почти чёрная.' },
-      c: { speaker: 'nurse', text: 'Хм. Сворачивается медленно… Ладно, лаборатория разберётся.' },
-      d: { speaker: 'nurse', text: 'Прижмите ватку. Вас ждут во второй допросной.', set: { objective: 'interrogation', blood_test: true } },
+      c: { speaker: 'medic', text: 'Хм. Сворачивается медленно… Ладно, лаборатория разберётся.' },
+      d: { speaker: 'medic', text: 'Прижмите ватку. Вас ждут во второй допросной.', set: { objective: 'interrogation', blood_test: true } },
     },
   },
 
@@ -402,6 +402,19 @@ export const DIALOGUES = {
     ['thought', 'Что со мной?'],
   ],
   n_return_hint: { mode: 'bark', nodes: { a: { speaker: 'thought', text: 'Назад. В палату. Пока никто не увидел.', set: { objective: 'back' } } } },
+  n_nurse_vn: {
+    mode: 'vn',
+    bg: 'ward',
+    cast: { left: 'julian', right: 'nurse' },
+    nodes: {
+      a: { speaker: 'nurse', text: 'Мистер Рид! Господи… Монитор показал остановку, я думала, вы…', expr: { nurse: 'concerned', julian: 'tired' } },
+      b: { speaker: 'nurse', text: 'Опять датчик отвалился. Двадцать лет работаю — и каждый раз сердце в пятки.', expr: { nurse: 'talk' } },
+      c: { speaker: 'nurse', text: 'Так. Капельница, датчики… Вы что, сами всё сорвали?', cmd: 'reattach', expr: { nurse: 'neutral' } },
+      d: { speaker: 'julian', text: 'Мне… приснилось что-то.', expr: { julian: 'tired' } },
+      e: { speaker: 'nurse', text: 'Лежите. И никуда не вставайте, слышите? Никуда.', expr: { nurse: 'talk' } },
+      f: { speaker: 'julian', text: 'Слышу.', end: true },
+    },
+  },
   n_nurse: [
     ['nurse', 'Мистер Рид! Господи… Монитор показал остановку, я думала, вы…'],
     ['nurse', 'Опять датчик отвалился. Двадцать лет работаю — и каждый раз сердце в пятки.'],
