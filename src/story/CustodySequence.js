@@ -467,7 +467,7 @@ const methods = {
     await this.enter('hospital', 'day', 'medical');
     const w = g.world;
     const J = this.julian;
-    J.sit({ x: w.anchors.examSpot.x - 0.3, z: w.anchors.examSpot.z - 0.5 }, 1);
+    J.sit({ x: w.anchors.examSpot.x - 0.3, z: w.anchors.examSpot.z - 0.2 }, 1);
     J.root.position.y = 0.45;
     const doc = this.castIn(w, 'doctor');
     doc.placeAt(-3.75, -5.3, -1);

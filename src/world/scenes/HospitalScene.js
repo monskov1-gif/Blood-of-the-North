@@ -112,7 +112,7 @@ export class HospitalScene extends LocationBase {
     this.box(0.1, H, 2.8, pMat, -3.15, H / 2, -5.4);
     const exam = new THREE.Group();
     this.box(1.8, 0.1, 0.7, this.mat('examTop', { color: 0x4a6a80 }), 0, 0.85, 0, exam);
-    this.box(0.5, 0.8, 0.5, this.mat('steel', { color: 0x9aa0a6, metalness: 0.9, roughness: 0.3 }), 0, 0.4, 0, exam);
+    this.box(0.5, 0.8, 0.3, this.mat('steel', { color: 0x9aa0a6, metalness: 0.9, roughness: 0.3 }), 0, 0.4, -0.15, exam);
     exam.position.set(-4.5, 0, -6.2); root.add(exam);
     const exLamp = new THREE.SpotLight(0xffffff, 18, 4, 0.5, 0.5, 1.4);
     exLamp.position.set(-4.3, 2.6, -5.6); exLamp.target.position.set(-4.5, 0.8, -6.0);
