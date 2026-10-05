@@ -239,7 +239,7 @@ export class HospitalScene extends LocationBase {
     const glassMat = this.mat('wardGlass', { color: 0xc8dce8, transparent: true, opacity: 0.14, roughness: 0.05, metalness: 0.2 });
     this.box(x1 - doorX1, 0.22, 0.06, this.mat('wardLow', { color: 0x7a9a9a }), (doorX1 + x1) / 2, 0.11, BACK);
     this.box(x1 - doorX1, 2.38, 0.03, glassMat, (doorX1 + x1) / 2, 1.41, BACK);
-    for (let mx = doorX1 + 1.2; mx < x1 - 0.2; mx += 1.2) this.box(0.05, 2.4, 0.06, this.mat('wardFrame', { color: 0xb8c0c4 }), mx, 1.3, BACK);
+    // no mullions across the pane: they would cut through the bed (a story point)
     this.box(0.4, 2.6, 0.06, this.mat('wardLow', { color: 0x7a9a9a }), x0 + 0.2, 1.3, BACK);
     this.box(x1 - x0, 0.1, 0.08, this.mat('wardFrame', { color: 0xb8c0c4 }), cx, 2.6, BACK);
     // blinds on the glass (half down)
