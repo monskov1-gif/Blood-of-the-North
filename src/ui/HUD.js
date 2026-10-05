@@ -62,8 +62,9 @@ export class HUD {
   update(camera) {
     if (!this.focus || !this.visible) return;
     const p = InteractionSystem.project(this.focus.anchor, camera, window.innerWidth, window.innerHeight);
-    this.marker.style.left = `${p.x}px`;
-    this.marker.style.top = `${Math.max(60, p.y - 10)}px`;
+    const k = window.__uiScale || 1; // #ui is zoomed on big screens
+    this.marker.style.left = `${p.x / k}px`;
+    this.marker.style.top = `${Math.max(60, p.y / k - 10)}px`;
   }
 
   toast(text, ms = 2200) {

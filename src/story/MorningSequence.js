@@ -87,6 +87,7 @@ const methods = {
 
   /** Back to the evening (new game / title). */
   resetMorning() {
+    this.setOutfit?.('coat');
     this.scene.setTimeOfDay('evening');
     this.g.renderer.clearLayer('morning');
     this.g.renderer.clearLayer('hangover');

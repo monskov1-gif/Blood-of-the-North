@@ -18,6 +18,40 @@ export class Fader {
   }
 }
 
+// In-story clock per stage (minutes from Sat 4 Dec, 00:00) — the phone shows the
+// current time and every notification's age relative to it.
+const DAY = 24 * 60;
+const STAGE_CLOCK = {
+  explore: 22 * 60 + 47, talk1: 23 * 60 + 5, talk2: 23 * 60 + 31, escape: 23 * 60 + 44,
+  morning: DAY + 7 * 60 + 52, police: DAY + 8 * 60 + 6, car: DAY + 8 * 60 + 24,
+  station: DAY + 9 * 60 + 2, interrogation: DAY + 9 * 60 + 41, medical: DAY + 11 * 60 + 12,
+  hospital_day: DAY + 13 * 60 + 27, hospital_evening: DAY + 19 * 60 + 38,
+  hospital_night: 2 * DAY + 3 * 60 + 12, hospital_return: 2 * DAY + 3 * 60 + 31,
+  recovery: 6 * DAY + 10 * 60 + 5, street: 6 * DAY + 11 * 60 + 4, ended: 6 * DAY + 11 * 60 + 10,
+};
+const WEEKDAYS = ['суббота', 'воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница'];
+const TEMPS = [-34, -31, -36, -29, -27, -30, -26];
+// messages: t = when it arrived (same minute scale); older ones show a date
+const MESSAGES = [
+  { t: -24 * 60 + 18 * 60 + 10, who: 'Капитан Морроу', text: 'Рид, дело о волках закрыто. Отдыхай.' },
+  { t: 22 * 60 + 35, who: 'Кайден', text: 'ты где? я уже взял тебе виски. не заставляй пить оба' },
+  { t: DAY + 7 * 60 + 41, who: 'Куинн', text: '3 пропущенных вызова', missed: true },
+  { t: DAY + 7 * 60 + 44, who: 'Куинн', text: 'джул, ответь. в «розе» что-то случилось. ты где??' },
+  { t: DAY + 12 * 60 + 50, who: 'Куинн', text: 'мне сказали, что тебя положили. я приду вечером. держись' },
+  { t: 2 * DAY + 9 * 60 + 15, who: 'Мама', text: 'Сынок, видела новости. Позвони, как сможешь.' },
+  { t: 5 * DAY + 20 * 60 + 2, who: 'Куинн', text: 'врачи говорят — чудо. завтра выписка? я заеду.' },
+];
+const pad = (n) => String(n).padStart(2, '0');
+function ago(now, t) {
+  const d = now - t;
+  if (d < 60) return `${Math.max(1, d)} мин назад`;
+  if (d < 6 * 60 && Math.floor(now / DAY) === Math.floor(t / DAY)) return `${Math.floor(d / 60)} ч назад`;
+  const dayDiff = Math.floor(now / DAY) - Math.floor(t / DAY);
+  if (dayDiff === 0) return `${pad(Math.floor((t % DAY) / 60))}:${pad(t % 60)}`;
+  if (dayDiff === 1) return 'вчера';
+  return `${4 + Math.floor(t / DAY)} дек.`;
+}
+
 /** Julian's phone: lock screen with Lizzie's missed call and voicemail. */
 export class PhoneView {
   constructor({ root, bus, audio, state }) {
@@ -34,10 +68,16 @@ export class PhoneView {
     const ph = el('div', 'phone', w);
     const sc = el('div', 'screen', ph);
     el('div', 'aurora', sc);
-    el('div', 'time', sc, '22:47');
-    el('div', 'date', sc, 'суббота, 4 декабря · −34°');
+    const now = STAGE_CLOCK[this.state.stage] ?? STAGE_CLOCK.explore;
+    const day = Math.floor(now / DAY);
+    el('div', 'time', sc, `${pad(Math.floor((now % DAY) / 60))}:${pad(now % 60)}`);
+    el('div', 'date', sc, `${WEEKDAYS[day % 7]}, ${4 + day} декабря · −${Math.abs(TEMPS[day % 7])}°`);
     const notes = el('div', 'notes', sc);
-    el('div', 'ntf', notes, '<b>Кайден <span>12 мин назад</span></b>ты где? я уже взял тебе виски. не заставляй пить оба');
+    // newest first; only what has already arrived
+    for (const m of MESSAGES.filter((m) => m.t <= now && m.t > -DAY * 2).sort((a, b) => b.t - a.t)) {
+      if (m.who === 'Капитан Морроу') continue; // shown at the bottom, below Lizzie
+      el('div', `ntf${m.missed ? ' missed' : ''}`, notes, `<b>${m.who} <span>${ago(now, m.t)}</span></b>${m.text}`);
+    }
     el('div', 'ntf missed', notes, '<b>Пропущенный вызов <span>11 нояб.</span></b>Лиззи 🦊');
     const vm = el('div', 'ntf play', notes, `<b>Голосовое · Лиззи <span>11 нояб. · 0:07</span></b>
       Нажмите, чтобы прослушать
@@ -55,7 +95,8 @@ export class PhoneView {
         this.bus.emit('voicemail');
       }
     });
-    el('div', 'ntf', notes, '<b>Капитан Морроу <span>вчера</span></b>Рид, дело о волках закрыто. Отдыхай.');
+    const morrow = MESSAGES[0];
+    el('div', 'ntf', notes, `<b>${morrow.who} <span>${ago(now, morrow.t)}</span></b>${morrow.text}`);
     const close = el('div', 'close-p', sc);
     el('div', 'phone-hint', w, 'НАЖМИТЕ ВНЕ ТЕЛЕФОНА, ЧТОБЫ УБРАТЬ');
     w.addEventListener('pointerdown', (e) => { if (e.target === w || e.target === close) this.close(); });

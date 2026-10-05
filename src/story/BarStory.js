@@ -202,13 +202,15 @@ export class BarStory {
     g.player.enabled = false;
     g.hud.show(false);
     g.cameraSys.setShot({ x: -10.2, y: 2.4, z: 9.4, lookX: -11, lookY: 1.4, lookZ: -1, fov: 30 }, 1);
+    // Julian starts at the door (placed before the fade, so he never pops back)
+    this.julian.placeAt(-12.2, -2.1, 1);
     g.cameraSys.snap();
-    await g.fader.to(false, 2200);
+    const fade = g.fader.to(false, 2200);
+    await sleep(0.9);
     if (S !== this.session) return;
     g.audio.play('sfx.door');
-    // Julian comes in from the cold: a few steps from the door
-    this.julian.placeAt(-12.2, -2.1, 1);
-    await this.julian.walkTo([{ x: -11.6, z: -0.6 }, { x: -11.2, z: 0.6 }]);
+    // he comes in from the cold: a few steps from the door
+    await Promise.all([fade, this.julian.walkTo([{ x: -11.6, z: -0.6 }, { x: -11.2, z: 0.6 }])]);
     if (S !== this.session) return;
     g.cameraSys.setShot(null, 0.8);
     await g.dialogue.start('intro');

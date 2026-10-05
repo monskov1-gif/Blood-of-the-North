@@ -651,12 +651,18 @@ export class HospitalScene extends LocationBase {
       { x0: -1.0, x1: 1.0, y0: 0, y1: 2.6 },      // side corridor
       { x0: 9.0, x1: 13.0, y0: 0, y1: 2.6 },      // ward 207 front
       { x0: 16.1, x1: 21.0, y0: 0, y1: 2.6 },     // ward 209 front
+      { x0: -9.85, x1: -8.75, y0: 0, y1: 2.2 },   // stairs door
+      { x0: 14.0, x1: 15.0, y0: 0, y1: 2.2 },     // staff-only door
     ];
     this.wall(-23, 23, H, BACK, wallMat, holes);
     for (const x of [-23, 23]) this.plane(15, H, wallMat, x, H / 2, -2.5, x < 0 ? Math.PI / 2 : -Math.PI / 2);
 
     // lower wall protection, rails, skirting, wall stripe, corner guards
-    const spans = [[-23, -21.4], [-19.4, -12.8], [-11.2, -5.8], [-3.2, -1.0], [1.0, 9.0], [13.0, 16.1], [21.0, 23]];
+    // wall dressing runs only between openings (it used to run across the doors)
+    const spans = [];
+    let from = -23;
+    for (const h of [...holes].sort((a, b) => a.x0 - b.x0)) { if (h.x0 > from) spans.push([from, h.x0]); from = Math.max(from, h.x1); }
+    if (from < 23) spans.push([from, 23]);
     const wains = this.mat('hWains', { map: TX.wainscot(), color: 0xffffff, roughness: 0.55 });
     const skirt = this.mat('hSkirt', { color: 0x2a3436, roughness: 0.6 });
     const railM = this.mat('hRail', { map: TX.veneer(), color: 0xc89a6a, roughness: 0.4 });
@@ -677,6 +683,7 @@ export class HospitalScene extends LocationBase {
       this.bx(w - 0.05, 0.12, 0.035, this.mat('hBumper', { color: 0x3c5a5e, roughness: 0.6 }), cx, 0.32, BACK + 0.045);
     }
     for (const h of holes) {
+      if (h.y1 <= 2.2) continue; // plain doors have their own frames
       for (const x of [h.x0, h.x1]) {
         if (Math.abs(x) >= 22.9) continue;
         this.bx(0.06, 1.6, 0.06, guard, x + (x === h.x0 ? -0.02 : 0.02), 0.85, BACK + 0.02);
@@ -909,6 +916,7 @@ export class HospitalScene extends LocationBase {
     }
     this.box(0.4, 0.08, 0.3, this.mat('hStep', { color: 0x30363c, roughness: 0.6 }), 0.4, 0.14, 0.45, exam);
     exam.position.set(-4.5, 0, -6.2); root.add(exam);
+    this.colliders.push({ box: { minX: -5.4, maxX: -3.6, minZ: -6.55, maxZ: -5.85 } });
     // round stool where the patient sits for the exam
     this.cy(0.18, 0.18, 0.06, 14, this.mat('examTop'), -4.7, 0.47, -6.0);
     this.cy(0.02, 0.02, 0.44, 6, this.mat('steel'), -4.7, 0.22, -6.0);
@@ -1101,9 +1109,9 @@ export class HospitalScene extends LocationBase {
     this.pl(0.18, 0.18, this.texMat('hFireTxt'), 13.45, 1.45, BACK + 0.01);
     this.bx(0.11, 0.15, 0.05, red, 13.85, 1.22, BACK + 0.025);
     this.hDoor(14.5, BACK + 0.02, { sign: 'ТОЛЬКО ПЕРСОНАЛ', w: 0.9, color: 0x6a7480 });
-    this.bx(0.14, 0.2, 0.04, this.mat('hKeypad', { color: 0x30343a, roughness: 0.5 }), 15.1, 1.25, BACK + 0.02);
-    this.bx(0.02, 0.02, 0.01, this.mat('hLedRed'), 15.1, 1.33, BACK + 0.045);
-    this.framed(TX.print('river'), 0.62, 0.42, 15.6, 1.8, BACK + 0.02, 0xc8ccd0);
+    this.bx(0.14, 0.2, 0.04, this.mat('hKeypad', { color: 0x30343a, roughness: 0.5 }), 15.22, 1.25, BACK + 0.02);
+    this.bx(0.02, 0.02, 0.01, this.mat('hLedRed'), 15.22, 1.33, BACK + 0.045);
+    this.framed(TX.print('river'), 0.5, 0.36, 15.66, 1.8, BACK + 0.02, 0xc8ccd0);
     this.framed(TX.print('lake'), 0.62, 0.42, 22.0, 1.8, BACK + 0.02, 0xc8ccd0);
     // radiator under the end of the corridor + a tall plant
     this.radiator(22.0, 0.45, BACK + 0.08, 1.2);
@@ -1511,7 +1519,10 @@ export class HospitalScene extends LocationBase {
     // window to the outside: recess, mullion, sill, blinds, frost, radiator
     let outsideMat = null;
     if (window) {
-      outsideMat = new THREE.MeshBasicMaterial({ map: streetTexture('morning'), color: 0xdde6ee });
+      // each ward has its own outside: 209 over the roofs and the river, 207 the courtyard
+      const view = number === '209' ? 'ward209' : 'ward207';
+      outsideMat = new THREE.MeshBasicMaterial({ map: streetTexture('morning', view), color: 0xdde6ee });
+      outsideMat.userData.view = view;
       this.outsideMats.push(outsideMat);
       this.plane(winW + 0.2, winY1 - winY0 + 0.2, outsideMat, winX, (winY0 + winY1) / 2, zb - 0.26);
       const rev = this.mat('hReveal', { color: 0xd8dcd8, roughness: 0.7 });
@@ -1542,6 +1553,14 @@ export class HospitalScene extends LocationBase {
     warm.position.set(bedX - 0.8, 2.0, BACK - 1.8); root.add(warm);
     const cold = new THREE.PointLight(0xd8e4f0, 5, 5, 1.5);
     cold.position.set(cx, 2.8, BACK - 1.8); root.add(cold);
+    // furniture is solid: bed, bedside cabinet, armchair, sink (the drip of the
+    // patient's ward too; Julian's own drip rolls along with him by day)
+    const B = (x, z, hx, hz) => this.colliders.push({ box: { minX: x - hx, maxX: x + hx, minZ: z - hz, maxZ: z + hz } });
+    B(bedX, bedZ, 1.05, 0.48);
+    B(cabX, cabZ, 0.26, 0.24);
+    B(chairX, chairZ, 0.34, 0.34);
+    B(x0 + 0.5, zb + 0.35, 0.28, 0.24);
+    if (patient) this.colliders.push({ x: bedX - 1.25, z: BACK - 1.3, r: 0.22 });
     return {
       x0, x1, cx, bed, mon, iv, hinge, leaf, warm, cold, outsideMat, readM,
       bedSpot: { x: bedX, z: bedZ, y: 0.72 },
@@ -1596,7 +1615,7 @@ export class HospitalScene extends LocationBase {
     this.wardB.readM.emissiveIntensity = this.wardBOpen ? 2.5 : 0;
     this.examLamp.intensity = night ? 0 : 18;
     this.examBulb.emissiveIntensity = night ? 0 : 3;
-    for (const m of this.outsideMats) { m.map = streetTexture(night ? 'night' : 'morning'); m.color.set(night ? 0x8a9ab8 : 0xdde6ee); m.needsUpdate = true; }
+    for (const m of this.outsideMats) { m.map = streetTexture(night ? 'night' : 'morning', m.userData.view || 'bar'); m.color.set(night ? 0x8a9ab8 : 0xdde6ee); m.needsUpdate = true; }
     for (const f of this.moonFx) f.m.opacity = night ? f.max : 0;
     for (const g of this.exitGlows) g.material.opacity = night ? 0.55 : 0.12;
     for (const s of this.exitSigns) s.material.emissiveIntensity = night ? 2.2 : 1.6;

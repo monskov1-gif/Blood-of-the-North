@@ -327,8 +327,14 @@ export function paintingTexture(kind, seed = 1) {
 
 // ------------------------------------------------------------------ window view
 
-export function streetTexture(time = 'night') {
+/**
+ * What you see through a window. `view` picks the place so every building has
+ * its own outside: 'bar' (the street), 'station' (the RCMP lot), 'ward209'
+ * (upper floor over the roofs and the river), 'ward207' (the inner courtyard).
+ */
+export function streetTexture(time = 'night', view = 'bar') {
   const night = time === 'night';
+  if (view !== 'bar') return viewTexture(time, view);
   return canvasTexture(`street-${time}`, 1600, 1100, (ctx, w, h) => {
     const r = rng(8);
     const ground = h * 0.74;
@@ -487,6 +493,91 @@ export function streetTexture(time = 'night') {
     // static falling snow layer
     ctx.fillStyle = night ? 'rgba(230,240,255,0.55)' : 'rgba(255,255,255,0.75)';
     for (let i = 0; i < 700; i++) { const sz = r() < 0.15 ? 3 : 1.6; ctx.fillRect(r() * w, r() * h, sz, sz + r() * 2); }
+  });
+}
+
+function viewTexture(time, view) {
+  const night = time === 'night';
+  return canvasTexture(`view-${view}-${time}`, 1024, 704, (ctx, w, h) => {
+    const r = rng(view.length * 31 + 5);
+    const sky = ctx.createLinearGradient(0, 0, 0, h * 0.6);
+    if (night) { sky.addColorStop(0, '#02050b'); sky.addColorStop(1, '#16243a'); }
+    else { sky.addColorStop(0, '#8e9bab'); sky.addColorStop(1, '#c9d2dc'); }
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, w, h);
+    const snow = night ? '#8a9ab4' : '#eef2f6';
+    const dark = night ? '#070a10' : '#3e444c';
+    const lit = () => (night && r() < 0.55 ? '#ffc878' : (night ? '#0e1420' : '#5a6878'));
+    const box = (x, y, bw, bh, c) => { ctx.fillStyle = c; ctx.fillRect(x, y, bw, bh); };
+    const spruce = (x, y, s, c) => { ctx.fillStyle = c; for (let k = 0; k < 4; k++) { ctx.beginPath(); ctx.moveTo(x, y - s * (1.6 - k * 0.3)); ctx.lineTo(x + s * (0.35 + k * 0.12), y - s * (0.9 - k * 0.3)); ctx.lineTo(x - s * (0.35 + k * 0.12), y - s * (0.9 - k * 0.3)); ctx.fill(); } box(x - s * 0.05, y - s * 0.1, s * 0.1, s * 0.12, c); ctx.fillStyle = snow; ctx.globalAlpha = 0.7; ctx.beginPath(); ctx.moveTo(x, y - s * 1.6); ctx.lineTo(x + s * 0.18, y - s * 1.35); ctx.lineTo(x - s * 0.18, y - s * 1.35); ctx.fill(); ctx.globalAlpha = 1; };
+    if (view === 'ward209') {
+      // upper floor: mountains, the frozen Yukon river, roofs below
+      for (let k = 0; k < 3; k++) {
+        ctx.fillStyle = night ? ['#0a1220', '#0d1626', '#111c2e'][k] : ['#9aa6b4', '#aab4c0', '#b8c2cc'][k];
+        ctx.beginPath(); ctx.moveTo(0, h);
+        for (let x = 0; x <= w; x += 16) ctx.lineTo(x, h * (0.22 + k * 0.06) + Math.sin(x * 0.006 + k * 1.7) * 50 + Math.sin(x * 0.021 + k) * 14);
+        ctx.lineTo(w, h); ctx.fill();
+        if (k === 0) { ctx.fillStyle = snow; ctx.globalAlpha = 0.55; for (let x = 0; x < w; x += 16) ctx.fillRect(x, h * 0.22 + Math.sin(x * 0.006) * 50 + Math.sin(x * 0.021) * 14, 16, 10); ctx.globalAlpha = 1; }
+      }
+      box(0, h * 0.5, w, h * 0.08, night ? '#5a6a84' : '#dfe6ee'); // the river, frozen
+      ctx.strokeStyle = night ? 'rgba(20,30,50,0.6)' : 'rgba(120,135,150,0.5)'; ctx.lineWidth = 2;
+      for (let i = 0; i < 10; i++) { ctx.beginPath(); ctx.moveTo(r() * w, h * 0.52 + r() * h * 0.05); ctx.lineTo(r() * w, h * 0.52 + r() * h * 0.05); ctx.stroke(); }
+      for (let i = 0; i < 40; i++) spruce(r() * w, h * 0.5, 14 + r() * 10, night ? '#05080e' : '#4e5a64');
+      box(0, h * 0.58, w, h * 0.42, snow);
+      for (let i = 0; i < 14; i++) {
+        const x = i * 78 + r() * 30, y = h * 0.62 + (i % 3) * 52, bw = 60 + r() * 40, bh = 30 + r() * 26;
+        box(x, y, bw, bh, night ? '#141a24' : ['#7a6a5a', '#8a4a3e', '#5e6f7c', '#9a8a70'][i % 4]);
+        box(x - 4, y - 10, bw + 8, 12, snow);
+        for (let k = 0; k < 3; k++) box(x + 8 + k * (bw - 20) / 2, y + 10, 8, 9, lit());
+      }
+      // parking lot below with a few cars
+      for (let i = 0; i < 6; i++) { box(80 + i * 150, h * 0.93, 70, 26, night ? '#1a1e26' : ['#5a2a24', '#2a3a5a', '#4a4a50'][i % 3]); box(78 + i * 150, h * 0.925, 74, 8, snow); }
+    } else if (view === 'ward207') {
+      // the inner courtyard: the other wing across, spruces, a bench, a lamp
+      box(0, h * 0.08, w, h * 0.56, night ? '#121820' : '#b8b2a6');
+      for (let yy = 0; yy < 3; yy++) for (let x = 40; x < w; x += 120) {
+        box(x, h * (0.14 + yy * 0.16), 70, 56, night ? '#0c121c' : '#e6eaee');
+        box(x + 5, h * (0.14 + yy * 0.16) + 5, 60, 46, night ? (r() < 0.3 ? '#d8c890' : '#101824') : '#6a7888');
+        box(x - 4, h * (0.14 + yy * 0.16) + 58, 78, 6, snow);
+      }
+      box(0, h * 0.64, w, h * 0.36, snow);
+      for (let i = 0; i < 9; i++) spruce(60 + i * 120 + r() * 40, h * 0.86 + r() * 30, 110 + r() * 60, night ? '#060a10' : '#2e3a34');
+      box(w * 0.55, h * 0.8, 150, 12, dark); box(w * 0.55 + 10, h * 0.81, 8, 34, dark); box(w * 0.55 + 132, h * 0.81, 8, 34, dark); box(w * 0.55 - 4, h * 0.79, 158, 8, snow);
+      box(w * 0.3, h * 0.42, 8, h * 0.44, dark);
+      if (night) { const g = ctx.createRadialGradient(w * 0.3 + 4, h * 0.43, 2, w * 0.3 + 4, h * 0.43, 180); g.addColorStop(0, 'rgba(255,210,150,0.8)'); g.addColorStop(1, 'rgba(255,190,120,0)'); ctx.fillStyle = g; ctx.fillRect(0, 0, w, h); }
+    } else {
+      // station: the RCMP lot — cruisers, a flagpole, the garage
+      for (let k = 0; k < 2; k++) {
+        ctx.fillStyle = night ? ['#0b1220', '#101a2b'][k] : ['#94a0ae', '#a6b0bc'][k];
+        ctx.beginPath(); ctx.moveTo(0, h * 0.6);
+        for (let x = 0; x <= w; x += 20) ctx.lineTo(x, h * (0.3 + k * 0.08) + Math.sin(x * 0.005 + k * 2) * 36);
+        ctx.lineTo(w, h * 0.6); ctx.fill();
+      }
+      for (let i = 0; i < 30; i++) spruce(r() * w, h * 0.5, 30 + r() * 20, night ? '#05080e' : '#56626c');
+      box(w * 0.48, h * 0.32, w * 0.5, h * 0.24, night ? '#1a1416' : '#7a4a3c'); // brick garage
+      box(w * 0.48 - 8, h * 0.3, w * 0.5 + 16, 14, snow);
+      for (let k = 0; k < 3; k++) { box(w * 0.52 + k * 150, h * 0.4, 110, h * 0.16, night ? '#0e1218' : '#9aa2aa'); for (let yy = 0; yy < 5; yy++) box(w * 0.52 + k * 150, h * 0.42 + yy * 18, 110, 3, night ? '#07090c' : '#7a828a'); }
+      box(0, h * 0.56, w, h * 0.44, night ? '#3a4658' : '#cfd6de'); // cleared lot
+      ctx.fillStyle = night ? 'rgba(220,220,160,0.35)' : 'rgba(250,240,170,0.8)';
+      for (let i = 0; i < 7; i++) ctx.fillRect(40 + i * 140, h * 0.7, 6, h * 0.16);
+      box(0, h * 0.56, w, 18, snow);
+      const cruiser = (x, y) => {
+        box(x, y, 190, 44, night ? '#c8ccd4' : '#f2f2f0');
+        box(x + 40, y - 34, 104, 36, night ? '#b8bcc4' : '#e8e8e6');
+        box(x + 50, y - 28, 84, 22, night ? '#18202c' : '#506070');
+        box(x, y + 14, 190, 10, '#1a2a6a'); box(x, y + 24, 190, 3, '#c8a040');
+        box(x + 60, y - 44, 64, 9, '#202020'); box(x + 62, y - 43, 28, 7, night ? '#ff3030' : '#a02020'); box(x + 94, y - 43, 28, 7, night ? '#3050ff' : '#2030a0');
+        ctx.fillStyle = '#050505'; ctx.beginPath(); ctx.arc(x + 40, y + 44, 18, 0, 7); ctx.arc(x + 150, y + 44, 18, 0, 7); ctx.fill();
+        box(x + 30, y - 38, 124, 6, snow);
+      };
+      cruiser(70, h * 0.74); cruiser(330, h * 0.76);
+      box(w * 0.4, h * 0.12, 5, h * 0.6, dark); // flagpole
+      box(w * 0.4 + 5, h * 0.13, 70, 40, '#d81e1e'); box(w * 0.4 + 23, h * 0.13, 34, 40, '#f4f4f4');
+      ctx.fillStyle = '#d81e1e'; ctx.beginPath(); ctx.moveTo(w * 0.4 + 40, h * 0.13 + 8); ctx.lineTo(w * 0.4 + 48, h * 0.13 + 24); ctx.lineTo(w * 0.4 + 32, h * 0.13 + 24); ctx.fill();
+      if (night) { const g = ctx.createRadialGradient(w * 0.75, h * 0.3, 2, w * 0.75, h * 0.3, 260); g.addColorStop(0, 'rgba(255,220,170,0.7)'); g.addColorStop(1, 'rgba(255,190,120,0)'); ctx.fillStyle = g; ctx.fillRect(0, 0, w, h); }
+    }
+    if (!night) { const fog = ctx.createLinearGradient(0, h * 0.2, 0, h); fog.addColorStop(0, 'rgba(220,228,236,0)'); fog.addColorStop(1, 'rgba(220,228,236,0.3)'); ctx.fillStyle = fog; ctx.fillRect(0, 0, w, h); }
+    ctx.fillStyle = night ? 'rgba(230,240,255,0.5)' : 'rgba(255,255,255,0.7)';
+    for (let i = 0; i < 380; i++) { const sz = r() < 0.15 ? 3 : 1.5; ctx.fillRect(r() * w, r() * h, sz, sz + r() * 2); }
   });
 }
 

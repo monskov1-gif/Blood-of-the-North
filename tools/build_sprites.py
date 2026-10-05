@@ -466,6 +466,12 @@ V06 = ['cop_blond_idle', 'cop_blond_aim', 'cop_red_idle', 'cop_red_aim', 'quinn_
        'lie_julian', 'lie_kayden', 'lie_waiter']
 for n in V06:
     frames[n] = load(n)
+# v0.07: Julian repainted — coat and hospital gown, painted walk frames, lying in the gown
+for n in ['jul_idle', 'jul_talk', 'jul_idle_walk1', 'jul_idle_walk2',
+          'julg_idle', 'julg_talk', 'julg_idle_walk1', 'julg_idle_walk2', 'lie_julian_gown']:
+    frames[n] = load(n)
+for n in ['jul_idle', 'jul_talk', 'julg_idle', 'julg_talk']:
+    ALIASES[f'{n}_sit'] = 'julian_seat'
 # Wyatt standing (he only came seated): the blond constable, greyed at the temples
 frames['wyatt_stand'] = frames['cop_blond_idle'] * 0.55 + grey_hair(frames['cop_blond_idle'], 0.1) * 0.45
 frames['wyatt_stand'][..., 3] = frames['cop_blond_idle'][..., 3]

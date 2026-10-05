@@ -1,7 +1,9 @@
 import * as THREE from 'three';
 import { Character2D } from '../characters/Character2D.js';
 import { CharacterState } from '../characters/CharacterState.js';
-import { CHARACTERS } from '../../data/characters.js';
+import { CHARACTERS, JULIAN_OUTFITS } from '../../data/characters.js';
+
+const GOWN_STAGES = new Set(['hospital_day', 'hospital_evening', 'hospital_night', 'hospital_return', 'recovery']);
 import { glow } from '../world/props.js';
 import { sleep } from './Director.js';
 
@@ -95,6 +97,18 @@ const methods = {
     await g.setLocation(location, { state });
     this.resetJulian();
     if (stage) g.state.setStage(stage);
+    this.setOutfit(GOWN_STAGES.has(stage) ? 'gown' : 'coat');
+  },
+
+  /** Coat or hospital gown: sprites, lying frame and the VN portrait. */
+  setOutfit(name) {
+    const o = JULIAN_OUTFITS[name];
+    const J = this.julian;
+    J.poses = { ...o.poses };
+    J.setLieFrame(o.lie);
+    CHARACTERS.julian.portrait = o.portrait;
+    J.currentFrame = null;
+    this.outfit = name;
   },
 
   lieInBed(spot, dir = -1) {
@@ -147,6 +161,11 @@ const methods = {
         g.audio.play('sfx.gulp');
         await sleep(1.4);
         this.julian.setPose('idle');
+      },
+      medOpen: () => {
+        g.world.setMedOpen?.(true);
+        g.audio.play('sfx.cell', { volume: 0.5 });
+        this.stationCast?.nurse?.setVisible(true);
       },
       reattach: () => {
         const w = g.world;
@@ -295,7 +314,7 @@ const methods = {
     const noah = this.castIn(w, 'survivorWaiter');
     noah.sit({ x: w.anchors.benchB.x, z: w.anchors.benchB.z }, 1);
     noah.setPose('hands');
-    const leo = this.castIn(w, 'survivorWaiter2');
+    const leo = this.castIn(w, 'barman'); // Ray — the bartender found under the counter
     leo.placeAt(-2.0, -2.7, -1);
     const chef = this.castIn(w, 'chef');
     chef.placeAt(-7.9, -2.75, 1);
@@ -304,6 +323,9 @@ const methods = {
     const nurse = this.castIn(w, 'medic');
     nurse.placeAt(10.1, -5.4, -1);
     nurse.shadow.visible = false;
+    // the med post is shut until he is called for the blood test
+    w.setMedOpen?.(!!g.state.get('survivors_questioned'));
+    nurse.setVisible(!!g.state.get('survivors_questioned'));
     this.stationCast = { sg, noah, leo, chef, tommy, nurse };
     g.cameraSys.snap();
     await g.card.show('Участок КККП, Уайтхорс', { sub: 'RCMP DETACHMENT', ms: 1900 });
@@ -341,7 +363,7 @@ const methods = {
     const talk = (id, ch) => async () => { ch.setPose(ch.poses.talk ? 'talk' : 'idle'); await g.dialogue.start(id); ch.setPose(ch === c.noah ? 'hands' : 'idle'); this.checkCalled(); };
     return [
       { id: 'st_noah', label: 'Ноа, официант', at: { x: -5.6, z: -2.4 }, radius: 0.9, anchor: A(-5.7, 1.7, -3.2), run: talk('st_noah', c.noah) },
-      { id: 'st_leo', label: 'Лео, официант', at: { x: -2.1, z: -2.2 }, radius: 0.8, anchor: A(-2.0, 2.1, -2.7), run: talk('st_leo', c.leo) },
+      { id: 'st_leo', label: 'Рэй, бармен', at: { x: -2.1, z: -2.2 }, radius: 0.8, anchor: A(-2.0, 2.1, -2.7), run: talk('st_leo', c.leo) },
       { id: 'st_chef', label: 'Шеф Ларош', at: { x: -7.8, z: -2.2 }, radius: 0.8, anchor: A(-7.9, 2.1, -2.75), run: talk('st_chef', c.chef) },
       { id: 'st_tommy', label: 'Томми, посудомойщик', at: { x: -3.6, z: -2.2 }, radius: 0.7, anchor: A(-3.5, 2.0, -2.8), run: talk('st_tommy', c.tommy) },
       { id: 'st_board', label: 'Доска объявлений', at: { x: -4.4, z: -2.4 }, radius: 0.5, anchor: w.anchors.board, run: say('st_board') },
@@ -516,6 +538,7 @@ const methods = {
   async startHospitalDay() {
     const g = this.g;
     const S = this.session;
+    this.eveningStarted = false;
     g.fader.set(true);
     await this.enter('hospital', 'day', 'hospital_day');
     const w = g.world;
@@ -588,16 +611,24 @@ const methods = {
       { id: 'h_side', label: 'Хирургия', at: { x: 0, z: -6.0 }, radius: 1.2, anchor: w.anchors.sideCorridor, run: say('h_side') },
       { id: 'h_station', label: 'Пост медсестры', at: { x: 5.0, z: -2.0 }, radius: 1.0, anchor: w.anchors.nurseStation, run: say('h_station') },
       { id: 'h_wardB', label: 'Палата 207', at: { x: 11.2, z: -2.3 }, radius: 1.3, anchor: A(11.2, 2.1, -4.0), run: say('h_wardB_day') },
-      { id: 'h_bed', label: 'Лечь в кровать', at: { x: w.wardA.bedSpot.x + 0.4, z: -4.9 }, radius: 1.0, anchor: A(w.wardA.bedSpot.x, 1.3, w.wardA.bedSpot.z),
+      { id: 'h_bed', label: 'Лечь в кровать', at: { x: w.wardA.bedSpot.x + 0.4, z: -4.9 }, radius: 1.6, anchor: A(w.wardA.bedSpot.x, 1.3, w.wardA.bedSpot.z),
         run: () => (g.state.get('overheard_doctors') ? this.startEvening() : g.dialogue.start('h_bed_wait')) },
     ];
   },
 
   // ------------------------------------------------------------------ EVENING — the investigator
 
+  inWardA() {
+    const a = this.g.world?.wardA;
+    const p = this.julian.position;
+    return !!a && p.x > a.x0 + 0.2 && p.x < a.x1 - 0.1 && p.z < -4.45;
+  },
+
   async startEvening() {
     const g = this.g;
     const S = this.session;
+    if (this.eveningStarted) return;
+    this.eveningStarted = true;
     g.player.enabled = false;
     g.interactions.setItems([]);
     await g.fader.to(true, 1200);
@@ -639,6 +670,7 @@ const methods = {
   async startNight() {
     const g = this.g;
     const S = this.session;
+    this.returnStarted = false;
     this.bloodFocus = false;
     await g.fader.to(true, 1800);
     if (S !== this.session) return;
@@ -725,7 +757,7 @@ const methods = {
       { id: 'n_elevator', label: 'Лифт', at: { x: -12.0, z: -2.4 }, radius: 0.8, anchor: w.anchors.elevator, run: say('n_elevator') },
       { id: 'n_bag', label: 'Пакет с кровью', at: { x: w.wardB.bedSpot.x - 1.0, z: -5.4 }, radius: 1.0, anchor: A(w.wardB.bedSpot.x - 1.05, 1.95, w.wardB.bedSpot.z + 0.7),
         if: 'ward_b_open && nurse_left && !blood_consumed', run: () => this.bloodEvent() },
-      { id: 'n_bed', label: 'Лечь в кровать', at: { x: w.wardA.bedSpot.x + 0.4, z: -4.9 }, radius: 1.0, anchor: A(w.wardA.bedSpot.x, 1.3, w.wardA.bedSpot.z),
+      { id: 'n_bed', label: 'Лечь в кровать', at: { x: w.wardA.bedSpot.x + 0.4, z: -4.9 }, radius: 1.6, anchor: A(w.wardA.bedSpot.x, 1.3, w.wardA.bedSpot.z),
         if: 'blood_consumed', run: () => this.nurseReturns() },
     ];
     return items;
@@ -841,6 +873,8 @@ const methods = {
   async nurseReturns() {
     const g = this.g;
     const S = this.session;
+    if (this.returnStarted) return;
+    this.returnStarted = true;
     const w = g.world;
     g.player.enabled = false;
     g.keyScene = true;
@@ -994,6 +1028,23 @@ const methods = {
         g.dialogue.start('st_called');
       }
     }
+    // by day his drip rolls along with him (he tears it off at night)
+    const iv = g.world?.wardA?.iv;
+    if (iv) {
+      iv.userData.home ??= iv.position.clone();
+      if (st === 'hospital_day' && g.player.enabled) {
+        const J = this.julian;
+        const tx = J.position.x - J.facing * 0.42, tz = J.position.z - 0.28;
+        const k = Math.min(1, dt * 4);
+        const vx = (tx - iv.position.x) * k;
+        iv.position.x += vx;
+        iv.position.z += (tz - iv.position.z) * k;
+        iv.rotation.z = THREE.MathUtils.clamp(-vx * 6, -0.12, 0.12); // a slight lean when pulled
+        if (Math.abs(vx) > 0.004 && (this.ivSqueak = (this.ivSqueak || 0) - dt) < 0) { this.ivSqueak = 1.4; g.audio.play('sfx.step', { volume: 0.12 }); }
+      } else if (st !== 'hospital_day' && !iv.position.equals(iv.userData.home)) {
+        iv.position.copy(iv.userData.home); iv.rotation.z = 0;
+      }
+    }
     if (st === 'hospital_day' && g.player.enabled) {
       this.hospT = (this.hospT || 0) + dt;
       const x = this.julian.position.x;
@@ -1009,7 +1060,10 @@ const methods = {
         });
       }
       if (!g.state.get('overheard_doctors') && this.hospT > 150) { g.state.set('overheard_doctors', true); g.state.set('objective', 'bed'); }
+      // "back to room 209" always completes: stepping into the ward is enough
+      if (g.state.get('overheard_doctors') && this.inWardA()) this.startEvening();
     }
+    if (st === 'hospital_return' && g.player.enabled && this.inWardA()) this.nurseReturns();
     if (st === 'hospital_night' && !g.state.get('blood_consumed')) {
       this.nightT = (this.nightT || 0) + dt;
       // thirst grows: heartbeat quickens, the picture pulses
@@ -1038,6 +1092,8 @@ const methods = {
       street: () => this.startStreet(),
     }[stage];
     this.carTalking = false;
+    this.eveningStarted = false;
+    this.returnStarted = false;
     this.calledStarted = false;
     this.wardBStarted = false;
     this.overhearing = false;

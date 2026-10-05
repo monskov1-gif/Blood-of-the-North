@@ -746,7 +746,7 @@ export class StationScene extends LocationBase {
 
   buildEntrance() {
     const S = this.S, root = this.root;
-    const outside = new THREE.MeshBasicMaterial({ map: streetTexture('morning'), color: 0xd6dee8 });
+    const outside = new THREE.MeshBasicMaterial({ map: streetTexture('morning', 'station'), color: 0xd6dee8 });
     this.plane(6, 3.4, outside, -11.5, 1.6, BACK - 1.4);
     // door frame, transom, two glass leaves with push bars and frost
     const alu = this.cm(0x5a6068, 0.4, 0.6);
@@ -767,7 +767,7 @@ export class StationScene extends LocationBase {
     ent.position.set(-12, 2.52, BACK + 0.03); root.add(ent);
     // EXIT sign (lit)
     S.box(0.44, 0.17, 0.06, this.cm(0xd8dcd8), -10.6, 2.6, BACK + 0.05);
-    S.plane(0.4, 0.13, this.signMat('ВЫХОД ◄ EXIT', 0.4, 0.13, '#0a6a2a', '#e8ffe8', { emissive: 1.4 }), -10.6, 2.6, BACK + 0.085);
+    S.plane(0.4, 0.13, this.signMat('◄ EXIT · SORTIE', 0.4, 0.13, '#0a6a2a', '#e8ffe8', { emissive: 1.4 }), -10.6, 2.6, BACK + 0.085);
     const eg = glow(0x40ff80, 0.7, 0.25); eg.position.set(-10.6, 2.6, BACK + 0.2); root.add(eg);
     this.anchors.entrance = new THREE.Vector3(-12, 1.4, BACK + 0.2);
     // cold daylight spilling in
@@ -884,7 +884,7 @@ export class StationScene extends LocationBase {
     };
     flag(-11.0, 'ca'); flag(-8.2, 'yt');
     // hanging RECEPTION sign
-    S.plane(1.5, 0.24, this.signMat('ПРИЁМНАЯ · RECEPTION', 1.5, 0.24, '#1a2a36', '#e8e4d8', { border: '#6a7a88' }), -9.5, 2.78, -2.3);
+    S.plane(1.5, 0.24, this.signMat('FRONT DESK · RECEPTION', 1.5, 0.24, '#1a2a36', '#e8e4d8', { border: '#6a7a88' }), -9.5, 2.78, -2.3);
     S.box(1.54, 0.28, 0.02, this.mDark, -9.5, 2.78, -2.315);
     for (const x of [-10.1, -8.9]) S.cyl(0.004, 0.1, this.mDark, x, 2.95, -2.3, { seg: 3 });
     // CCTV dome on the ceiling
@@ -896,7 +896,7 @@ export class StationScene extends LocationBase {
   buildWaiting() {
     const S = this.S, root = this.root;
     // high grimy window with snow outside
-    const outside = new THREE.MeshBasicMaterial({ map: streetTexture('morning'), color: 0xc8d4e2 });
+    const outside = new THREE.MeshBasicMaterial({ map: streetTexture('morning', 'station'), color: 0xc8d4e2 });
     this.plane(3.2, 2.2, outside, -6.4, 2.0, BACK - 1.2);
     const alu = this.cm(0x5a6068, 0.4, 0.6);
     S.box(1.66, 0.06, 0.16, alu, -6.4, 2.45, BACK); S.box(1.66, 0.08, 0.22, this.cm(0xb8b4a8, 0.6), -6.4, 1.53, BACK + 0.04);
@@ -975,7 +975,7 @@ export class StationScene extends LocationBase {
     board.position.set(-4.4, 1.85, BACK + 0.03);
     root.add(board);
     this.anchors.board = new THREE.Vector3(-4.4, 1.9, BACK + 0.2);
-    S.plane(0.9, 0.12, this.signMat('ДОСКА ОБЪЯВЛЕНИЙ', 0.9, 0.12, '#1a2026', '#e8e0c8'), -4.4, 2.48, BACK + 0.03);
+    S.plane(0.9, 0.12, this.signMat('NOTICE BOARD', 0.9, 0.12, '#1a2026', '#e8e0c8'), -4.4, 2.48, BACK + 0.03);
 
     // map of Whitehorse with pins
     S.box(1.2, 0.84, 0.03, this.cm(0x1a1a1a, 0.5), -2.6, 1.82, BACK + 0.02);
@@ -1001,7 +1001,7 @@ export class StationScene extends LocationBase {
     vb.box(0.18, 0.5, 0.02, this.cm(0x2a2e34, 0.4, 0.6), 0.32, 1.25, 0.355);
     vb.box(0.08, 0.04, 0.02, this.em(0x40ff60, 1.5), 0.32, 1.42, 0.37);
     vb.box(0.6, 0.18, 0.04, this.cm(0x080a0c, 0.5), -0.07, 0.3, 0.36);
-    vb.plane(0.86, 0.1, this.signMat('ICE COLD · ХОЛОДНЫЕ НАПИТКИ', 0.86, 0.1, '#d02030', '#ffffff', { emissive: 0.9 }), 0, 1.86, 0.352);
+    vb.plane(0.86, 0.1, this.signMat('ICE COLD DRINKS', 0.86, 0.1, '#d02030', '#ffffff', { emissive: 0.9 }), 0, 1.86, 0.352);
     vb.flush(vend);
     vend.position.set(-1.2, 0, BACK + 0.4);
     root.add(vend);
@@ -1017,7 +1017,7 @@ export class StationScene extends LocationBase {
 
   buildOffices() {
     const S = this.S, root = this.root;
-    this.door(-0.4, BACK + 0.02, { sign: 'ДЕТЕКТИВЫ', w: 0.9 });
+    this.door(-0.4, BACK + 0.02, { sign: 'DETECTIVES', w: 0.9 });
     // window frames, glass, blinds
     const alu = this.cm(0x4a5058, 0.4, 0.6);
     for (const [a, b] of [[0.15, 2.1], [2.3, 4.3]]) {
@@ -1101,7 +1101,7 @@ export class StationScene extends LocationBase {
     S.box(0.34, 0.5, 0.3, this.cm(0x1a4a8a, 0.6), 0.9, 0.25, -3.8);
     S.box(0.3, 0.06, 0.26, this.mPaper, 0.9, 0.52, -3.8, 0.2);
     // wall sign pointing to the cells
-    S.plane(0.62, 0.14, this.signMat('КАМЕРЫ · CELLS ►', 0.62, 0.14, '#2a2a20', '#e8d890'), 4.08, 2.5, BACK + 0.03);
+    S.plane(0.62, 0.14, this.signMat('CELLS ►', 0.62, 0.14, '#2a2a20', '#e8d890'), 4.08, 2.5, BACK + 0.03);
   }
 
   // ---------------------------------------------------------------- holding cell
@@ -1183,7 +1183,7 @@ export class StationScene extends LocationBase {
     root.add(cellDoor);
     this.cellDoor = cellDoor;
     this.cellDoorX = 5.6;
-    const cellSign = new THREE.Mesh(new THREE.PlaneGeometry(2.1, 0.2), this.signMat('КАМЕРА ВРЕМ. СОДЕРЖАНИЯ · 1', 2.1, 0.2, '#2a2a20', '#e8d890', { border: '#8a7a40', emissive: 0.35 }));
+    const cellSign = new THREE.Mesh(new THREE.PlaneGeometry(2.1, 0.2), this.signMat('HOLDING CELL · 1', 2.1, 0.2, '#2a2a20', '#e8d890', { border: '#8a7a40', emissive: 0.35 }));
     cellSign.position.set(6.1, 2.8, BACK + 0.05); root.add(cellSign);
     this.anchors.cellInside = { x: 6.1, z: -5.4 };
     this.anchors.cellBench = { x: 5.6, z: -6.0 };
@@ -1231,9 +1231,26 @@ export class StationScene extends LocationBase {
     S.box(0.08, 2.3, 2.0, mpMat, 10.6, 1.15, -5.0);
     S.box(1.6, 0.06, 2.0, this.cm(0xc8ccc8, 0.9), 9.8, 2.33, -5.0);
     S.box(0.8, 0.03, 0.22, this.em(0xe8f2ff, 1.2), 9.8, 2.295, -5.0);
-    this.medArea = { minX: 9.2, maxX: 10.4, minZ: -5.6, maxZ: -2.5 };
+    this.medOpen = false;
+    this.medArea = { minX: 9.2, maxX: 10.4, minZ: -5.6, maxZ: -2.5, enabled: () => this.medOpen };
     this.bounds.walk.areas.push(this.medArea);
-    S.plane(1.2, 0.22, this.signMat('МЕДПУНКТ ✚', 1.2, 0.22, '#f0f4f6', '#b01818', { border: '#b01818' }), 9.8, 2.5, BACK + 0.04);
+    // roll-up shutter over the opening: down (closed) until the sergeant sends him for the blood test
+    const shTex = ptex('medshutter', 32, 64, (ctx, w, h, r) => {
+      for (let y = 0; y < h; y++) { const v = (y % 4 === 0) ? 96 : (y % 4 === 1 ? 168 : 142) + (r() - 0.5) * 8; ctx.fillStyle = `rgb(${v},${v + 4},${v + 8})`; ctx.fillRect(0, y, w, 1); }
+      noise(ctx, w, h, 8, r);
+    });
+    const shGeo = new THREE.BoxGeometry(1.62, 2.3, 0.04);
+    shGeo.translate(0, -1.15, 0); // pivot at the top: rolling up = scaling towards it
+    const shutter = new THREE.Mesh(shGeo, this.pm('medshutter', shTex, { roughness: 0.5, metalness: 0.5 }));
+    shutter.position.set(9.8, 2.3, BACK + 0.045);
+    root.add(shutter);
+    const closed = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.16), this.signMat('CLOSED · FERMÉ', 0.5, 0.16, '#a01010', '#ffffff'));
+    closed.position.set(0, -1.1, 0.025);
+    shutter.add(closed);
+    S.box(1.72, 0.2, 0.16, this.cm(0x6a7278, 0.5, 0.4), 9.8, 2.42, BACK + 0.06);
+    this.medShutter = shutter;
+    this.medShutterTarget = 1;
+    S.plane(1.2, 0.22, this.signMat('FIRST AID ✚', 1.2, 0.22, '#f0f4f6', '#b01818', { border: '#b01818' }), 9.8, 2.5, BACK + 0.04);
     // wall cabinet with glass doors and bottles
     S.box(0.7, 0.6, 0.24, this.cm(0x8a9a98, 0.4, 0.3), 9.55, 1.75, -5.84);
     S.box(0.64, 0.54, 0.02, this.cm(0x2a3236, 0.6), 9.55, 1.75, -5.73);
@@ -1272,10 +1289,10 @@ export class StationScene extends LocationBase {
     S.box(0.44, 0.3, 0.36, card, 11.06, 0.87, -3.78, 0.12);
     S.box(0.4, 0.3, 0.03, this.cm(0x2a1a10, 0.5), 11.1, 1.8, BACK + 0.02);
     S.plane(0.34, 0.24, this.pm('groupphoto', photoTex()), 11.1, 1.8, BACK + 0.037);
-    S.plane(0.42, 0.1, this.signMat('ТИШИНА · ИДЁТ ДОПРОС', 0.42, 0.1, '#7a1010', '#ffffff'), 11.1, 1.48, BACK + 0.02);
+    S.plane(0.42, 0.1, this.signMat('QUIET · INTERVIEW', 0.42, 0.1, '#7a1010', '#ffffff'), 11.1, 1.48, BACK + 0.02);
 
     // interrogation door at the far right + recording lamp
-    this.interDoor = this.door(12.2, BACK + 0.02, { sign: 'ДОПРОСНАЯ 2', w: 1.0, color: 0x4a5560 });
+    this.interDoor = this.door(12.2, BACK + 0.02, { sign: 'INTERVIEW 2', w: 1.0, color: 0x4a5560 });
     this.anchors.interrogationDoor = new THREE.Vector3(12.2, 2.0, BACK + 0.2);
     S.box(0.1, 0.1, 0.05, this.mDark, 12.95, 2.25, BACK + 0.03);
     S.box(0.06, 0.06, 0.02, this.em(0xffa020, 2.4), 12.95, 2.25, BACK + 0.065);
@@ -1410,7 +1427,7 @@ export class StationScene extends LocationBase {
       const y = this.cm(0xf0c010, 0.5);
       b.box(0.32, 0.62, 0.02, y, 0, 0.31, 0.09, 0, 0.28);
       b.box(0.32, 0.62, 0.02, y, 0, 0.31, -0.09, 0, -0.28);
-      b.plane(0.26, 0.26, this.signMat('⚠ МОКРЫЙ ПОЛ', 0.26, 0.26, '#f0c010', '#1a1a1a'), 0, 0.36, 0.103, 0, 0.28);
+      b.plane(0.26, 0.26, this.signMat('⚠ WET FLOOR', 0.26, 0.26, '#f0c010', '#1a1a1a'), 0, 0.36, 0.103, 0, 0.28);
     });
     // a detective's desk at the right edge
     this.fg(8.2, 3.2, 'fg-desk', (b, g) => {
@@ -1429,6 +1446,11 @@ export class StationScene extends LocationBase {
     });
   }
 
+  setMedOpen(open) {
+    this.medOpen = open;
+    this.medShutterTarget = open ? 0.04 : 1;
+  }
+
   setCellOpen(open) {
     this.cellOpen = open;
     this.cellDoorTarget = open ? this.cellDoorX + 1.1 : this.cellDoorX;
@@ -1436,6 +1458,11 @@ export class StationScene extends LocationBase {
 
   update(dt) {
     super.update(dt);
+    if (this.medShutter) {
+      const sh = this.medShutter;
+      sh.scale.y += (this.medShutterTarget - sh.scale.y) * Math.min(1, dt * 1.8);
+      sh.children[0].visible = sh.scale.y > 0.6;
+    }
     if (this.cellDoorTarget != null) {
       this.cellDoor.position.x += (this.cellDoorTarget - this.cellDoor.position.x) * Math.min(1, dt * 3);
     }

@@ -145,7 +145,7 @@ export const DIALOGUES = {
   },
   st_medpost_wait: {
     mode: 'bark',
-    nodes: { a: { speaker: 'thought', text: 'Медпункт. Пока закрыт.' } },
+    nodes: { a: { speaker: 'thought', text: 'Медпункт. Ставня опущена — закрыто.' } },
   },
   st_door_wait: {
     mode: 'bark',
@@ -176,8 +176,9 @@ export const DIALOGUES = {
   st_leo: {
     mode: 'bark',
     nodes: {
-      a: { speaker: 'survivorWaiter2', text: 'Я был в подсобке — менял кегу. Дверь заклинило изнутри. Это меня и спасло.' },
-      b: { speaker: 'survivorWaiter2', text: 'Кто-то скрёбся в неё. Долго. А потом перестал.', set: { talked_leo: true } },
+      a: { speaker: 'barman', text: 'Детектив… Нас всех сюда привезли. Меня — прямо из-под стойки, в одном фартуке.' },
+      b: { speaker: 'barman', text: 'Я им всё рассказал. Что и вам утром. Крики, стекло — и тень. Больше ничего.' },
+      c: { speaker: 'barman', text: 'А руки до сих пор трясутся. Смешно, да? Двенадцать лет за стойкой.', set: { talked_leo: true } },
     },
   },
   st_chef: {
@@ -197,7 +198,8 @@ export const DIALOGUES = {
   st_called: {
     mode: 'bark',
     nodes: {
-      a: { speaker: 'sergeant', text: 'Рид! Вы следующий. Сначала в медпункт — анализы. Потом вторая допросная.', set: { objective: 'medpost', survivors_questioned: true } },
+      a: { speaker: 'sergeant', text: 'Рид! Вы следующий. Сначала в медпункт — анализы. Потом вторая допросная.', cmd: 'medOpen' },
+      b: { speaker: 'julian', text: 'Понял. Моя очередь. Сначала анализы — потом допрос.', set: { objective: 'medpost', survivors_questioned: true } },
     },
   },
   st_blood: {
@@ -312,7 +314,7 @@ export const DIALOGUES = {
       a: { speaker: 'thought', text: 'Кулер. Стаканчик, второй, третий. Живот полон. Горло — сухое.', cmd: 'sfx:sfx.water' },
     },
   },
-  h_reception: { mode: 'bark', nodes: { a: { speaker: 'thought', text: 'Регистратура. На стойке — свежая газета: «Резня в “Северной Розе”: единственный выживший гость — полицейский».' } } },
+  h_reception: { mode: 'bark', nodes: { a: { speaker: 'thought', text: 'Регистратура. На стойке — свежая газета: «Резня в “Северной Розе”: одиннадцать погибших. Детектив очнулся среди тел; персонал уцелел, спрятавшись».' } } },
   h_elevator: { mode: 'bark', nodes: { a: { speaker: 'thought', text: 'Лифт. Внизу — выход. Меня не выпустят в больничной пижаме и с капельницей в руке.' } } },
   h_stairs: { mode: 'bark', nodes: { a: { speaker: 'thought', text: 'Лестница. Пахнет хлоркой и холодом.' } } },
   h_procedure: { mode: 'bark', nodes: { a: { speaker: 'thought', text: 'Процедурная. Здесь мне светили фонариком в глаза. Свет до сих пор плавает пятнами.' } } },

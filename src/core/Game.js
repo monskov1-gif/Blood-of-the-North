@@ -53,7 +53,7 @@ export class Game {
   }
 
   async boot() {
-    preloadPortraits(['julian', 'kayden', 'waiter', 'owen', 'quinn', 'wyatt', 'nurse']);
+    preloadPortraits(['julian', 'julian_gown', 'kayden', 'waiter', 'owen', 'quinn', 'wyatt', 'nurse']);
     this.progress(0.1, 'персонажи…');
     this.atlas = await new SpriteAtlas().load();
     this.progress(0.35, 'бар «Северная Роза»…');
@@ -273,6 +273,19 @@ export class Game {
 
   resize() {
     this.cameraSys.resize(window.innerWidth, window.innerHeight);
+    this.scaleUI();
+  }
+
+  /** The UI is laid out in px for ~1280×760; on bigger screens it scales up as a whole. */
+  scaleUI() {
+    const w = window.innerWidth, h = window.innerHeight;
+    const k = Math.min(2.2, Math.max(1, Math.min(w / 1280, h / 760)));
+    const ui = document.getElementById('ui');
+    if (!ui) return;
+    ui.style.zoom = k;
+    ui.style.width = `${w / k}px`;
+    ui.style.height = `${h / k}px`;
+    window.__uiScale = k;
   }
 
   // ------------------------------------------------------------------ modes

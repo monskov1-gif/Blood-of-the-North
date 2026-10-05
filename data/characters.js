@@ -3,10 +3,16 @@
  * `portrait` names the procedural portrait painter (src/characters/portraits).
  * `layer` 1 = visible to the main camera only (not to mirrors).
  */
+// Julian's outfits: the coat (default) and the hospital gown (admitted → recovery)
+export const JULIAN_OUTFITS = {
+  coat: { poses: { idle: 'jul_idle', talk: 'jul_talk', think: 'julian_think', drink: 'julian_think' }, lie: 'lie_julian', portrait: 'julian' },
+  gown: { poses: { idle: 'julg_idle', talk: 'julg_talk', think: 'julg_idle', drink: 'julg_idle' }, lie: 'lie_julian_gown', portrait: 'julian_gown' },
+};
+
 export const CHARACTERS = {
   julian: {
     id: 'julian', name: 'Джулиан Рид', nameEn: 'JULIAN REED', portrait: 'julian', color: '#b5302f',
-    poses: { idle: 'julian_idle', talk: 'julian_talk', think: 'julian_think', drink: 'julian_think' },
+    poses: { idle: 'jul_idle', talk: 'jul_talk', think: 'julian_think', drink: 'julian_think' },
     lie: 'lie_julian',
     speed: 1.55,
   },

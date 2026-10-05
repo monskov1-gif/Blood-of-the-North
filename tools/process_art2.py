@@ -98,4 +98,27 @@ if os.path.exists(os.path.join(SRC, '31.jpg')):
     for k, (cid, s) in enumerate(comps[:3]):
         save_portrait(figure(a, lab, cid), f'quinn_{k}')
     f = figure(a, lab, comps[3][0])
-    raw(pixelize(f, 132 / f.shape[0]), 'quinn_drive')
+    raw(pixelize(f, 128 / f.shape[0]), 'quinn_drive')
+
+# ------------------------------------------------------------------ 32: Julian — coat + hospital gown (idle, talk, walk ×2), lying in the gown
+if os.path.exists(os.path.join(SRC, '32.jpg')):
+    a = load('32.jpg')
+    lab, comps = components(a)
+    top = by_x([c for c in comps if c[1][0].start < 300])
+    S32 = 182 / 616.0  # standing frames are 616 px → 182 cm
+    names = ['jul_idle', 'jul_talk', 'jul_idle_walk1', 'jul_idle_walk2',
+             'julg_idle', 'julg_talk', 'julg_idle_walk1', 'julg_idle_walk2']
+    for (cid, s_), n in zip(top, names):
+        raw(pixelize(figure(a, lab, cid), S32), n)
+    low = [c for c in comps if c[1][0].start >= 300]
+    raw(pixelize(figure(a, lab, low[0][0]), S32 * 0.9), 'lie_julian_gown')
+
+# ------------------------------------------------------------------ 33: Julian in the gown — VN portraits
+if os.path.exists(os.path.join(SRC, '33.jpg')):
+    a = load('33.jpg')
+    lab, comps = components(a)
+    comps = by_x(comps)
+    c2 = comps[0][0]  # the two left portraits touch: split at the gap
+    figs = [figure(a, lab, c2, (0, 478)), figure(a, lab, c2, (478, 1000)), figure(a, lab, comps[1][0])]
+    for k, f in enumerate(figs):
+        save_portrait(f, f'julian_gown_{k}')
