@@ -142,9 +142,19 @@ export class AudioManager {
   music(mood, fade = 3) { if (this.ready) this.musicEngine.setMood(mood, fade); }
 
   /** 0 = clear, 1 = underwater. */
-  setMuffle(amount, time = 1.5) {
+  /**
+   * World low-pass. Each source (story scenes, the hallucination system) keeps
+   * its own amount and the strongest wins, so the per-frame hallucination
+   * update can't wipe out a muffle a scene asked for.
+   */
+  setMuffle(amount, time = 1.5, source = 'story') {
     if (!this.ready) return;
-    const f = 20000 * Math.pow(250 / 20000, Math.min(1, Math.max(0, amount)));
+    this.muffles ??= {};
+    this.muffles[source] = Math.min(1, Math.max(0, amount));
+    const eff = Math.max(0, ...Object.values(this.muffles));
+    if (this.muffleEff !== undefined && Math.abs(eff - this.muffleEff) < 0.002 && source !== 'story') return;
+    this.muffleEff = eff;
+    const f = 20000 * Math.pow(250 / 20000, eff);
     this.worldFilter.frequency.setTargetAtTime(f, this.ctx.currentTime, time / 3);
   }
 

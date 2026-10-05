@@ -87,7 +87,7 @@ export class Hallucination {
     r.redPulse = (r.redPulse || 0) * (0.6 + 0.4 * Math.max(0, Math.sin(this.heartPhase || 0)));
     this.renderer.setLayer('hallucination', r);
     this.cameraSys.sway = c.cam;
-    this.audio.setMuffle(c.muffle, 1);
+    this.audio.setMuffle(c.muffle, 1, 'hallucination');
     this.audio.setWarp(c.warp);
     this.scene.setUnreality?.(c.unreal);
     if (this.player) this.player.impair = c.impair;
