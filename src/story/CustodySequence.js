@@ -1079,6 +1079,9 @@ const methods = {
   },
 
   async loadCustody(stage) {
+    // a fresh session: whatever scene was running stops touching the cast
+    this.bump();
+    await this.g.dialogue.abort();
     const start = {
       car: () => this.startCar(),
       station: () => this.startStation(),
