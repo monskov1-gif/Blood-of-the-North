@@ -749,11 +749,14 @@ const methods = {
     g.state.set('blood_bag_seen', true);
     const bag = w.wardB.iv.userData.bag;
     const bed = w.wardB.bedSpot;
+    // stand left of the drip so neither he nor the pole hides the bag or the patient
+    await J.walkTo({ x: bed.x - 1.8, z: bed.z + 0.75 }, { speed: 0.7 });
+    if (S !== this.session) return;
     J.face(1);
     // perception narrows: the room blurs and greys, the red stays, the heart pounds
     g.audio.setMuffle(0.8, 2);
-    g.renderer.setLayer('blood', { saturation: -0.75, blur: 0.9, vignette: 0.55, redPulse: 0.5, exposure: -0.1 });
-    bag.material.emissiveIntensity = 2.5;
+    g.renderer.setLayer('blood', { saturation: -0.45, blur: 0.9, vignette: 0.55, redPulse: 0.5, exposure: -0.1 });
+    bag.material.emissiveIntensity = 4;
     bag.material.emissive.set(0x700010);
     g.cameraSys.setShot({ x: bed.x - 0.6, y: 1.65, z: bed.z + 2.6, lookX: bed.x - 0.8, lookY: 1.25, lookZ: bed.z, fov: 30 }, 0.5);
     const beats = setInterval(() => g.audio.play('inner.heartbeat', { volume: 1 }), 520);
