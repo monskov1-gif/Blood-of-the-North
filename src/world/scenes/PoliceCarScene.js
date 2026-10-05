@@ -161,13 +161,13 @@ const sirenTex = () => PX('siren', 32, 16, (ctx, w, h) => {
 
 // ---- outside layers (transparent tops, scrolled with texture offsets)
 
-const skyTex = () => canvasTexture('car-sky', 8, 128, (ctx, w, h) => {
+export const skyTex = () => canvasTexture('car-sky', 8, 128, (ctx, w, h) => {
   const g = ctx.createLinearGradient(0, 0, 0, h);
   g.addColorStop(0, '#3c4858'); g.addColorStop(0.45, '#7a8798'); g.addColorStop(0.8, '#b8c0ca'); g.addColorStop(0.9, '#d4ccc4'); g.addColorStop(1, '#c8ccd2');
   ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
 });
 
-const mountainTex = () => PX('mtn', 256, 64, (ctx, w, h) => {
+export const mountainTex = () => PX('mtn', 256, 64, (ctx, w, h) => {
   const r = rng(21);
   ctx.clearRect(0, 0, w, h);
   const ridge = (k) => (x) => h * (0.25 + k * 0.18) + Math.sin(x / w * Math.PI * 2 * (2 + k) + k * 1.7) * 9 + Math.sin(x / w * Math.PI * 2 * (7 + k)) * 4 + Math.sin(x / w * Math.PI * 2 * 13) * 1.5;
@@ -184,7 +184,7 @@ const mountainTex = () => PX('mtn', 256, 64, (ctx, w, h) => {
   });
 });
 
-const treeTex = () => PX('trees', 256, 64, (ctx, w, h) => {
+export const treeTex = () => PX('trees', 256, 64, (ctx, w, h) => {
   const r = rng(22);
   ctx.clearRect(0, 0, w, h);
   ctx.fillStyle = '#4c5864';
@@ -204,7 +204,7 @@ const treeTex = () => PX('trees', 256, 64, (ctx, w, h) => {
 });
 
 /** Whitehorse: clapboard houses, shops with lit windows, a log "skyscraper". */
-const townTex = () => PX('town', 256, 128, (ctx, w, h) => {
+export const townTex = () => PX('town', 256, 128, (ctx, w, h) => {
   const r = rng(23);
   ctx.clearRect(0, 0, w, h);
   const G = h - 4;
@@ -280,7 +280,7 @@ const townTex = () => PX('town', 256, 128, (ctx, w, h) => {
   for (let i = 0; i < 30; i++) { ctx.fillStyle = '#f4f7fa'; ctx.fillRect(r() * w, G - 1 - r() * 2, 3 + r() * 6, 2); }
 });
 
-const roadTex = () => PX('road', 64, 64, (ctx, w, h) => {
+export const roadTex = () => PX('road', 64, 64, (ctx, w, h) => {
   const r = rng(24);
   noiseFill(ctx, w, h, [92, 98, 106], 14, r);
   // packed snow between and beside the ruts
@@ -293,7 +293,7 @@ const roadTex = () => PX('road', 64, 64, (ctx, w, h) => {
   for (let x = 0; x < w; x += 1) { ctx.fillStyle = 'rgba(40,44,50,0.25)'; ctx.fillRect(x, 18, 1, 1); ctx.fillRect(x, 44, 1, 1); }
 });
 
-const bankTex = () => PX('bank', 256, 32, (ctx, w, h) => {
+export const bankTex = () => PX('bank', 256, 32, (ctx, w, h) => {
   const r = rng(25);
   ctx.clearRect(0, 0, w, h);
   for (let x = 0; x < w; x++) {
@@ -493,7 +493,7 @@ export class PoliceCarScene extends LocationBase {
     const cage = new THREE.Group();
     const steel = this.mat('steel', { color: 0x9aa0a6, metalness: 0.9, roughness: 0.3 });
     const panel = this.pmat('cagePanel', steelTex(), { roughness: 0.5, metalness: 0.5 });
-    const frameM = this.mat('cageFrame', { color: 0x1c1e22, roughness: 0.5, metalness: 0.5 });
+    const frameM = this.mat('cageFrame', { color: 0x3a3e44, roughness: 0.5, metalness: 0.5 });
     // lower kick panel (steel), upper polycarbonate with a sliding window, mesh header
     this.B(0.03, 0.42, 1.6, panel, 0, 0.21, 0, cage);
     this.box(0.05, 0.62, 1.6, this.mat('cagePlex', { color: 0x9ab0c0, transparent: true, opacity: 0.1, roughness: 0.05, depthWrite: false }), 0, 0.73, 0, cage);
@@ -836,7 +836,7 @@ export class PoliceCarScene extends LocationBase {
     day.position.set(-1, 4, 3);
     // window light spilling onto the rear bench (Julian) and the driver
     const fill = new THREE.PointLight(0xc4d2e8, 4.5, 3.6, 1.3);
-    fill.position.set(-0.7, 1.45, 0.5);
+    fill.position.set(-0.7, 1.2, 0.8);
     const front = new THREE.PointLight(0xc4d2e8, 4, 3.2, 1.4);
     front.position.set(1.15, 1.3, -0.5);
     const dash = new THREE.PointLight(0x5a9ac8, 3, 2.2, 1.6);
