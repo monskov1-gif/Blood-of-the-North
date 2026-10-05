@@ -21,7 +21,12 @@ export class InteractionSystem {
     });
   }
 
-  setItems(items) { this.items = items; this.focused = null; }
+  setItems(items) {
+    this.items = items;
+    // emit the change so the HUD drops the old marker (otherwise a label from
+    // the previous location lingers on screen)
+    this.setFocus(null);
+  }
 
   add(item) { this.items.push(item); }
 
