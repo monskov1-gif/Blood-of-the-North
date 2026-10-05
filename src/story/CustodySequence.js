@@ -627,6 +627,7 @@ const methods = {
   async startNight() {
     const g = this.g;
     const S = this.session;
+    this.bloodFocus = false;
     await g.fader.to(true, 1800);
     if (S !== this.session) return;
     await this.enter('hospital', 'night', 'hospital_night');
@@ -761,16 +762,30 @@ const methods = {
     if (S !== this.session) return;
     const bag = w.wardB.iv.userData.bag;
     const bed = w.wardB.bedSpot;
-    // stand left of the drip so neither he nor the pole hides the bag or the patient
-    await J.walkTo({ x: bed.x - 1.8, z: bed.z + 0.75 }, { speed: 0.7 });
+    // in front of the middle of the bed, facing the head end: the drip and the
+    // patient's head stay clear on his left (by the doorway the door leaf and the
+    // jamb would hide him or the bag)
+    await J.walkTo([{ x: bed.x - 0.9, z: bed.z + 1.2 }, { x: bed.x + 0.25, z: bed.z + 1.0 }], { speed: 0.7 });
     if (S !== this.session) return;
-    J.face(1);
+    J.face(-1);
     // perception narrows: the room blurs and greys, the red stays, the heart pounds
     g.audio.setMuffle(0.8, 2);
-    g.renderer.setLayer('blood', { saturation: -0.45, blur: 0.9, vignette: 0.55, redPulse: 0.5, exposure: -0.1 });
-    bag.material.emissiveIntensity = 4;
-    bag.material.emissive.set(0x700010);
-    g.cameraSys.setShot({ x: bed.x - 0.6, y: 1.65, z: bed.z + 2.6, lookX: bed.x - 0.8, lookY: 1.25, lookZ: bed.z, fov: 30 }, 0.5);
+    // the room sinks into dark and red; the bag is the one bright thing left in it
+    // (pure red is dark once colour drains away; the bag glows light-red and the
+    // thirst filter eases its desaturation while he stares, so the red survives)
+    g.renderer.setLayer('blood', { saturation: -0.1, blur: 0.6, vignette: 0.1, redPulse: 0.1, exposure: -0.35 });
+    bag.material.emissive.set(0xff3848);
+    bag.material.emissiveIntensity = 3.2;
+    // (locations are cached, so the boost is set absolutely, never compounded)
+    for (const c of bag.children) {
+      c.userData.baseScale ??= c.scale.clone();
+      c.scale.copy(c.userData.baseScale).multiplyScalar(2.2);
+      if (c.material && !c.userData.ownMat) { c.material = c.material.clone(); c.userData.ownMat = true; }
+      if (c.material) c.material.opacity = 0.85;
+    }
+    // from the corridor, right of the doorway jamb: drip, patient's head, Julian
+    g.cameraSys.setShot({ x: bed.x - 0.3, y: 1.45, z: bed.z + 3.3, lookX: bed.x - 0.7, lookY: 1.28, lookZ: bed.z + 0.5, fov: 30 }, 0.9);
+    this.bloodFocus = true; // the thirst vignette eases so the bag stays in the light
     const beats = setInterval(() => g.audio.play('inner.heartbeat', { volume: 1 }), 520);
     for (const [who, text] of g.dialogue.dialogues.n_patient) {
       if (S !== this.session) { clearInterval(beats); return; }
@@ -796,6 +811,7 @@ const methods = {
     g.player.impair = 0;
     J.dizzy = 0;
     g.state.set('blood_consumed', true);
+    this.bloodFocus = false;
     g.fader.set(false);
     g.audio.play('sfx.whoosh', { volume: 0.4 });
     if (!(await this.lines(g.dialogue.dialogues.n_after))) return;
@@ -989,7 +1005,7 @@ const methods = {
       const k = Math.min(1, this.nightT / 90);
       this.thirstBeat -= dt;
       if (this.thirstBeat <= 0 && g.player.enabled) { this.thirstBeat = 1.0 - k * 0.45; g.audio.play('inner.heartbeat', { volume: 0.55 + k * 0.4 }); }
-      g.renderer.setLayer('thirst', { redPulse: 0.3 + k * 0.25, vignette: 0.4 + k * 0.2, ca: 0.6 + k * 0.6, saturation: -0.3 - k * 0.2, blur: 0.2 + k * 0.2, wave: 0.25 + k * 0.3 });
+      g.renderer.setLayer('thirst', { redPulse: 0.3 + k * 0.25, vignette: (0.4 + k * 0.2) * (this.bloodFocus ? 0.3 : 1), ca: 0.6 + k * 0.6, saturation: (-0.3 - k * 0.2) * (this.bloodFocus ? 0.2 : 1), blur: 0.2 + k * 0.2, wave: 0.25 + k * 0.3 });
       const x = this.julian.position.x;
       if (!this.wardBStarted && g.player.enabled && (g.state.get('night_water') || this.nightT > 25) && x > 11.6 && x < 16.0 && this.julian.position.z > -3) {
         this.wardBOpens();
