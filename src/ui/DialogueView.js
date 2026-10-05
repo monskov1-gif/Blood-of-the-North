@@ -376,10 +376,15 @@ export class DialogueView {
     this.barkName.textContent = info.name;
     this.barkText.textContent = text;
     this.barkHint.classList.remove('show');
+    // a newer flash replaces this one: settle the old promise so its awaiter
+    // never hangs
     clearTimeout(this.flashT);
+    this.flashResolve?.();
     return new Promise((resolve) => {
+      this.flashResolve = resolve;
       this.flashT = setTimeout(() => {
         if (this.mode === 'flash') { this.bark.classList.add('hidden'); this.mode = null; }
+        if (this.flashResolve === resolve) this.flashResolve = null;
         resolve();
       }, ms);
     });

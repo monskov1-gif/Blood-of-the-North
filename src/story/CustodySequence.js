@@ -718,7 +718,12 @@ const methods = {
   },
 
   /** The door of 207 opens: warm light, a voice, the nurse leaves without turning. */
-  async wardBOpens() {
+  wardBOpens() {
+    this.wardVoice = this.wardBScene();
+    return this.wardVoice;
+  },
+
+  async wardBScene() {
     const g = this.g;
     const S = this.session;
     const w = g.world;
@@ -747,6 +752,9 @@ const methods = {
     g.keyScene = true;
     g.hud.show(false);
     g.state.set('blood_bag_seen', true);
+    // let the nurse finish her lines first — two subtitle streams must not overlap
+    await this.wardVoice;
+    if (S !== this.session) return;
     const bag = w.wardB.iv.userData.bag;
     const bed = w.wardB.bedSpot;
     // stand left of the drip so neither he nor the pole hides the bag or the patient
