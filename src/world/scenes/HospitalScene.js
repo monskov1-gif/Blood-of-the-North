@@ -315,7 +315,7 @@ export class HospitalScene extends LocationBase {
   openWardB(open = true) {
     this.wardBOpen = open;
     this.wardBDoorTarget = open ? 1.35 : 0;
-    this.wardB.warm.intensity = open ? 14 : 0;
+    this.wardB.warm.intensity = open ? 9 : 0;
     if (open && !this.spill) {
       this.spill = this.pool(0xffb070, 10.0, -1.8, 2.6, 3.4, 0.0);
     }

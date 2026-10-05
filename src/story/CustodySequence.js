@@ -710,7 +710,7 @@ const methods = {
       { id: 'n_station', label: 'Пост медсестры', at: { x: 5.0, z: -2.0 }, radius: 1.0, anchor: w.anchors.nurseStation, run: say('n_station') },
       { id: 'n_elevator', label: 'Лифт', at: { x: -12.0, z: -2.4 }, radius: 0.8, anchor: w.anchors.elevator, run: say('n_elevator') },
       { id: 'n_bag', label: 'Пакет с кровью', at: { x: w.wardB.bedSpot.x - 1.0, z: -5.4 }, radius: 1.0, anchor: A(w.wardB.bedSpot.x - 1.05, 1.95, w.wardB.bedSpot.z + 0.7),
-        if: 'ward_b_open && !blood_consumed', run: () => this.bloodEvent() },
+        if: 'ward_b_open && nurse_left && !blood_consumed', run: () => this.bloodEvent() },
       { id: 'n_bed', label: 'Лечь в кровать', at: { x: w.wardA.bedSpot.x + 0.4, z: -4.9 }, radius: 1.0, anchor: A(w.wardA.bedSpot.x, 1.3, w.wardA.bedSpot.z),
         if: 'blood_consumed', run: () => this.nurseReturns() },
     ];
@@ -735,7 +735,11 @@ const methods = {
     nurse.placeAt(10.0, -4.9, -1);
     await sleep(0.6);
     if (!(await this.lines(g.dialogue.dialogues.n_ward_voice.slice(0, 1), { blocking: false }))) return;
-    nurse.walkTo([{ x: 10.0, z: -2.0 }, { x: 4.5, z: -1.6 }, { x: -9.3, z: -2.3 }], { speed: 1.05 }).then(() => nurse.setVisible(false));
+    nurse.walkTo([{ x: 10.0, z: -2.0 }, { x: 4.5, z: -1.6 }, { x: -9.3, z: -2.3 }], { speed: 1.05 }).then(() => {
+      if (S !== this.session) return;
+      nurse.setVisible(false);
+      g.state.set('nurse_left', true);
+    });
     g.audio.play('sfx.lighter', { delay: 2.5, volume: 0.3 });
     await sleep(1.5);
     if (S !== this.session) return;
@@ -1001,8 +1005,8 @@ const methods = {
       medical: () => this.startMedical(),
       hospital_day: () => this.startHospitalDay(),
       hospital_evening: () => this.startEvening(),
-      hospital_night: () => { this.g.state.set('blood_consumed', false); this.g.state.set('ward_b_open', false); this.wardBStarted = false; return this.startNight(); },
-      hospital_return: () => { this.g.state.set('blood_consumed', false); this.g.state.set('ward_b_open', false); this.wardBStarted = false; return this.startNight(); },
+      hospital_night: () => { this.g.state.set('nurse_left', false); this.g.state.set('blood_consumed', false); this.g.state.set('ward_b_open', false); this.wardBStarted = false; return this.startNight(); },
+      hospital_return: () => { this.g.state.set('nurse_left', false); this.g.state.set('blood_consumed', false); this.g.state.set('ward_b_open', false); this.wardBStarted = false; return this.startNight(); },
       recovery: () => this.startRecovery(),
       street: () => this.startStreet(),
     }[stage];
