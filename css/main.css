@@ -347,3 +347,10 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .pflash.memory.show { animation: memflick 0.18s steps(2) infinite; }
 @keyframes memflick { 50% { opacity: 0.55; } }
 .pflash.dead img { filter: grayscale(0.85) brightness(0.8) contrast(1.05) sepia(0.2) hue-rotate(170deg) drop-shadow(0 0 30px rgba(0,0,0,0.8)); }
+
+/* ------------------------------------------------------------------ title cards */
+.card-title { position: absolute; inset: 0; z-index: 75; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; opacity: 0; transition: opacity 0.7s; pointer-events: none; text-align: center; padding: 20px; }
+.card-title.bg { background: #000; }
+.card-title.show { opacity: 1; }
+.card-title .ct-main { font-family: var(--serif); font-style: italic; font-size: clamp(26px, 4vw, 44px); color: #efe3cd; letter-spacing: 0.04em; }
+.card-title .ct-sub { font-family: var(--sc); font-size: 12px; letter-spacing: 0.4em; color: rgba(233,220,197,0.5); }

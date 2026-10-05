@@ -97,6 +97,7 @@ export class BarScene {
       camera: { minX: -10.2, maxX: 10.6 },
     };
     this.colliders = [];
+    this.foregroundGroups = [];
     this.spawns = { player: { x: -11.6, z: 0.9, facing: 1 } };
     this.anchors = {};
   }
@@ -854,34 +855,41 @@ export class BarScene {
 
   buildForeground() {
     const m = this.mats;
-    const root = this.root;
-    // tables and chairs closer to the camera than the walk lane — they occlude characters
+    // tables and chairs closer to the camera than the walk lane — they occlude characters.
+    // Every set is one group registered with the Narrative Safe Zones, so it fades out
+    // whenever it would hide a story-important point.
     const spots = [-11.6, -7.4, -3.0, 1.8, 6.2, 10.4, 12.9];
     this.foregroundSeats = [];
     spots.forEach((x, i) => {
+      const set = new THREE.Group();
+      set.name = `fg-table-${i}`;
+      const add = (o) => { set.add(o); return o; };
       const z = 2.85 + (i % 2) * 0.3;
-      const t = bistroTable(m, { radius: 0.56 });
-      t.position.set(x, 0, z);
-      root.add(t);
-      const c = candle(m);
+      add(bistroTable(m, { radius: 0.56 })).position.set(x, 0, z);
+      const c = add(candle(m));
       c.position.set(x + 0.05, 0.765, z - 0.08);
-      root.add(c);
       this.flickers.push(c);
       // table dressing: bottle, glasses, ashtray, fringed lamp on some tables
-      if (i % 3 === 0) { const l = tableLamp(m, i % 2 ? 0x4a1010 : 0x120a08); l.position.set(x - 0.22, 0.765, z - 0.12); l.scale.setScalar(0.85); root.add(l); }
-      else { const b = wineBottle(m, [0x1e2a14, 0x3a0a10, 0x2a1a0a][i % 3]); b.position.set(x - 0.24, 0.765, z - 0.1); root.add(b); }
-      const g1 = wineGlass(m, i % 2 ? 0x5a0a10 : 0x8a6a20); g1.position.set(x + 0.2, 0.765, z + 0.05); root.add(g1);
-      const g2 = tumbler(m); g2.position.set(x - 0.05, 0.765, z + 0.2); root.add(g2);
-      if (i % 2 === 0) { const a = ashtray(m); a.position.set(x + 0.28, 0.765, z - 0.18); root.add(a); }
-      const ch1 = bentwoodChair(m, 1); ch1.position.set(x - 0.86, 0, z + 0.05); ch1.rotation.y = 0.12; root.add(ch1);
-      const ch2 = bentwoodChair(m, -1); ch2.position.set(x + 0.86, 0, z - 0.05); ch2.rotation.y = -0.15; root.add(ch2);
+      if (i % 3 === 0) { const l = add(tableLamp(m, i % 2 ? 0x4a1010 : 0x120a08)); l.position.set(x - 0.22, 0.765, z - 0.12); l.scale.setScalar(0.85); }
+      else add(wineBottle(m, [0x1e2a14, 0x3a0a10, 0x2a1a0a][i % 3])).position.set(x - 0.24, 0.765, z - 0.1);
+      add(wineGlass(m, i % 2 ? 0x5a0a10 : 0x8a6a20)).position.set(x + 0.2, 0.765, z + 0.05);
+      add(tumbler(m)).position.set(x - 0.05, 0.765, z + 0.2);
+      if (i % 2 === 0) add(ashtray(m)).position.set(x + 0.28, 0.765, z - 0.18);
+      const ch1 = add(bentwoodChair(m, 1)); ch1.position.set(x - 0.86, 0, z + 0.05); ch1.rotation.y = 0.12;
+      const ch2 = add(bentwoodChair(m, -1)); ch2.position.set(x + 0.86, 0, z - 0.05); ch2.rotation.y = -0.15;
       this.foregroundSeats.push({ x: x - 0.86, z: z + 0.05, facing: 1 }, { x: x + 0.86, z: z - 0.05, facing: -1 });
+      this.root.add(set);
+      this.foregroundGroups.push(set);
     });
-    // carved columns in the extreme foreground (depth framing)
-    for (const x of [-5.2, 8.3]) {
+    // carved columns in the extreme foreground (depth framing). They stand away from the
+    // places where the story happens (collapse spot, main table, Kayden, the bar centre);
+    // the safe-zone system handles anything that still crosses them.
+    for (const x of [-8.2, 7.4]) {
       const c = column(m, CEIL, 0.19);
+      c.name = `fg-column-${x}`;
       c.position.set(x, 0, 4.7);
-      root.add(c);
+      this.root.add(c);
+      this.foregroundGroups.push(c);
     }
   }
 

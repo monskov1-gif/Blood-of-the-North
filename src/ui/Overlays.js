@@ -249,6 +249,8 @@ export class EndingScreen {
       f.heard_voicemail ? 'Вы прослушали голосовое Лиззи.' : '',
       f.saw_wounds ? 'Вы видели проколы на шее.' : '',
       f.memory_flash ? 'Вы почти вспомнили, что было в бокале.' : '',
+      f.saw_poster ? 'Вы видели плакат с Лиззи.' : '',
+      f.looked_mirror_interrogation ? 'Вы заметили, что ваше отражение потускнело.' : '',
     ].filter(Boolean).join(' '));
     const btns = el('div', 'btns', e);
     const cont = el('button', '', btns, 'Продолжить<small>ГЛАВА 1 · СКОРО</small>');
@@ -286,5 +288,25 @@ export class PortraitFlash {
     await wait(ms);
     this.el.classList.remove('show');
     await wait(600);
+  }
+}
+
+/** Centered title card over black (time skips: "Day two", locations). */
+export class Card {
+  constructor(root) {
+    this.el = el('div', 'card-title', root);
+    this.main = el('div', 'ct-main', this.el);
+    this.sub = el('div', 'ct-sub', this.el);
+  }
+
+  async show(text, { sub = '', ms = 2200, bg = true } = {}) {
+    this.main.textContent = text;
+    this.sub.textContent = sub;
+    this.el.classList.toggle('bg', bg);
+    void this.el.offsetWidth;
+    this.el.classList.add('show');
+    await wait(ms);
+    this.el.classList.remove('show');
+    await wait(700);
   }
 }

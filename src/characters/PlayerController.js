@@ -16,8 +16,26 @@ export class PlayerController {
     this.time = 0;
   }
 
+  /**
+   * Seated / restrained scenes (police car): the axis moves a "gaze" point
+   * that drives interactions instead of the character.
+   *   setGaze({ x, z, minX, maxX, y }) / setGaze(null)
+   */
+  setGaze(cfg) {
+    this.gaze = cfg ? { position: { x: cfg.x, y: cfg.y ?? 1, z: cfg.z }, cfg } : null;
+  }
+
   update(dt) {
     this.time += dt;
+    if (this.gaze) {
+      if (this.enabled) {
+        const a = this.input.axis;
+        const g = this.gaze;
+        g.position.x = Math.min(g.cfg.maxX, Math.max(g.cfg.minX, g.position.x + a.x * dt * 1.6));
+      }
+      this.c.root.userData.vx = 0;
+      return;
+    }
     const c = this.c;
     let ax = 0, az = 0;
     if (this.enabled) {

@@ -213,7 +213,7 @@ export class DialogueView {
     slot.sig = sig;
     const next = slot.imgs[1 - slot.front];
     const cur = slot.imgs[slot.front];
-    next.src = `assets/portraits/${id}_${idx}.webp`;
+    next.src = `assets/portraits/${CHARACTERS[id]?.portrait || id}_${idx}.webp`;
     const swap = () => { next.classList.add('on'); cur.classList.remove('on'); slot.front = 1 - slot.front; };
     if (next.complete && next.naturalWidth) swap(); else next.onload = swap;
   }

@@ -165,7 +165,152 @@ export const SOUND_DEFS = {
     },
   },
 
+  // ---------------------------------------------------------------- custody / hospital ambience
+  'amb.car': {
+    bus: 'ambience', volume: 0.8,
+    loop(am, out) {
+      const c = am.ctx;
+      const o = c.createOscillator(); o.type = 'sawtooth'; o.frequency.value = 42;
+      const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 160;
+      const g = c.createGain(); g.gain.value = 0.12;
+      o.connect(f).connect(g).connect(out); o.start();
+      const road = noiseBed(am, out, { type: 'lowpass', freq: 380, q: 0.4, vol: 0.45, wobble: 0.15, rate: 0.3 });
+      const hiss = noiseBed(am, out, { type: 'highpass', freq: 2500, q: 0.5, vol: 0.05, wobble: 0.4, rate: 0.2 });
+      let alive = true;
+      const wipers = () => {
+        if (!alive) return;
+        const t = c.currentTime + 0.05;
+        noise(am, out, t, { freq: 1400, sweep: 700, q: 2, dur: 0.45, vol: 0.06, attack: 0.1 });
+        noise(am, out, t + 0.6, { freq: 700, sweep: 1400, q: 2, dur: 0.45, vol: 0.06, attack: 0.1 });
+        tone(am, out, t + 0.5, { freq: 160, dur: 0.05, vol: 0.05 });
+        setTimeout(wipers, 3200 + Math.random() * 600);
+      };
+      const radio = () => {
+        if (!alive) return;
+        const t = c.currentTime + 0.05;
+        noise(am, out, t, { freq: 1800, q: 1.5, dur: 0.12, vol: 0.12 });
+        for (let i = 0; i < 6; i++) noise(am, out, t + 0.15 + i * 0.12, { freq: 900 + Math.random() * 900, q: 8, dur: 0.1, vol: 0.06 });
+        noise(am, out, t + 0.95, { freq: 1800, q: 1.5, dur: 0.1, vol: 0.1 });
+        setTimeout(radio, 9000 + Math.random() * 9000);
+      };
+      wipers(); setTimeout(radio, 4000);
+      return () => { alive = false; o.stop(); road(); hiss(); };
+    },
+  },
+  'amb.station': {
+    bus: 'ambience', volume: 0.7,
+    loop(am, out) {
+      const c = am.ctx;
+      const hum = noiseBed(am, out, { type: 'lowpass', freq: 160, q: 0.4, vol: 0.3, wobble: 0.1, rate: 0.05 });
+      const buzz = c.createOscillator(); buzz.frequency.value = 120;
+      const bg = c.createGain(); bg.gain.value = 0.012; buzz.connect(bg).connect(out); buzz.start();
+      let alive = true;
+      const tick = () => {
+        if (!alive) return;
+        const t = c.currentTime + 0.05;
+        const r = Math.random();
+        if (r < 0.35) for (let i = 0; i < 6 + Math.random() * 10; i++) tone(am, out, t + i * (0.08 + Math.random() * 0.06), { freq: 2200 + Math.random() * 400, dur: 0.02, vol: 0.03, type: 'square' }); // keyboard
+        else if (r < 0.5) { noise(am, out, t, { freq: 1800, q: 1.5, dur: 0.1, vol: 0.08 }); for (let i = 0; i < 5; i++) noise(am, out, t + 0.12 + i * 0.11, { freq: 900 + Math.random() * 800, q: 7, dur: 0.09, vol: 0.05 }); } // radio
+        else if (r < 0.62) for (let i = 0; i < 2; i++) { tone(am, out, t + i * 0.5, { freq: 900, dur: 0.18, vol: 0.04 }); tone(am, out, t + i * 0.5, { freq: 1100, dur: 0.18, vol: 0.03 }); } // phone
+        else if (r < 0.8) for (let i = 0; i < 4; i++) noise(am, out, t + i * 0.45, { type: 'lowpass', freq: 500, dur: 0.08, vol: 0.12 }); // steps
+        else for (let i = 0; i < 4; i++) noise(am, out, t + i * 0.2 + Math.random() * 0.1, { freq: 400 + Math.random() * 400, q: 5, dur: 0.16, vol: 0.05, attack: 0.03 }); // talk
+        setTimeout(tick, 900 + Math.random() * 2600);
+      };
+      tick();
+      return () => { alive = false; hum(); buzz.stop(); };
+    },
+  },
+  'amb.interrogation': {
+    bus: 'ambience', volume: 0.7,
+    loop(am, out) {
+      const vent = noiseBed(am, out, { type: 'lowpass', freq: 240, q: 0.5, vol: 0.4, wobble: 0.05, rate: 0.03 });
+      const c = am.ctx;
+      const buzz = c.createOscillator(); buzz.frequency.value = 100; buzz.type = 'triangle';
+      const bg = c.createGain(); bg.gain.value = 0.015; buzz.connect(bg).connect(out); buzz.start();
+      let alive = true;
+      const clock = () => { if (!alive) return; tone(am, out, c.currentTime + 0.02, { freq: 3200, dur: 0.012, vol: 0.05, type: 'square' }); setTimeout(clock, 1000); };
+      clock();
+      return () => { alive = false; vent(); buzz.stop(); };
+    },
+  },
+  'amb.hospital_day': {
+    bus: 'ambience', volume: 0.7,
+    loop(am, out) {
+      const vent = noiseBed(am, out, { type: 'lowpass', freq: 300, q: 0.4, vol: 0.3, wobble: 0.1, rate: 0.05 });
+      let alive = true;
+      const tick = () => {
+        if (!alive) return;
+        const t = am.ctx.currentTime + 0.05;
+        const r = Math.random();
+        if (r < 0.3) tone(am, out, t, { freq: 960, dur: 0.12, vol: 0.03 }); // distant monitor
+        else if (r < 0.5) for (let i = 0; i < 8; i++) noise(am, out, t + i * 0.1, { freq: 1200, q: 6, dur: 0.06, vol: 0.03 }); // trolley
+        else if (r < 0.7) for (let i = 0; i < 4; i++) noise(am, out, t + i * 0.42, { type: 'lowpass', freq: 600, dur: 0.07, vol: 0.1 }); // steps
+        else if (r < 0.85) for (let i = 0; i < 4; i++) noise(am, out, t + i * 0.2, { freq: 500 + Math.random() * 300, q: 5, dur: 0.15, vol: 0.04, attack: 0.03 }); // voices
+        else { tone(am, out, t, { freq: 660, dur: 0.3, vol: 0.04 }); tone(am, out, t + 0.35, { freq: 880, dur: 0.4, vol: 0.04 }); } // pager chime
+        setTimeout(tick, 1200 + Math.random() * 3000);
+      };
+      tick();
+      return () => { alive = false; vent(); };
+    },
+  },
+  'amb.hospital_night': {
+    bus: 'ambience', volume: 0.6,
+    loop(am, out) {
+      const vent = noiseBed(am, out, { type: 'lowpass', freq: 200, q: 0.4, vol: 0.35, wobble: 0.08, rate: 0.03 });
+      let alive = true;
+      const tick = () => {
+        if (!alive) return;
+        const t = am.ctx.currentTime + 0.05;
+        const r = Math.random();
+        if (r < 0.5) tone(am, out, t, { freq: 960, dur: 0.1, vol: 0.02 });
+        else if (r < 0.65) for (let i = 0; i < 3; i++) noise(am, out, t + i * 0.6, { type: 'lowpass', freq: 500, dur: 0.07, vol: 0.06 });
+        setTimeout(tick, 3000 + Math.random() * 6000);
+      };
+      tick();
+      return () => { alive = false; vent(); };
+    },
+  },
+  'sfx.flatline': {
+    bus: 'inner', volume: 0.25,
+    loop(am, out) {
+      const o = am.ctx.createOscillator(); o.type = 'sine'; o.frequency.value = 960;
+      const g = am.ctx.createGain(); g.gain.value = 0.5;
+      o.connect(g).connect(out); o.start();
+      return () => o.stop();
+    },
+  },
+
   // ---------------------------------------------------------------- sfx
+  'sfx.beep': { bus: 'inner', volume: 0.35, synth: (am, out, t) => tone(am, out, t, { freq: 960, dur: 0.11, vol: 0.4, attack: 0.002 }) },
+  'sfx.cuffs': {
+    volume: 0.7,
+    synth: (am, out, t) => { for (let i = 0; i < 7; i++) tone(am, out, t + i * 0.035, { type: 'square', freq: 2600 + Math.random() * 600, dur: 0.02, vol: 0.06 }); clink(am, out, t + 0.3, 0.06); },
+  },
+  'sfx.spit': {
+    volume: 0.7,
+    synth: (am, out, t) => { noise(am, out, t, { freq: 1600, sweep: 600, q: 1, dur: 0.35, vol: 0.4, attack: 0.01 }); noise(am, out, t + 0.05, { type: 'lowpass', freq: 400, dur: 0.2, vol: 0.3 }); },
+  },
+  'sfx.gulp': {
+    volume: 0.6,
+    synth: (am, out, t) => { for (let i = 0; i < 4; i++) { tone(am, out, t + i * 0.42, { freq: 180, slide: 90, dur: 0.12, vol: 0.35 }); noise(am, out, t + i * 0.42, { type: 'lowpass', freq: 500, dur: 0.12, vol: 0.2 }); } },
+  },
+  'sfx.water': {
+    volume: 0.5,
+    synth: (am, out, t) => { for (let i = 0; i < 18; i++) noise(am, out, t + i * 0.05, { freq: 700 + Math.random() * 1200, q: 10, dur: 0.07, vol: 0.12 }); },
+  },
+  'sfx.tear': {
+    volume: 0.8,
+    synth: (am, out, t) => { noise(am, out, t, { freq: 2600, q: 0.8, dur: 0.25, vol: 0.4, attack: 0.005 }); tone(am, out, t + 0.05, { freq: 300, slide: 120, dur: 0.15, vol: 0.2 }); clink(am, out, t + 0.2, 0.05); },
+  },
+  'sfx.cell': {
+    volume: 0.8,
+    synth: (am, out, t) => { noise(am, out, t, { freq: 900, sweep: 300, q: 2, dur: 0.9, vol: 0.25, attack: 0.05 }); tone(am, out, t + 0.85, { freq: 110, slide: 60, dur: 0.3, vol: 0.5 }); clink(am, out, t + 0.86, 0.1); },
+  },
+  'sfx.lighter': {
+    volume: 0.4,
+    synth: (am, out, t) => { noise(am, out, t, { freq: 3000, q: 1, dur: 0.05, vol: 0.3 }); noise(am, out, t + 0.06, { freq: 800, q: 0.6, dur: 0.4, vol: 0.12, attack: 0.05 }); },
+  },
+
   'sfx.cardoor': {
     volume: 0.7,
     synth: (am, out, t) => {

@@ -104,7 +104,7 @@ const methods = {
     // evening ambience back
     const a = this.g.audio;
     if (a.ready) {
-      for (const k of ['amb.room', 'amb.morning', 'inner.breath', 'amb.siren', 'inner.drone', 'inner.ring']) a.loops.get(k)?.stop(0.5);
+      for (const k of ['amb.room', 'amb.morning', 'inner.breath', 'amb.siren', 'inner.drone', 'inner.ring', 'amb.car', 'amb.station', 'amb.interrogation', 'amb.hospital_day', 'amb.hospital_night', 'sfx.flatline']) a.loops.get(k)?.stop(0.5);
       a.setMuffle(0, 0.5);
       a.loop('amb.crowd'); a.loop('amb.vent'); a.loop('amb.wind', { volume: 0.4 });
     }
@@ -126,6 +126,7 @@ const methods = {
       { id: 'm_body_door', label: 'У входа', at: { x: -11.4, z: 0.45 }, radius: 1.0, anchor: A(-12.4, 0.7, -0.55), run: say('m_body_door') },
       { id: 'm_body_far', label: 'В глубине зала', at: { x: 9.6, z: 0.2 }, radius: 1.1, anchor: A(9.9, 0.7, -0.85), run: say('m_body_far') },
       { id: 'm_bar', label: 'Барная стойка', at: { x: -1.0, z: -2.25 }, radius: 1.0, anchor: A(-1.0, 1.6, -3.4), run: say('m_bar') },
+      { id: 'm_behind_bar', label: 'Заглянуть за стойку', at: { x: 3.0, z: -2.25 }, radius: 1.0, anchor: A(3.0, 1.5, -3.6), if: '!bartender_discovered', run: () => this.discoverBartender() },
       { id: 'm_door', label: 'Дверь', at: { x: -12.2, z: -2.0 }, radius: 1.1, anchor: A(-12.2, 2.8, -4.8), run: say('m_door') },
       { id: 'm_window', label: 'Окно', at: { x: -8.95, z: -2.05 }, radius: 1.1, anchor: A(-8.95, 2.9, -4.9), run: say('m_window') },
       { id: 'm_marks', label: 'Следы на полу', at: { x: 5.3, z: 1.35 }, radius: 1.0, anchor: A(5.3, 0.4, 0.7), run: say('m_marks') },
@@ -187,6 +188,8 @@ const methods = {
     const S = this.session;
     if (g.state.get('kaydenDeathDiscovered')) return;
     g.state.set('kaydenDeathDiscovered', true);
+    g.state.set('kayden_dead_discovered', true);
+    g.keyScene = true;
     g.saves.block('kayden');
     g.player.enabled = false;
     g.hud.show(false);
@@ -257,6 +260,7 @@ const methods = {
     g.hud.show(true);
     g.player.enabled = true;
     g.saves.unblock('kayden');
+    g.keyScene = false;
     g.saves.autosave('kayden');
     this.kaydenT = 0;
     this.checkPolice();
@@ -300,12 +304,57 @@ const methods = {
     this.checkPolice();
   },
 
+  /** Behind the counter: a sound, a pause — the bartender jumps up, terrified. */
+  async discoverBartender() {
+    const g = this.g;
+    const S = this.session;
+    g.player.enabled = false;
+    g.keyScene = true;
+    const J = this.julian;
+    const B = this.bartender;
+    J.face(-1);
+    await J.walkTo({ x: 3.1, z: -2.25 }, { speed: 0.6 });
+    if (S !== this.session) return;
+    J.face(-1);
+    g.cameraSys.setShot({ x: 2.6, y: 1.65, z: 3.4, lookX: 2.4, lookY: 1.15, lookZ: -3.8, fov: 34 }, 0.8);
+    g.audio.play('sfx.glass', { volume: 0.35 });
+    await g.view.flash('thought', 'За стойкой что-то шевельнулось.', 2200);
+    if (S !== this.session) return;
+    await sleep(1.3);
+    // the bartender pops up from behind the counter
+    B.setLife('alive');
+    B.setVisible(true);
+    B.stand();
+    B.placeAt(2.2, -4.05, 1);
+    B.shadow.visible = false;
+    B.setPose('talk');
+    B.root.position.y = -1.9;
+    this.popUp = { ch: B, t: 0 };
+    g.audio.play('sfx.bottle');
+    g.audio.play('sfx.whoosh', { volume: 0.6 });
+    g.cameraSys.shake = 0.35;
+    J.setPose('talk');
+    for (const [who, text, pose] of g.dialogue.dialogues.m_bartender_lines) {
+      if (S !== this.session) return;
+      if (pose) B.setPose(pose);
+      g.dialogue.history.push({ speaker: who, text });
+      await g.view.flash(who, text, 1800 + text.length * 42);
+    }
+    J.setPose('idle');
+    B.setPose('idle');
+    g.state.set('bartender_discovered', true);
+    g.cameraSys.setShot(null, 0.8);
+    g.keyScene = false;
+    g.player.enabled = true;
+    this.checkPolice();
+  },
+
   /** POLICE_ARRIVAL fires once Kayden is found and the room has been looked at. */
   checkPolice() {
     const f = this.g.state.flags;
     if (this.policeStarted || !f.kaydenDeathDiscovered) return;
     const bodies = ['m_body_bar', 'm_body_window', 'm_body_door', 'm_body_far'].filter((k) => f[k]).length;
-    const clues = ['m_clue_chair', 'm_clue_bar', 'm_clue_door', 'm_clue_window', 'm_clue_marks', 'm_clue_bag', 'memory_flash'].filter((k) => f[k]).length;
+    const clues = ['bartender_discovered', 'm_clue_chair', 'm_clue_bar', 'm_clue_door', 'm_clue_window', 'm_clue_marks', 'm_clue_bag', 'memory_flash'].filter((k) => f[k]).length;
     if (bodies >= 2 && clues >= 2) {
       this.policeStarted = true;
       setTimeout(() => this.policeArrival(), 3500);
@@ -372,18 +421,32 @@ const methods = {
     g.cameraSys.setShot({ x: tx - 1.2, y: 1.7, z: 6.2, lookX: tx - 0.6, lookY: 1.25, lookZ: 0.4, fov: 32 }, 0.25);
     await sleep(3.2);
     if (S !== this.session) return;
+    // an officer walks up, turns him around: handcuffs
+    const cop = offs[0];
+    await cop.walkTo({ x: tx - 0.75, z: J.position.z }, { speed: 1.6 });
+    if (S !== this.session) return;
+    cop.setPose('idle');
+    J.face(1);
+    await g.view.flash('officer', 'Руки за спину.', 1800);
+    g.audio.play('sfx.cuffs');
+    J.setPose('think');
+    await g.view.flash('officer', 'Вы задержаны до выяснения обстоятельств. Всё, что скажете…', 2800);
+    await g.view.flash('julian', 'Я детектив Рид. Я… я не знаю, что здесь случилось.', 2600);
+    await g.view.flash('officer2', 'Вот и разберёмся. В машину его.', 2000);
+    g.state.set('police_arrived', true);
+    g.state.set('arrested', true);
+    if (S !== this.session) return;
     // CUT TO BLACK
     g.fader.set(true);
     g.audio.stopAllLoops(0.2);
     g.audio.setMasterVolume(0, 0.05);
     this.drone?.stop(0.2);
-    await sleep(1.6);
+    await sleep(1.8);
     g.audio.setMasterVolume(1, 0.1);
-    g.audio.loop('amb.wind', { volume: 0.8, fade: 2 });
-    g.state.setStage('ended');
     g.saves.unblock('police');
-    g.saves.clear('auto');
-    g.showEnding();
+    J.setPose('idle');
+    if (S !== this.session) return;
+    await this.startCar();
   },
 
   spawnOfficers() {
@@ -407,6 +470,13 @@ const methods = {
 
   updateMorning(dt) {
     const g = this.g;
+    if (this.popUp) {
+      const p = this.popUp;
+      p.t += dt;
+      const k = Math.min(1, p.t / 0.28);
+      p.ch.root.position.y = -1.9 * (1 - k) * (1 - k) + (k >= 1 ? Math.sin(p.t * 20) * 0.01 * Math.max(0, 1 - (p.t - 0.28) * 2) : 0);
+      if (p.t > 1) { p.ch.root.position.y = 0; this.popUp = null; }
+    }
     if (g.state.stage !== 'morning') return;
     this.morningT = (this.morningT || 0) + dt;
     // a nudge if he wanders for a long time without finding Kayden

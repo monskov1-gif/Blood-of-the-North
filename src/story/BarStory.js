@@ -6,6 +6,7 @@ import { DIALOGUES } from '../../data/dialogue/bar.js';
 import { paintCocktail } from '../ui/Overlays.js';
 import { sleep } from './Director.js';
 import { installMorning } from './MorningSequence.js';
+import { installCustody, CUSTODY_STAGES } from './CustodySequence.js';
 
 /**
  * Scene logic for the prologue in the "Northern Rose" bar:
@@ -424,9 +425,10 @@ export class BarStory {
   // ------------------------------------------------------------------ dialogue backgrounds
 
   async paintBackground(key) {
-    const cacheKey = `${key}|${this.owen.root.visible}`;
+    const cacheKey = `${this.g.locationId}|${key}|${this.owen.root.visible}`;
     if (this.bgCache.has(cacheKey)) return this.bgCache.get(cacheKey);
-    const shot = this.scene.shots[key];
+    const world = this.g.world;
+    const shot = world.shots?.[key] || this.scene.shots[key];
     if (!shot) return null;
     const cam = new THREE.PerspectiveCamera(shot.fov, 16 / 9, 0.1, 80);
     cam.layers.enable(1);
@@ -434,7 +436,7 @@ export class BarStory {
     cam.lookAt(new THREE.Vector3(...shot.look));
     cam.updateMatrixWorld();
     const low = this.g.renderer.isLow;
-    const hide = [this.julian.root, this.kayden.root, this.waiter.root, this.coupe];
+    const hide = [this.julian.root, this.kayden.root, this.waiter.root, this.coupe, ...(world.vnHide || [])];
     const canvas = this.g.renderer.paintShot(cam, low ? 960 : 1600, low ? 540 : 900, { radius: low ? 3 : 5, hide });
     this.bgCache.set(cacheKey, canvas);
     return canvas;
@@ -512,6 +514,7 @@ export class BarStory {
   update(dt) {
     const g = this.g;
     this.updateMorning(dt);
+    this.updateCustody(dt);
     const J = this.julian;
     // Kayden calls out when Julian gets close the first time
     if (g.state.stage === 'explore' && !g.state.get('kayden_called') && J.position.x > -3.5) {
@@ -547,6 +550,10 @@ export class BarStory {
     const st = g.state.stage;
     if (data?.leaverGone) { this.leaver.setVisible(false); this.leaverGone = true; }
     const a = this.scene.anchors;
+    if (CUSTODY_STAGES.includes(st)) {
+      await this.loadCustody(st);
+      return;
+    }
     if (st === 'morning' || st === 'police' || st === 'ended') {
       this.setupMorning();
       g.state.setStage('morning');
@@ -593,3 +600,4 @@ export class BarStory {
 }
 
 installMorning(BarStory);
+installCustody(BarStory);

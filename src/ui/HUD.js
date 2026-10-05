@@ -5,6 +5,16 @@ const OBJECTIVES = {
   kayden: { ru: 'Кайден ждёт за столиком у стойки', en: 'JOIN KAYDEN' },
   air: { ru: 'Воздух. Дойти до двери', en: 'GET OUTSIDE' },
   morning: { ru: 'Что здесь произошло?', en: 'WHAT HAPPENED HERE' },
+  car: { ru: 'Осмотреться. Подумать', en: 'LOOK AROUND' },
+  cell: { ru: 'Ждать', en: 'WAIT' },
+  survivors: { ru: 'Поговорить с выжившими', en: 'TALK TO THE SURVIVORS' },
+  medpost: { ru: 'Медпункт: сдать анализы', en: 'MEDICAL POST' },
+  interrogation: { ru: 'Вторая допросная', en: 'INTERROGATION ROOM 2' },
+  sit: { ru: 'Сесть за стол', en: 'TAKE A SEAT' },
+  hospital: { ru: 'Пройтись по отделению', en: 'WALK THE WARD' },
+  bed: { ru: 'Вернуться в палату 209', en: 'BACK TO ROOM 209' },
+  night: { ru: 'Жажда', en: 'THIRST' },
+  back: { ru: 'Вернуться в палату 209', en: 'BACK TO ROOM 209' },
 };
 
 /** Exploration overlay: objective, interaction marker, phone & menu buttons, toasts. */

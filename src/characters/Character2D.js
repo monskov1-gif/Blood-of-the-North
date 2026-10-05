@@ -88,9 +88,11 @@ export class Character2D {
   frameName() {
     let base = this.poses[this.pose] || this.poses.idle;
     if (this.state === 'walk' && !this.seated) {
+      // walking uses the profile frame (`poses.walk`) when the idle frame is a front view
+      const wb = this.poses.walk || this.poses.idle;
       const step = Math.floor(this.walkPhase) % 4;
-      const w = step === 0 ? `${this.poses.idle}_walk1` : step === 2 ? `${this.poses.idle}_walk2` : this.poses.idle;
-      if (this.atlas.has(w)) base = w;
+      const w = step === 0 ? `${wb}_walk1` : step === 2 ? `${wb}_walk2` : wb;
+      base = this.atlas.has(w) ? w : wb;
     }
     if (this.seated) {
       const s = `${base}_sit`;

@@ -10,6 +10,7 @@ import { CameraSystem } from '../camera/CameraSystem.js';
 import { SpriteAtlas } from '../characters/SpriteAtlas.js';
 import { PlayerController } from '../characters/PlayerController.js';
 import { Navigation } from '../world/Navigation.js';
+import { SafeZones } from '../world/SafeZones.js';
 import { InteractionSystem } from '../interaction/InteractionSystem.js';
 import { DialogueSystem } from '../dialogue/DialogueSystem.js';
 import { Director } from '../story/Director.js';
@@ -18,9 +19,9 @@ import { HUD } from '../ui/HUD.js';
 import { DialogueView, preloadPortraits } from '../ui/DialogueView.js';
 import { TouchControls } from '../ui/TouchControls.js';
 import { MainMenu, Panels } from '../ui/Menus.js';
-import { Fader, PhoneView, Insert, EndingScreen, PortraitFlash } from '../ui/Overlays.js';
+import { Fader, PhoneView, Insert, EndingScreen, PortraitFlash, Card } from '../ui/Overlays.js';
 import { el } from '../ui/dom.js';
-import { SCENES } from '../world/scenes/index.js';
+import { SCENES, LOCATIONS } from '../world/scenes/index.js';
 import { DIALOGUES } from '../../data/dialogue/index.js';
 
 /**
@@ -67,6 +68,13 @@ export class Game {
     this.renderer.setup(this.scene3d, this.cameraSys.camera);
     this.cameraSys.setBounds(this.world.bounds.camera);
     this.nav = new Navigation(this.world.bounds.walk, this.world.colliders);
+    this.locations = new Map([['bar', this.world]]);
+    this.locationId = 'bar';
+    this.barWorld = this.world;
+    this.world.background = 0x040202;
+    this.world.camera = { distance: 8.4, height: 2.4, lookHeight: 1.28, lookZ: -0.6 };
+    this.world.safeZones = new SafeZones('bar');
+    for (const g of this.world.foregroundGroups) this.world.safeZones.addForeground(g);
     this.progress(0.6, 'свет…');
     await nextFrame();
 
@@ -79,6 +87,7 @@ export class Game {
     this.touch = new TouchControls({ root, input: this.input, bus: this.bus, settings: this.settings });
     this.insert = new Insert(root);
     this.pflash = new PortraitFlash(root);
+    this.card = new Card(root);
     this.phone = new PhoneView({ root, bus: this.bus, audio: this.audio, state: this.state });
     this.ending = new EndingScreen({ root, bus: this.bus, audio: this.audio });
 
@@ -97,6 +106,7 @@ export class Game {
     this.player = new PlayerController(this.story.julian, this.input, this.nav, this.audio);
     this.cameraSys.follow(this.story.julian.root);
     this.director.registerAll(this.story.commands());
+    this.director.registerAll(this.story.custodyCommands());
     this.interactions.setItems(this.story.interactables());
     this.view.bgProvider = (key) => this.story.paintBackground(key);
     this.hallucination = new Hallucination({
@@ -114,6 +124,17 @@ export class Game {
       };
     }
 
+    this.story.registerSafeZones?.(this.world);
+    this.debugSafeZones = new URLSearchParams(location.search).has('debug');
+    if (this.debugSafeZones) this.world.safeZones.setDebug(true, this.world.root, this.world.bounds.walk);
+    window.addEventListener('keydown', (e) => {
+      if (e.code !== 'F3') return;
+      e.preventDefault();
+      this.debugSafeZones = !this.debugSafeZones;
+      this.world.safeZones?.setDebug(this.debugSafeZones, this.world.root, this.world.bounds.walk);
+      this.hud.toast(this.debugSafeZones ? 'SAFE ZONES: DEBUG ON' : 'SAFE ZONES: DEBUG OFF');
+      if (this.debugSafeZones) this.reportSafeZones();
+    });
     this.rotateHint(root);
     this.registerSaves();
     this.wireEvents();
@@ -176,6 +197,74 @@ export class Game {
     b.addEventListener('click', () => h.classList.remove('enabled'));
   }
 
+  // ------------------------------------------------------------------ locations (scene manager)
+
+  /**
+   * Switches the 3D location. Worlds are built once and cached; the persistent
+   * cast (Julian) moves with the player. `state` feeds the location's Scene
+   * State System (e.g. hospital 'day' / 'night').
+   */
+  async setLocation(id, { state } = {}) {
+    let w = this.locations.get(id);
+    if (!w) {
+      const Def = LOCATIONS[id];
+      if (!Def) throw new Error(`unknown location ${id}`);
+      w = new Def({ renderer: this.renderer, bus: this.bus, quality: this.renderer.quality });
+      w.build();
+      w.initSafeZones();
+      this.locations.set(id, w);
+      this.story.registerSafeZones?.(w);
+    }
+    if (this.world !== w) {
+      this.world.safeZones?.setDebug(false);
+      this.scene3d.remove(this.world.root);
+      this.scene3d.add(w.root);
+      this.world = w;
+    }
+    this.locationId = id;
+    this.state.sceneId = id;
+    if (state) w.setState?.(state);
+    this.scene3d.background.set(w.background ?? 0x040202);
+    // the player's character lives in the current location
+    w.root.add(this.story.julian.root);
+    this.cameraSys.configure(w.camera);
+    this.cameraSys.setBounds(w.bounds.camera);
+    this.nav.set(w.bounds.walk, w.colliders);
+    this.hallucination.scene = w;
+    if (this.debugSafeZones) w.safeZones?.setDebug(true, w.root, w.bounds.walk);
+    this.bus.emit('location', { id, state });
+    return w;
+  }
+
+  /** Back to the bar location with a clean player state (title / new game / load). */
+  async returnToBar() {
+    this.keyScene = false;
+    this.player.setGaze(null);
+    this.player.impair = 0;
+    this.story.reticle && (this.story.reticle.visible = false);
+    if (this.locationId !== 'bar') await this.setLocation('bar');
+    for (const k of ['thirst', 'blood', 'flash', 'wake', 'evening', 'interro']) this.renderer.clearLayer(k);
+    this.cameraSys.sway = 0;
+    this.audio.setMasterVolume?.(1, 0.1);
+  }
+
+  /** Static safe-zone validation along the location's camera path (console). */
+  reportSafeZones() {
+    const w = this.world;
+    if (!w.safeZones) return [];
+    const cams = [];
+    const { minX, maxX } = w.bounds.camera;
+    for (let x = minX; x <= maxX + 0.01; x += Math.max(0.5, (maxX - minX) / 16 || 1)) {
+      const c = this.cameraSys.camera.clone();
+      c.position.set(x, this.cameraSys.baseHeight, this.cameraSys.baseDistance);
+      c.lookAt(x, this.cameraSys.lookHeight, this.cameraSys.lookZ);
+      cams.push(c);
+    }
+    const v = w.safeZones.validate(cams);
+    console.info(`[safe-zones] ${this.locationId}: ${w.safeZones.zones.length} zones, ${w.safeZones.foreground.length} foreground objects, ${v.length} static occlusions (auto-faded at runtime)`, v);
+    return v;
+  }
+
   updateControl() {
     const blocked = this.panels.open || this.phone.isOpen || this.dialogue.busy || this.mode !== 'play';
     this.blocked = blocked;
@@ -192,6 +281,7 @@ export class Game {
     this.mode = 'title';
     this.story.bump();
     await this.dialogue.abort();
+    await this.returnToBar();
     this.panels.closeAll();
     this.ending.hide();
     this.hud.show(false);
@@ -253,6 +343,7 @@ export class Game {
     this.story.stopAmbient();
     this.renderer.clearLayer('menu');
     this.hallucination.reset();
+    await this.returnToBar();
     this.mode = 'play';
     this.story.julian.setVisible(true);
   }
@@ -302,8 +393,8 @@ export class Game {
       this.player.update(canMove ? dt : dt);
       for (const c of this.characters.values()) c.update(dt);
       if (this.mode === 'play') {
-        this.interactions.enabled = this.player.enabled && !this.blocked && (this.state.stage === 'explore' || this.state.stage === 'morning');
-        this.interactions.update(this.story.julian);
+        this.interactions.enabled = this.player.enabled && !this.blocked && INTERACTIVE_STAGES.has(this.state.stage);
+        this.interactions.update(this.player.gaze || this.story.julian);
         this.story.update(dt);
       } else {
         this.interactions.update(null);
@@ -312,6 +403,7 @@ export class Game {
       this.hallucination.update(dt);
       this.world.update(dt);
       this.cameraSys.update(dt);
+      this.world.safeZones?.update(this.cameraSys.camera, dt);
       this.hud.update(this.cameraSys.camera);
       // the dialogue screen covers everything: skip the 3D render to save power
       const covered = this.view.mode === 'vn' && !this.view.vn.classList.contains('hidden') && this.view.vn.classList.contains('show');
@@ -326,5 +418,7 @@ export class Game {
     this.cameraSys.setShot({ x: 1.5 + Math.sin(t) * 4.5, y: 2.3 + Math.sin(t * 1.7) * 0.15, z: 10.5, lookX: 1.5 + Math.sin(t) * 4.8, lookY: 1.6, lookZ: -2, fov: 30 }, 0.5);
   }
 }
+
+const INTERACTIVE_STAGES = new Set(['explore', 'morning', 'car', 'station', 'interrogation', 'hospital_day', 'hospital_night', 'hospital_return']);
 
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));

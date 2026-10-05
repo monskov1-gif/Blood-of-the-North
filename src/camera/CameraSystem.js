@@ -26,17 +26,29 @@ export class CameraSystem {
   }
 
   setBounds(b) { this.bounds = b; }
+
+  /** Per-location framing (distance/height/look point/fov/min visible width). */
+  configure(cfg = {}) {
+    this.baseDistance = cfg.distance ?? 8.4;
+    this.baseHeight = cfg.height ?? 2.4;
+    this.lookHeight = cfg.lookHeight ?? 1.28;
+    this.lookZ = cfg.lookZ ?? -0.6;
+    this.baseFov = cfg.fov ?? 32;
+    this.minWidth = cfg.minWidth ?? 6.2;
+    this.resize(this.width || window.innerWidth, this.height || window.innerHeight);
+  }
   follow(target) { this.target = target; }
 
   /** Smoothly move to an explicit framing; pass null to return to follow mode. */
   setShot(shot, speed = 1.5) { this.shot = shot; this.shotSpeed = speed; if (shot) this.lastShot = shot; }
 
   resize(w, h) {
+    this.width = w; this.height = h;
     this.aspect = w / h;
     this.camera.aspect = this.aspect;
     // keep a minimum visible width on narrow (portrait) screens
-    const baseFov = 32;
-    const minWidth = 6.2; // metres visible at the subject plane
+    const baseFov = this.baseFov ?? 32;
+    const minWidth = this.minWidth ?? 6.2; // metres visible at the subject plane
     const dist = this.baseDistance;
     const hFov = 2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(baseFov) / 2) * this.aspect);
     const width = 2 * dist * Math.tan(hFov / 2);

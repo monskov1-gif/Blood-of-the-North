@@ -9,6 +9,16 @@ const STAGE_LABEL = {
   escape: 'Воздух…',
   morning: 'Утро. Место преступления',
   police: 'Утро. Полиция',
+  car: 'Полицейская машина',
+  station: 'Полицейский участок',
+  interrogation: 'Допросная',
+  medical: 'Обследование',
+  hospital_day: 'Больница. День',
+  hospital_evening: 'Больница. Вечер',
+  hospital_night: 'Больница. Ночь',
+  hospital_return: 'Больница. Ночь',
+  recovery: 'Выздоровление',
+  street: 'Выписка',
   ended: 'Конец демо',
 };
 

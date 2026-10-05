@@ -433,6 +433,31 @@ for n, (hshift, sat, val) in VARIANTS.items():
     if n in frames:
         frames[n + '_v'] = variant(frames[n], hshift, sat, val, head=0.26 if n.startswith('sit_') else 0.16)
 
+# ---------------------------------------------------------------- custody / hospital cast
+def grey_hair(a, frac=0.24):
+    a = a.copy()
+    rgb = a[..., :3]
+    op = a[..., 3] > 0
+    rows_ = np.indices(op.shape)[0]
+    warm = (rgb[..., 0] > rgb[..., 2] + 18) & (rgb.max(-1) > 120)
+    hair = op & (rows_ < frac * op.shape[0]) & ~warm
+    lum = (rgb @ np.array([0.3, 0.59, 0.11]))[..., None]
+    rgb[hair] = np.clip(np.repeat(lum, 3, -1)[hair] * 1.25 + 60, 0, 235)
+    return a
+
+
+CAST = {
+    'doctor': variant(frames['npc_glasses_front'], 0.0, 0.06, 2.6),
+    'doctor_side': variant(frames['npc_glasses_side'], 0.0, 0.06, 2.6),
+    'nurse': variant(frames['npc_green_front'], 0.12, 0.7, 1.7),
+    'nurse_side': variant(frames['npc_green_side'], 0.12, 0.7, 1.7),
+    'chef': variant(frames['npc_butler_front'], 0.0, 0.05, 2.8),
+    'dishwasher': variant(frames['npc_vest_front'], 0.5, 0.3, 1.1),
+    'officer_seat': variant(frames['sit_suit'], 0.52, 1.0, 0.7, head=0.26),
+    'patient_old': grey_hair(frames['npc_green_front'], 0.2),
+}
+frames.update(CAST)
+
 # ---------------------------------------------------------------- walk cycle
 WALK_HIP = 112
 
@@ -461,7 +486,7 @@ def walk(a, amp, front_dark):
 
 
 for name in ['julian_idle', 'kayden_idle', 'waiter_idle', 'waiter2', 'patron_a', 'patron_b', 'woman', 'bartender_idle',
-             'npc_cap_side', 'npc_glasses_side', 'npc_vest_side', 'npc_fedora_side', 'officer_a', 'officer_b']:
+             'npc_cap_side', 'npc_glasses_side', 'npc_vest_side', 'npc_fedora_side', 'officer_a', 'officer_b', 'doctor_side', 'nurse_side']:
     if name not in frames: continue
     frames[name + '_walk1'] = walk(frames[name], 7, False)
     frames[name + '_walk2'] = walk(frames[name], 7, True)
