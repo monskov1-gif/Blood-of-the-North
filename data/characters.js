@@ -43,14 +43,14 @@ export const CHARACTERS = {
   // Quinn Nova Torres — constable, Julian's friend (arrest, the drive, the news at the end)
   quinn: {
     id: 'quinn', name: 'Куинн Торрес', nameEn: 'QUINN TORRES', portrait: 'quinn', color: '#5a4a6a',
-    poses: { idle: 'quinn_idle', talk: 'quinn_idle', aim: 'quinn_aim', drive: 'quinn_drive' }, speed: 1.5,
+    poses: { idle: 'quinn_idle', talk: 'quinn_idle', aim: 'quinn_aim', drive: 'quinn_drive', side: 'quinn_side', walk: 'quinn_side' }, speed: 1.5,
   },
   radio: { id: 'radio', name: 'Рация', nameEn: 'RADIO', poses: { idle: 'officer_seat' } },
   // --- custody / station / hospital cast
   driver: { id: 'driver', name: 'Куинн Торрес', nameEn: 'QUINN TORRES', portrait: 'quinn', poses: { idle: 'quinn_drive' } },
   sergeant: { id: 'sergeant', name: 'Сержант Пелли', nameEn: 'SGT. PELLY', poses: { idle: 'officer_b', walk: 'officer_b' }, speed: 1.3 },
   // Wyatt Nicholas Lewis — Julian doesn't know him; his name is never put on screen
-  interrogator: { id: 'interrogator', name: 'Офицер', nameEn: 'OFFICER', portrait: 'wyatt', poses: { idle: 'wyatt_stand', sit: 'wyatt_seat' }, speed: 1.4 },
+  interrogator: { id: 'interrogator', name: 'Офицер', nameEn: 'OFFICER', portrait: 'wyatt', poses: { idle: 'wyatt_side', sit: 'wyatt_seat' }, speed: 1.4 },
   investigator: { id: 'investigator', name: 'Детектив Мэтт Ковальски', nameEn: 'DET. KOWALSKI', poses: { idle: 'npc_fedora_side', front: 'npc_fedora_front' }, speed: 1.2 },
   survivorWaiter: { id: 'survivorWaiter', name: 'Ноа, официант', nameEn: 'NOAH', portrait: 'waiter', poses: { idle: 'waiter_idle', talk: 'waiter_talk', hands: 'waiter_hands' } },
   survivorWaiter2: { id: 'survivorWaiter2', name: 'Лео, официант', nameEn: 'LEO', poses: { idle: 'waiter2' } },
@@ -63,7 +63,7 @@ export const CHARACTERS = {
   nurseNight: { id: 'nurseNight', name: 'Медсестра', nameEn: 'NURSE', poses: { idle: 'nurse_blue', wave: 'nurse_blue_wave' }, speed: 1.05 },
   medic: { id: 'medic', name: 'Фельдшер', nameEn: 'MEDIC', poses: { idle: 'nurse_white', wave: 'nurse_white_wave' }, speed: 1.1 },
   nurse2: { id: 'nurse2', name: 'Медсестра', nameEn: 'NURSE', poses: { idle: 'nurse_white', wave: 'nurse_white_wave' }, speed: 1.15 },
-  patient: { id: 'patient', name: 'Пациентка', nameEn: 'PATIENT', poses: { idle: 'patient_old' } },
+  patient: { id: 'patient', name: 'Пациентка', nameEn: 'PATIENT', poses: { idle: 'patient_old' }, lie: 'lie_granny' },
   bartender: {
     id: 'bartender', name: 'Бармен', nameEn: 'BARTENDER', color: '#8a3030',
     poses: { idle: 'bartender_idle', talk: 'bartender_talk' },

@@ -8,6 +8,7 @@ Besides the hero frames it derives extra characters by palette work
 import sys, json, colorsys, os
 import numpy as np
 from PIL import Image
+from scipy import ndimage as nd
 
 RAW, OUT = sys.argv[1], sys.argv[2]
 ALIASES = {}
@@ -470,11 +471,188 @@ for n in V06:
 for n in ['jul_idle', 'jul_talk', 'jul_idle_walk1', 'jul_idle_walk2',
           'julg_idle', 'julg_talk', 'julg_idle_walk1', 'julg_idle_walk2', 'lie_julian_gown']:
     frames[n] = load(n)
+
+
+# v0.08: one head for Julian. The painted frames each had their own head (the walk
+# frames bowed, in shadow, ~4% shorter): the walk frames are scaled to the idle
+# height, then every frame gets the head + upper neck of the first painted frame
+# (jul_idle) — in the coat with the top of the scarf, in the gown with the neck
+# continued down into the collar.
+def bbox(a):
+    ys, xs = np.where(a[..., 3] > 0)
+    return ys.min(), ys.max(), xs.min(), xs.max()
+
+
+def match_scale(a, ref):
+    """Rescale a painted walk frame so the figure is as tall as the idle frame."""
+    y0, y1, _, _ = bbox(a); r0, r1, _, _ = bbox(ref)
+    k = (r1 - r0 + 1) / (y1 - y0 + 1)
+    if abs(k - 1) < 0.01:
+        return a
+    h, w = a.shape[:2]
+    pm = a.copy(); pm[..., :3] *= pm[..., 3:4] / 255.0
+    img = Image.fromarray(pm.clip(0, 255).astype(np.uint8), 'RGBA').resize((round(w * k), round(h * k)), Image.BICUBIC)
+    d = np.asarray(img).astype(float)
+    al = d[..., 3:4] / 255.0
+    rgb = np.where(al > 0.01, d[..., :3] / np.maximum(al, 1e-3), 0)
+    alpha = d[..., 3] > 128
+    pal = np.unique(a[a[..., 3] > 0][:, :3], axis=0)
+    flat = rgb[alpha]
+    idx = np.argmin(((flat[:, None, :] - pal[None]) ** 2).sum(-1), 1)
+    out = np.zeros(d.shape, float)
+    out[alpha, :3] = pal[idx]; out[alpha, 3] = 255
+    return out
+
+def is_red(a):
+    return (a[..., 3] > 0) & (a[..., 0] > a[..., 1] * 1.6) & (a[..., 0] > 70)
+
+def is_skin(a):
+    r, g, b = a[..., 0], a[..., 1], a[..., 2]
+    return (a[..., 3] > 0) & (r > 150) & (r > g + 12) & (g > b) & ~is_red(a)
+
+def is_gown(a):
+    r, g, b = a[..., 0], a[..., 1], a[..., 2]
+    return (a[..., 3] > 0) & (b >= r - 6) & (b > 95)
+
+HEAD_ROWS = 24  # head + upper neck of the reference frame, rows from the top of the figure
+
+
+SCARF_ROWS = 7  # coat: the top of the scarf comes along with the head
+
+
+def head_of(ref, with_scarf=False):
+    """The reference head with the upper neck; in the coat also the scarf wrapped
+    under the jaw, otherwise the scarf (and its dark shadow tones) is left out."""
+    t = bbox(ref)[0]
+    m = np.zeros(ref.shape[:2], bool); m[t:t + HEAD_ROWS] = True
+    op = ref[..., 3] > 0
+    # the scarf's own shadow tones: reddish pixels right next to the scarf (not the brown hair)
+    scarfish = is_red(ref) | (nd.binary_dilation(is_red(ref), iterations=2) & op & (ref[..., 0] > ref[..., 1] * 1.35))
+    if with_scarf:
+        m &= op
+        low = np.zeros_like(m); low[t + HEAD_ROWS:t + HEAD_ROWS + SCARF_ROWS] = True
+        m |= low & (scarfish | is_skin(ref))
+    else:
+        m &= op & ~scarfish
+    lab, n = nd.label(m)
+    if n > 1:
+        sizes = nd.sum(m, lab, range(1, n + 1))
+        m &= np.isin(lab, 1 + np.where(sizes >= 6)[0])
+    return m, t
+
+
+def neck_span(m, y):
+    xs = np.where(m[y])[0]
+    return (xs.min(), xs.max()) if len(xs) else None
+
+
+def graft_head(a, ref):
+    """Replaces the head and neck of a frame with the reference head (+ upper
+    neck); in the gown the neck is continued down into the collar."""
+    a = a.copy()
+    t = bbox(a)[0]
+    H, W = a.shape[:2]
+    coat = is_red(a)[t:t + 40].sum() > 20
+    hm, rt = head_of(ref, with_scarf=coat)
+    cloth = is_red(a) if coat else is_gown(a)
+    # only the garment itself: background specks of the same colour do not count
+    lab, n = nd.label(cloth)
+    if n > 1:
+        sizes = nd.sum(cloth, lab, range(1, n + 1))
+        cloth = cloth & np.isin(lab, 1 + np.where(sizes >= 0.2 * sizes.max())[0])
+    lo = t + (18 if coat else 16)
+    # first garment row per column (scarf / gown collar) below the face
+    first = np.full(W, -1)
+    for x in range(W):
+        ys = np.where(cloth[lo:t + 52, x])[0]
+        if len(ys): first[x] = lo + ys[0]
+    # where the neck enters the garment (gown: the skin between the collar edges)
+    ref_neck = neck_span(hm & is_skin(ref), rt + HEAD_ROWS - 1) or neck_span(hm, rt + HEAD_ROWS - 1)
+    if coat:
+        rs = np.median(np.where(is_red(ref)[rt + HEAD_ROWS - 2:rt + HEAD_ROWS + 8])[1])
+        ts = np.median(np.where(is_red(a)[t + HEAD_ROWS - 2:t + HEAD_ROWS + 8])[1])
+        dx = int(round(ts - rs))
+        base_y, base_c = None, None
+    else:
+        sk = is_skin(a)
+        base_y = None
+        for y in range(t + HEAD_ROWS, t + 44):
+            gx = np.where(cloth[y])[0]
+            sx = np.where(sk[y])[0]
+            if len(gx) >= 3 and len(sx):
+                inside = sx[(sx > gx.min())] if len(sx[(sx > gx.min())]) else sx
+                base_y, base_c = y, (inside.min() + inside.max()) / 2
+                break
+        rc = (ref_neck[0] + ref_neck[1]) / 2
+        dx = int(round(base_c - rc)) if base_y is not None else 0
+    dy = t - rt
+    # clear the old head and neck: per column, everything above the garment
+    for x in range(W):
+        stop = first[x] if first[x] >= 0 else t + HEAD_ROWS + (6 if coat else 10)
+        col = slice(t, stop)
+        keep = cloth[col, x]
+        a[col, x][~keep] = 0
+    # paste the reference head
+    ys, xs = np.where(hm)
+    ty, tx = ys + dy, xs + dx
+    ok = (tx >= 0) & (tx < W) & (ty >= 0) & (ty < H)
+    a[ty[ok], tx[ok]] = ref[ys[ok], xs[ok]]
+    # continue the neck down to where the garment starts (no gap, no cut chin)
+    last = rt + HEAD_ROWS - 1
+    span = None if coat else ref_neck
+    if span is not None:
+        # the throat sits a little behind the jaw line
+        span = (span[0], max(span[0] + 4, span[1] - 2))
+        row = ref[last, span[0]:span[1] + 1].copy()
+        y = last + dy + 1
+        while y < H and y < t + 52:
+            x0 = span[0] + dx
+            need = False
+            for i, c in enumerate(row):
+                x = x0 + i
+                if 0 <= x < W and not cloth[y, x] and a[y, x, 3] == 0:
+                    if first[x] < 0 or y < first[x] or (not coat and base_y is not None and y <= base_y):
+                        a[y, x] = c; need = True
+            if not need or (base_y is not None and y >= base_y) or (coat and y > t + HEAD_ROWS + 6):
+                break
+            y += 1
+    return a
+
+
+def coarser(a, k=2):
+    """Same sprite on a k× coarser pixel grid (premultiplied box filter, own palette)."""
+    h, w = a.shape[:2]
+    pm = a.copy(); pm[..., :3] *= pm[..., 3:4] / 255.0
+    d = np.asarray(Image.fromarray(pm.clip(0, 255).astype(np.uint8), 'RGBA').resize(
+        (max(1, round(w / k)), max(1, round(h / k))), Image.BOX)).astype(float)
+    al = d[..., 3:4] / 255.0
+    rgb = np.where(al > 0.01, d[..., :3] / np.maximum(al, 1e-3), 0)
+    alpha = d[..., 3] > 120
+    pal = np.unique(a[a[..., 3] > 0][:, :3], axis=0)
+    flat = rgb[alpha]
+    idx = np.argmin(((flat[:, None, :] - pal[None]) ** 2).sum(-1), 1)
+    small = np.zeros(d.shape, float)
+    small[alpha, :3] = pal[idx]; small[alpha, 3] = 255
+    return np.asarray(Image.fromarray(small.astype(np.uint8), 'RGBA').resize((w, h), Image.NEAREST)).astype(float)
+
+
+for g in ['jul', 'julg']:
+    for n in ['idle_walk1', 'idle_walk2']:
+        frames[f'{g}_{n}'] = match_scale(frames[f'{g}_{n}'], frames[f'{g}_idle'])
+JUL_HEAD = frames['jul_idle'].copy()
+for n in ['jul_talk', 'jul_idle_walk1', 'jul_idle_walk2', 'julg_idle', 'julg_talk', 'julg_idle_walk1', 'julg_idle_walk2',
+          'julian_think', 'julian_seat']:
+    frames[n] = graft_head(frames[n], JUL_HEAD)
+# lying in bed he is seen close up: the same grid as the standing NPCs looks too fine
 for n in ['jul_idle', 'jul_talk', 'julg_idle', 'julg_talk']:
     ALIASES[f'{n}_sit'] = 'julian_seat'
-# Wyatt standing (he only came seated): the blond constable, greyed at the temples
-frames['wyatt_stand'] = frames['cop_blond_idle'] * 0.55 + grey_hair(frames['cop_blond_idle'], 0.1) * 0.45
-frames['wyatt_stand'][..., 3] = frames['cop_blond_idle'][..., 3]
+# v0.08: Wyatt and Quinn standing in profile (walk source), the old woman of 107 lying
+for n in ['wyatt_side', 'quinn_side', 'lie_granny']:
+    frames[n] = load(n)
+# the hospital beds are seen close up: the lying patients go on a 2× coarser grid,
+# like the standing cast reads at that distance
+for n in ['lie_julian_gown', 'lie_granny']:
+    frames[n] = coarser(frames[n])
 if os.path.exists(f'{RAW}/raw_quinn_drive.png'):
     frames['quinn_drive'] = load('quinn_drive')
 else:
@@ -502,9 +680,10 @@ else:
 WALK_HIP = 112
 
 
-def walk(a, amp, front_dark):
+def walk(a, amp, front_dark, hip=WALK_HIP):
     """Two-layer leg scissor: back leg = darker copy sheared one way,
-    front leg = copy sheared the other way. Rows above WALK_HIP are kept."""
+    front leg = copy sheared the other way. Rows above the hip are kept."""
+    WALK_HIP = hip
     h, w = a.shape[:2]
     pad = abs(amp) + 2
     out = np.zeros((h, w + pad * 2, 4), float)
@@ -527,10 +706,15 @@ def walk(a, amp, front_dark):
 
 for name in ['julian_idle', 'kayden_idle', 'waiter_idle', 'waiter2', 'patron_a', 'patron_b', 'woman', 'bartender_idle',
              'npc_cap_side', 'npc_glasses_side', 'npc_vest_side', 'npc_fedora_side', 'officer_a', 'officer_b', 'doctor_side', 'nurse_side',
-             'cop_blond_idle', 'cop_red_idle', 'quinn_idle', 'wyatt_stand', 'nurse_red', 'medic_m', 'doctor_f', 'nurse_white', 'nurse_blue']:
+             'cop_blond_idle', 'cop_red_idle', 'quinn_idle', 'nurse_red', 'medic_m', 'doctor_f', 'nurse_white', 'nurse_blue']:
     if name not in frames: continue
     frames[name + '_walk1'] = walk(frames[name], 7, False)
     frames[name + '_walk2'] = walk(frames[name], 7, True)
+# the painted standing profiles: hip at ~61% of the height
+for name in ['wyatt_side', 'quinn_side']:
+    hip = round(frames[name].shape[0] * 0.61)
+    frames[name + '_walk1'] = walk(frames[name], 7, False, hip)
+    frames[name + '_walk2'] = walk(frames[name], 7, True, hip)
 
 # simple shelf packing, 2px padding
 PAD = 2

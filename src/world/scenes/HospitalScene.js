@@ -5,14 +5,14 @@ import { streetTexture, canvasTexture, rng } from '../../render/textures.js';
 import { glow, lightPool } from '../props.js';
 
 /**
- * Whitehorse General — 2nd floor, side-on cut-away. States: 'day' / 'night'.
+ * Whitehorse General — ground floor, side-on cut-away. States: 'day' / 'night'.
  *   x -22 … -14  entrance hall: reception, waiting area
  *   x -14 …  -3  corridor A: elevator, stairs, water cooler, vending, procedure room
  *   x  -1 …   1  side corridor going back (surgery / service)
  *   x   3 …   7  nurse station
- *   x   9 …  13  ward 207 — the old woman (glass front)
+ *   x   9 …  13  ward 107 — the old woman (glass front)
  *   x  14 …  15  staff door
- *   x  16 …  21  ward 209 — Julian (glass front)
+ *   x  16 …  21  ward 109 — Julian (glass front)
  *
  * Look: a slightly dated northern regional hospital. Everything is painted on
  * small nearest-filtered canvases (the sprites' pixel register); static set
@@ -248,7 +248,7 @@ const TX = {
   status: () => T('status', 64, 36, (c, w, h) => {
     const r = rng(73);
     rect(c, '#081828', 0, 0, w, h); rect(c, '#1a3a5a', 0, 0, w, 6); ptext(c, 'WARD 2 - CENSUS', 2, 1, '#9ad0ff');
-    const rooms = ['201', '203', '205', '207', '209', '211'];
+    const rooms = ['101', '103', '105', '107', '109', '111'];
     rooms.forEach((n, i) => {
       const y = 8 + i * 4.6 | 0;
       ptext(c, n, 2, y, '#d0e0f0');
@@ -273,14 +273,14 @@ const TX = {
   }),
   annunciator: () => T('annun', 80, 20, (c, w, h) => {
     rect(c, '#22262c', 0, 0, w, h); rect(c, '#3a4048', 0, 0, w, 1);
-    ['201', '203', '205', '207', '209', '211'].forEach((n, i) => { ptext(c, n, 2 + i * 13, 13, '#c8ccd0'); rect(c, '#0e1012', 3 + i * 13, 3, 9, 8); });
+    ['101', '103', '105', '107', '109', '111'].forEach((n, i) => { ptext(c, n, 2 + i * 13, 13, '#c8ccd0'); rect(c, '#0e1012', 3 + i * 13, 3, 9, 8); });
   }),
   whiteboard: () => T('whiteboard', 80, 48, (c, w, h) => {
     const r = rng(83);
     rect(c, '#f6f8f8', 0, 0, w, h);
     ptext(c, 'RM', 2, 2, '#1a2a6a'); ptext(c, 'PATIENT', 16, 2, '#1a2a6a'); ptext(c, 'RN', 50, 2, '#1a2a6a'); ptext(c, 'MD', 64, 2, '#1a2a6a');
     rect(c, '#202830', 0, 8, w, 1); rect(c, '#202830', 14, 0, 1, h); rect(c, '#202830', 48, 0, 1, h); rect(c, '#202830', 62, 0, 1, h);
-    ['201', '203', '205', '207', '209', '211'].forEach((n, i) => {
+    ['101', '103', '105', '107', '109', '111'].forEach((n, i) => {
       const y = 11 + i * 6;
       ptext(c, n, 2, y, '#202020');
       scribble(c, r, 17, y + 2, 28, i === 4 ? '#c02020' : '#2a3aa0');
@@ -498,8 +498,8 @@ export class HospitalScene extends LocationBase {
       { minX: -21.5, maxX: 21.4, minZ: -2.6, maxZ: 1.8 },          // main corridor
       { minX: -0.9, maxX: 0.9, minZ: -9.0, maxZ: -2.5 },            // side corridor
       { minX: -5.6, maxX: -3.4, minZ: -6.4, maxZ: -2.5 },           // procedure room
-      { minX: 16.3, maxX: 20.8, minZ: -7.4, maxZ: -4.4 },           // ward 209 (Julian)
-      { minX: 16.55, maxX: 17.45, minZ: -4.6, maxZ: -2.5 },         // ward 209 door
+      { minX: 16.3, maxX: 20.8, minZ: -7.4, maxZ: -4.4 },           // ward 109 (Julian)
+      { minX: 16.55, maxX: 17.45, minZ: -4.6, maxZ: -2.5 },         // ward 109 door
       { minX: 9.2, maxX: 12.8, minZ: -7.4, maxZ: -4.4, enabled: () => this.wardBOpen },
       { minX: 9.55, maxX: 10.45, minZ: -4.6, maxZ: -2.5, enabled: () => this.wardBOpen },
     ];
@@ -595,11 +595,11 @@ export class HospitalScene extends LocationBase {
     this.buildProcedure();
     this.buildSideCorridor();
     this.buildNurseStation();
-    this.buildStretch(); // between station and ward 207, staff door, end of corridor
+    this.buildStretch(); // between station and ward 107, staff door, end of corridor
 
     // ---------------------------------------------------------------- wards
-    this.wardB = this.buildWard(9.0, 13.0, '207', { patient: true, window: true });
-    this.wardA = this.buildWard(16.1, 21.0, '209', { window: true });
+    this.wardB = this.buildWard(9.0, 13.0, '107', { patient: true, window: true });
+    this.wardA = this.buildWard(16.1, 21.0, '109', { window: true });
     this.wardA.hinge.rotation.y = 1.35; // Julian's door stands open
     this.anchors.wardBDoor = new THREE.Vector3(10.0, 1.9, BACK + 0.15);
     this.anchors.wardADoor = new THREE.Vector3(16.9, 1.9, BACK + 0.15);
@@ -611,7 +611,7 @@ export class HospitalScene extends LocationBase {
 
     this.dustFx = this.dust(new THREE.Box3(new THREE.Vector3(-22, 0.3, -3.5), new THREE.Vector3(22, 2.8, 2)), 300);
     this.setState('day');
-    // painted VN backdrop: ward 209 seen from the corridor
+    // painted VN backdrop: ward 109 seen from the corridor
     this.shots = { ward: { pos: [18.4, 1.6, -1.4], look: [18.8, 1.15, -6.8], fov: 56 } };
     this.vnHide = [];
     return root;
@@ -649,8 +649,8 @@ export class HospitalScene extends LocationBase {
       { x0: -12.8, x1: -11.2, y0: 0, y1: 2.3 },   // elevator
       { x0: -5.8, x1: -3.2, y0: 0, y1: 2.4 },     // procedure room
       { x0: -1.0, x1: 1.0, y0: 0, y1: 2.6 },      // side corridor
-      { x0: 9.0, x1: 13.0, y0: 0, y1: 2.6 },      // ward 207 front
-      { x0: 16.1, x1: 21.0, y0: 0, y1: 2.6 },     // ward 209 front
+      { x0: 9.0, x1: 13.0, y0: 0, y1: 2.6 },      // ward 107 front
+      { x0: 16.1, x1: 21.0, y0: 0, y1: 2.6 },     // ward 109 front
       { x0: -9.85, x1: -8.75, y0: 0, y1: 2.2 },   // stairs door
       { x0: 14.0, x1: 15.0, y0: 0, y1: 2.2 },     // staff-only door
     ];
@@ -831,7 +831,7 @@ export class HospitalScene extends LocationBase {
     const ebtn = new THREE.Mesh(new THREE.CircleGeometry(0.03, 10), this.mat('ebtn', { color: 0, emissive: 0xffc860, emissiveIntensity: 2 }));
     ebtn.position.set(-10.9, 1.27, BACK + 0.025); root.add(ebtn);
     this.cy(0.03, 0.03, 0.01, 10, this.mat('hBtnOff', { color: 0x2a2c30 }), -10.9, 1.13, BACK + 0.025, { rx: Math.PI / 2 });
-    const es = this.textSign('ЛИФТ · 2 ЭТАЖ', { w: 1.1, h: 0.18 });
+    const es = this.textSign('ЛИФТ · 1 ЭТАЖ', { w: 1.1, h: 0.18 });
     es.position.set(-12, 2.86, BACK + 0.03); root.add(es);
     this.anchors.elevator = new THREE.Vector3(-12, 1.8, BACK + 0.2);
     // fire extinguisher cabinet
@@ -1139,7 +1139,7 @@ export class HospitalScene extends LocationBase {
       for (const s2 of [-0.7, 0.7]) this.cy(0.006, 0.006, 0.26, 4, this.mat('steel'), x + s2, H - 0.13, -2.3);
     };
     hang('← РЕГИСТРАТУРА · ЛИФТ', -7.0);
-    hang('ПАЛАТЫ 201–215 →', 7.8);
+    hang('ПАЛАТЫ 101–115 →', 7.8);
     // paper snowflakes taped to the ward glass (winter craft)
     const flake = this.texMat('hFlake', TX.snowflake(), { transparent: true });
     for (const [x, y, s] of [[12.6, 2.25, 0.2], [12.25, 2.0, 0.14], [11.75, 2.32, 0.16], [20.6, 2.25, 0.2], [20.25, 2.05, 0.14], [17.9, 2.3, 0.15]]) this.pl(s, s, flake, x, y, BACK + 0.025);
@@ -1456,7 +1456,7 @@ export class HospitalScene extends LocationBase {
     outlets.forEach(([c], i) => this.cy(0.035, 0.035, 0.03, 10, this.mat(`hOutlet-${c}`, { color: c, roughness: 0.4 }), tx0 + 0.2 + i * 0.13, 1.18, zb + 0.12, { rx: Math.PI / 2 }));
     this.cy(0.02, 0.02, 0.02, 8, this.mat('hCallBtn', { color: 0xc02020, emissive: 0x400000 }), tx1 - 0.15, 1.18, zb + 0.12, { rx: Math.PI / 2 });
     this.bx(0.07, 0.12, 0.05, this.mat('hFlowmeter', { color: 0xdfe8ee, transparent: true, opacity: 0.7 }), tx0 + 0.2, 1.06, zb + 0.15);
-    // reading lamp above the head end (lit at night in 209)
+    // reading lamp above the head end (lit at night in 109)
     const readM = this.mat(`hRead-${number}`, { color: 0x202020, emissive: 0xffc890, emissiveIntensity: 0 });
     this.bx(0.4, 0.05, 0.12, this.mat('hTrunk2'), bedX - 0.8, 2.05, zb + 0.1);
     this.bx(0.36, 0.015, 0.1, readM, bedX - 0.8, 2.023, zb + 0.1);
@@ -1519,8 +1519,8 @@ export class HospitalScene extends LocationBase {
     // window to the outside: recess, mullion, sill, blinds, frost, radiator
     let outsideMat = null;
     if (window) {
-      // each ward has its own outside: 209 over the roofs and the river, 207 the courtyard
-      const view = number === '209' ? 'ward209' : 'ward207';
+      // each ward has its own outside: 109 over the roofs and the river, 107 the courtyard
+      const view = number === '109' ? 'ward109' : 'ward107';
       outsideMat = new THREE.MeshBasicMaterial({ map: streetTexture('morning', view), color: 0xdde6ee });
       outsideMat.userData.view = view;
       this.outsideMats.push(outsideMat);
@@ -1632,7 +1632,7 @@ export class HospitalScene extends LocationBase {
     if (this.dustFx) this.dustFx.material.opacity = night ? 0.12 : 0.25;
   }
 
-  /** Ward 207 door opens: warm light spills into the dark corridor. */
+  /** Ward 107 door opens: warm light spills into the dark corridor. */
   openWardB(open = true) {
     this.wardBOpen = open;
     this.wardBDoorTarget = open ? 1.35 : 0;
@@ -1674,7 +1674,7 @@ export class HospitalScene extends LocationBase {
       const on = Math.sin(t * 13.0) + Math.sin(t * 5.3 + 1) > 0.9 || (t % 4.7) < 0.08;
       this.lens.F.emissiveIntensity = on ? 0.9 : 0.06;
       this.flickLight.intensity = on ? 2.2 : 0.8;
-      // a call light blinks for 207
+      // a call light blinks for 107
       this.callLamps[3].material.emissiveIntensity = Math.sin(t * 3) > 0 ? 2 : 0;
     }
   }

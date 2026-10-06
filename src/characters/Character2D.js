@@ -3,6 +3,8 @@ import { glowTexture, canvasTexture } from '../render/textures.js';
 import { CharacterState } from './CharacterState.js';
 
 const PX = 0.01; // metres per sprite pixel
+// walk-cycle beats per second at normal walking speed (6 beats = two steps ≈ 1 s)
+const WALK_BEATS = 6;
 
 /**
  * A fully 2D character living in the 3D scene: a lit, alpha-tested plane
@@ -158,8 +160,10 @@ export class Character2D {
     if (this.state === 'walk' && !this.seated) {
       // walking uses the profile frame (`poses.walk`) when the idle frame is a front view
       const wb = this.poses.walk || this.poses.idle;
-      const step = Math.floor(this.walkPhase) % 4;
-      const w = step === 0 ? `${wb}_walk1` : step === 2 ? `${wb}_walk2` : wb;
+      // 6-beat cycle: each stride frame is held for two beats, the passing
+      // (standing) frame for one — softer than flipping every beat
+      const step = Math.floor(this.walkPhase) % 6;
+      const w = step < 2 ? `${wb}_walk1` : step === 2 || step === 5 ? wb : `${wb}_walk2`;
       base = this.atlas.has(w) ? w : wb;
     }
     if (this.seated) {
@@ -251,7 +255,7 @@ export class Character2D {
     const moving = Math.hypot(vx, vz) > 0.01;
     this.state = moving ? 'walk' : (this.state === 'walk' ? 'idle' : this.state);
     if (moving) {
-      this.walkPhase += dt * 7.5 * Math.min(1.4, Math.hypot(vx, vz) / 1.3);
+      this.walkPhase += dt * WALK_BEATS * Math.min(1.4, Math.hypot(vx, vz) / 1.3);
       if (Math.abs(vx) > 0.02) this.face(vx);
     }
     this.root.userData.vx = vx;
@@ -327,7 +331,7 @@ export class Character2D {
         this.position.x += (dx / d) * step;
         this.position.z += (dz / d) * step;
         if (Math.abs(dx) > 0.01) this.face(dx);
-        this.walkPhase += sdt * 7.5 * (p.speed / 1.35);
+        this.walkPhase += sdt * WALK_BEATS * (p.speed / 1.35);
         this.root.userData.vx = (dx / d) * p.speed;
         this.onStep?.(this);
       }
@@ -336,9 +340,10 @@ export class Character2D {
     // idle life: breathing + tiny weight shift; walking: bob
     let sy = 1, bob = 0, tilt = 0;
     if (this.state === 'walk') {
-      const ph = this.walkPhase * Math.PI / 2;
-      bob = Math.abs(Math.sin(ph)) * 0.015;
-      tilt = Math.sin(ph) * 0.012;
+      // rise on the passing beats (2 and 5), settle into the strides
+      const u = this.walkPhase;
+      bob = (0.5 + 0.5 * Math.cos(2 * Math.PI * (u - 2.5) / 3)) * 0.01;
+      tilt = Math.sin(2 * Math.PI * u / 6) * 0.007;
     } else if (this.state !== 'collapse' && this.state !== 'rise') {
       sy = 1 + Math.sin(t * 1.6 + this.breath) * 0.006;
       tilt = Math.sin(t * 0.37 + this.breath) * 0.006;

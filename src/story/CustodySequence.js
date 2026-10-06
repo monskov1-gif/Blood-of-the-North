@@ -479,6 +479,7 @@ const methods = {
     if (S !== this.session) return;
     await g.view.flash('interrogator', 'Рид? Рид!', 1200);
     this.dawson.stand();
+    this.dawson.setPose('idle');
     this.dawson.placeAt(w.anchors.officerSeat.x, -0.4, -1);
     await this.dawson.walkTo({ x: J.position.x + 0.55, z: J.position.z }, { speed: 2.4 });
     g.cameraSys.shake = 0.8;
@@ -567,7 +568,7 @@ const methods = {
     w.onBeat = (m) => { if (m === w.wardA.mon && Math.abs(J.position.x - m.halo.getWorldPosition(new THREE.Vector3()).x) < 6) g.audio.play('sfx.beep', { volume: 0.35 }); };
     g.cameraSys.setShot({ x: 18.6, y: 1.7, z: 1.4, lookX: 18.6, lookY: 0.9, lookZ: -6.0, fov: 42 }, 1);
     g.cameraSys.snap();
-    await g.card.show('Палата 209', { sub: 'ПОЛДЕНЬ', ms: 1800 });
+    await g.card.show('Палата 109', { sub: 'ПОЛДЕНЬ', ms: 1800 });
     if (S !== this.session) return;
     await g.fader.to(false, 1600);
     await g.dialogue.start('h_wake');
@@ -610,7 +611,7 @@ const methods = {
       { id: 'h_procedure', label: 'Процедурная', at: { x: -4.5, z: -3.0 }, radius: 1.0, anchor: w.anchors.procedure, run: say('h_procedure') },
       { id: 'h_side', label: 'Хирургия', at: { x: 0, z: -6.0 }, radius: 1.2, anchor: w.anchors.sideCorridor, run: say('h_side') },
       { id: 'h_station', label: 'Пост медсестры', at: { x: 5.0, z: -2.0 }, radius: 1.0, anchor: w.anchors.nurseStation, run: say('h_station') },
-      { id: 'h_wardB', label: 'Палата 207', at: { x: 11.2, z: -2.3 }, radius: 1.3, anchor: A(11.2, 2.1, -4.0), run: say('h_wardB_day') },
+      { id: 'h_wardB', label: 'Палата 107', at: { x: 11.2, z: -2.3 }, radius: 1.3, anchor: A(11.2, 2.1, -4.0), run: say('h_wardB_day') },
       { id: 'h_bed', label: 'Лечь в кровать', at: { x: w.wardA.bedSpot.x + 0.4, z: -4.9 }, radius: 1.6, anchor: A(w.wardA.bedSpot.x, 1.3, w.wardA.bedSpot.z),
         run: () => (g.state.get('overheard_doctors') ? this.startEvening() : g.dialogue.start('h_bed_wait')) },
     ];
@@ -640,6 +641,7 @@ const methods = {
     w.wardA.mon.bpm = 50; w.wardA.mon.flat = false;
     for (const c of ['doc', 'psy', 'nurse', 'nurse2']) this.hospCast?.[c]?.setVisible(false);
     const kow = this.castIn(w, 'quinn');
+    kow.setPose('side'); // painted standing profile: she walks in and stands by the bed
     w.vnHide = [kow.root];
     kow.placeAt(16.9, -1.5, 1);
     this.setAmbience(['amb.hospital_day']);
@@ -654,10 +656,8 @@ const methods = {
     await kow.walkTo([{ x: 16.9, z: -4.6 }, { x: w.wardA.bedSpot.x + 1.6, z: w.wardA.bedSpot.z + 0.9 }], { speed: 1.0 });
     if (S !== this.session) return;
     kow.face(-1);
-    kow.setPose('front');
     await g.dialogue.start('h_investigator');
     if (S !== this.session) return;
-    kow.setPose('idle');
     await kow.walkTo([{ x: 16.9, z: -4.6 }, { x: 16.9, z: -1.5 }, { x: 8, z: -1.0 }], { speed: 1.1 });
     kow.setVisible(false);
     g.keyScene = false;
@@ -763,7 +763,7 @@ const methods = {
     return items;
   },
 
-  /** The door of 207 opens: warm light, a voice, the nurse leaves without turning. */
+  /** The door of 107 opens: warm light, a voice, the nurse leaves without turning. */
   wardBOpens() {
     this.wardVoice = this.wardBScene();
     return this.wardVoice;
@@ -1040,9 +1040,12 @@ const methods = {
         iv.position.x += vx;
         iv.position.z += (tz - iv.position.z) * k;
         iv.rotation.z = THREE.MathUtils.clamp(-vx * 6, -0.12, 0.12); // a slight lean when pulled
+        // the line always runs into his arm, whichever side of him the stand rolls on
+        iv.userData.aimTube?.(J.position.x - iv.position.x, 1.02, J.position.z - iv.position.z + 0.03);
         if (Math.abs(vx) > 0.004 && (this.ivSqueak = (this.ivSqueak || 0) - dt) < 0) { this.ivSqueak = 1.4; g.audio.play('sfx.step', { volume: 0.12 }); }
       } else if (st !== 'hospital_day' && !iv.position.equals(iv.userData.home)) {
         iv.position.copy(iv.userData.home); iv.rotation.z = 0;
+        iv.userData.aimTube?.(null);
       }
     }
     if (st === 'hospital_day' && g.player.enabled) {
@@ -1060,7 +1063,7 @@ const methods = {
         });
       }
       if (!g.state.get('overheard_doctors') && this.hospT > 150) { g.state.set('overheard_doctors', true); g.state.set('objective', 'bed'); }
-      // "back to room 209" always completes: stepping into the ward is enough
+      // "back to room 109" always completes: stepping into the ward is enough
       if (g.state.get('overheard_doctors') && this.inWardA()) this.startEvening();
     }
     if (st === 'hospital_return' && g.player.enabled && this.inWardA()) this.nurseReturns();

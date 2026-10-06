@@ -285,6 +285,9 @@ export class Game {
     ui.style.zoom = k;
     ui.style.width = `${w / k}px`;
     ui.style.height = `${h / k}px`;
+    // zoom multiplies viewport units too: inside #ui they come from px variables
+    ui.style.setProperty('--vh', `${h / 100 / k}px`);
+    ui.style.setProperty('--vw', `${w / 100 / k}px`);
     window.__uiScale = k;
   }
 

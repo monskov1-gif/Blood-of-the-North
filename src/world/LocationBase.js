@@ -200,12 +200,27 @@ export class LocationBase {
     for (let i = 0; i < 5; i++) { const leg = this.box(0.3, 0.02, 0.02, steel, 0.12, 0.05, 0, g); leg.rotation.y = (i / 5) * Math.PI * 2; leg.position.set(Math.cos(leg.rotation.y) * 0.12, 0.05, -Math.sin(leg.rotation.y) * 0.12); }
     const bagMat = new THREE.MeshStandardMaterial({ color: bagColor, roughness: 0.2, transparent: true, opacity: 0.8, emissive: bagColor === 0xdde8f0 ? 0x000000 : 0x300004 });
     const bag = this.box(0.16, 0.26, 0.05, bagMat, 0.2, 1.68, 0, g);
-    const tube = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([
-      new THREE.Vector3(0.2, 1.55, 0), new THREE.Vector3(0.25, 1.1, 0.05), new THREE.Vector3(0.45, 0.9, 0.1), new THREE.Vector3(0.7, 0.8, 0.05)]), 20, 0.006, 5),
+    const tubeGeo = (x, y, z) => {
+      // from the drip chamber under the bag, sagging, into the arm at (x, y, z)
+      const sx = 0.2, sy = 1.55;
+      const mx = sx + (x - sx) * 0.45, my = Math.min(y, sy) - 0.18 - Math.abs(x - sx) * 0.12;
+      return new THREE.TubeGeometry(new THREE.CatmullRomCurve3([
+        new THREE.Vector3(sx, sy, 0), new THREE.Vector3(sx + (x - sx) * 0.08, sy - 0.4, z * 0.4),
+        new THREE.Vector3(mx, my, z * 0.8), new THREE.Vector3(x, y, z)]), 20, 0.006, 5);
+    };
+    const tube = new THREE.Mesh(tubeGeo(0.7, 0.8, 0.05),
       new THREE.MeshStandardMaterial({ color: bagColor === 0xdde8f0 ? 0xe8eef2 : 0x7a0010, transparent: true, opacity: 0.8 }));
     g.add(tube);
     g.userData.bag = bag;
     g.userData.tube = tube;
+    /** Re-route the tube to end at a point given in the stand's local space (null = back to the bed). */
+    g.userData.aimTube = (x, y, z) => {
+      const key = x == null ? 'home' : `${x.toFixed(2)},${y.toFixed(2)},${z.toFixed(2)}`;
+      if (tube.userData.key === key) return;
+      tube.userData.key = key;
+      tube.geometry.dispose();
+      tube.geometry = x == null ? tubeGeo(0.7, 0.8, 0.05) : tubeGeo(x, y, z);
+    };
     g.position.set(x, 0, z);
     this.root.add(g);
     return g;

@@ -329,8 +329,8 @@ export function paintingTexture(kind, seed = 1) {
 
 /**
  * What you see through a window. `view` picks the place so every building has
- * its own outside: 'bar' (the street), 'station' (the RCMP lot), 'ward209'
- * (upper floor over the roofs and the river), 'ward207' (the inner courtyard).
+ * its own outside: 'bar' (the street), 'station' (the RCMP lot), 'ward109'
+ * (ground floor: the lot, the road, the river and the hills beyond), 'ward107' (the inner courtyard).
  */
 export function streetTexture(time = 'night', view = 'bar') {
   const night = time === 'night';
@@ -509,29 +509,38 @@ function viewTexture(time, view) {
     const lit = () => (night && r() < 0.55 ? '#ffc878' : (night ? '#0e1420' : '#5a6878'));
     const box = (x, y, bw, bh, c) => { ctx.fillStyle = c; ctx.fillRect(x, y, bw, bh); };
     const spruce = (x, y, s, c) => { ctx.fillStyle = c; for (let k = 0; k < 4; k++) { ctx.beginPath(); ctx.moveTo(x, y - s * (1.6 - k * 0.3)); ctx.lineTo(x + s * (0.35 + k * 0.12), y - s * (0.9 - k * 0.3)); ctx.lineTo(x - s * (0.35 + k * 0.12), y - s * (0.9 - k * 0.3)); ctx.fill(); } box(x - s * 0.05, y - s * 0.1, s * 0.1, s * 0.12, c); ctx.fillStyle = snow; ctx.globalAlpha = 0.7; ctx.beginPath(); ctx.moveTo(x, y - s * 1.6); ctx.lineTo(x + s * 0.18, y - s * 1.35); ctx.lineTo(x - s * 0.18, y - s * 1.35); ctx.fill(); ctx.globalAlpha = 1; };
-    if (view === 'ward209') {
-      // upper floor: mountains, the frozen Yukon river, roofs below
+    if (view === 'ward109') {
+      // ground floor: hills and the frozen Yukon over the road, the parking lot right outside
       for (let k = 0; k < 3; k++) {
         ctx.fillStyle = night ? ['#0a1220', '#0d1626', '#111c2e'][k] : ['#9aa6b4', '#aab4c0', '#b8c2cc'][k];
         ctx.beginPath(); ctx.moveTo(0, h);
-        for (let x = 0; x <= w; x += 16) ctx.lineTo(x, h * (0.22 + k * 0.06) + Math.sin(x * 0.006 + k * 1.7) * 50 + Math.sin(x * 0.021 + k) * 14);
+        for (let x = 0; x <= w; x += 16) ctx.lineTo(x, h * (0.26 + k * 0.05) + Math.sin(x * 0.006 + k * 1.7) * 34 + Math.sin(x * 0.021 + k) * 10);
         ctx.lineTo(w, h); ctx.fill();
-        if (k === 0) { ctx.fillStyle = snow; ctx.globalAlpha = 0.55; for (let x = 0; x < w; x += 16) ctx.fillRect(x, h * 0.22 + Math.sin(x * 0.006) * 50 + Math.sin(x * 0.021) * 14, 16, 10); ctx.globalAlpha = 1; }
+        if (k === 0) { ctx.fillStyle = snow; ctx.globalAlpha = 0.55; for (let x = 0; x < w; x += 16) ctx.fillRect(x, h * 0.26 + Math.sin(x * 0.006) * 34 + Math.sin(x * 0.021) * 10, 16, 8); ctx.globalAlpha = 1; }
       }
-      box(0, h * 0.5, w, h * 0.08, night ? '#5a6a84' : '#dfe6ee'); // the river, frozen
-      ctx.strokeStyle = night ? 'rgba(20,30,50,0.6)' : 'rgba(120,135,150,0.5)'; ctx.lineWidth = 2;
-      for (let i = 0; i < 10; i++) { ctx.beginPath(); ctx.moveTo(r() * w, h * 0.52 + r() * h * 0.05); ctx.lineTo(r() * w, h * 0.52 + r() * h * 0.05); ctx.stroke(); }
-      for (let i = 0; i < 40; i++) spruce(r() * w, h * 0.5, 14 + r() * 10, night ? '#05080e' : '#4e5a64');
-      box(0, h * 0.58, w, h * 0.42, snow);
-      for (let i = 0; i < 14; i++) {
-        const x = i * 78 + r() * 30, y = h * 0.62 + (i % 3) * 52, bw = 60 + r() * 40, bh = 30 + r() * 26;
+      for (let i = 0; i < 46; i++) spruce(r() * w, h * 0.42, 12 + r() * 8, night ? '#05080e' : '#4e5a64');
+      box(0, h * 0.42, w, h * 0.03, night ? '#5a6a84' : '#dfe6ee'); // the river, frozen, a strip behind the trees
+      // the road, a lamp post, houses across seen straight on
+      box(0, h * 0.45, w, h * 0.55, snow);
+      for (let i = 0; i < 7; i++) {
+        const x = i * 150 + r() * 40, bw = 90 + r() * 40, bh = 46 + r() * 20, y = h * 0.46 - bh * 0.4;
         box(x, y, bw, bh, night ? '#141a24' : ['#7a6a5a', '#8a4a3e', '#5e6f7c', '#9a8a70'][i % 4]);
-        box(x - 4, y - 10, bw + 8, 12, snow);
-        for (let k = 0; k < 3; k++) box(x + 8 + k * (bw - 20) / 2, y + 10, 8, 9, lit());
+        box(x - 5, y - 12, bw + 10, 14, snow);
+        for (let k = 0; k < 3; k++) box(x + 10 + k * (bw - 26) / 2, y + 12, 10, 11, lit());
       }
-      // parking lot below with a few cars
-      for (let i = 0; i < 6; i++) { box(80 + i * 150, h * 0.93, 70, 26, night ? '#1a1e26' : ['#5a2a24', '#2a3a5a', '#4a4a50'][i % 3]); box(78 + i * 150, h * 0.925, 74, 8, snow); }
-    } else if (view === 'ward207') {
+      box(0, h * 0.6, w, h * 0.05, night ? '#2a3240' : '#8a929a'); // ploughed road
+      box(0, h * 0.65, w, h * 0.06, snow); // windrow
+      // parked cars right under the window, at eye level
+      for (let i = 0; i < 5; i++) {
+        const x = 30 + i * 210, y = h * 0.74;
+        box(x, y, 160, 60, night ? '#1a1e26' : ['#5a2a24', '#2a3a5a', '#4a4a50'][i % 3]);
+        box(x + 24, y - 30, 108, 34, night ? '#141820' : '#3a4450');
+        box(x + 30, y - 26, 44, 24, night ? '#202838' : '#9ab0c4'); box(x + 82, y - 26, 44, 24, night ? '#202838' : '#9ab0c4');
+        box(x + 20, y - 36, 120, 10, snow);
+        box(x + 18, y + 52, 26, 20, '#101214'); box(x + 116, y + 52, 26, 20, '#101214');
+      }
+      box(0, h * 0.95, w, h * 0.05, snow);
+    } else if (view === 'ward107') {
       // the inner courtyard: the other wing across, spruces, a bench, a lamp
       box(0, h * 0.08, w, h * 0.56, night ? '#121820' : '#b8b2a6');
       for (let yy = 0; yy < 3; yy++) for (let x = 40; x < w; x += 120) {

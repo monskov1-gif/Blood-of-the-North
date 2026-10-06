@@ -12,9 +12,9 @@ const OBJECTIVES = {
   interrogation: { ru: 'Вторая допросная', en: 'INTERROGATION ROOM 2' },
   sit: { ru: 'Сесть за стол', en: 'TAKE A SEAT' },
   hospital: { ru: 'Пройтись по отделению', en: 'WALK THE WARD' },
-  bed: { ru: 'Вернуться в палату 209', en: 'BACK TO ROOM 209' },
+  bed: { ru: 'Вернуться в палату 109', en: 'BACK TO ROOM 109' },
   night: { ru: 'Жажда', en: 'THIRST' },
-  back: { ru: 'Вернуться в палату 209', en: 'BACK TO ROOM 209' },
+  back: { ru: 'Вернуться в палату 109', en: 'BACK TO ROOM 109' },
 };
 
 /** Exploration overlay: objective, interaction marker, phone & menu buttons, toasts. */
