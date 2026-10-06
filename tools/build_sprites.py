@@ -546,9 +546,26 @@ def neck_span(m, y):
     return (xs.min(), xs.max()) if len(xs) else None
 
 
+def skin_run(a, y, cloth):
+    """The neck at row y: the run of skin inside the collar opening (left, right)."""
+    sk = is_skin(a)[y]
+    gx = np.where(cloth[y])[0]
+    xs = np.where(sk)[0]
+    if len(gx) >= 3:
+        xs = xs[xs > gx.min()]
+    if not len(xs):
+        return None
+    # the contiguous run around the middle of the skin pixels
+    runs = np.split(xs, np.where(np.diff(xs) > 1)[0] + 1)
+    run = max(runs, key=len)
+    return int(run.min()), int(run.max())
+
+
 def graft_head(a, ref):
     """Replaces the head and neck of a frame with the reference head (+ upper
-    neck); in the gown the neck is continued down into the collar."""
+    neck). Coat: aligned on the scarf, with the top of the reference scarf.
+    Gown: the head goes where the frame's own head was, and the neck runs at the
+    frame's own angle from under the new jaw down into the collar."""
     a = a.copy()
     t = bbox(a)[0]
     H, W = a.shape[:2]
@@ -566,26 +583,22 @@ def graft_head(a, ref):
     for x in range(W):
         ys = np.where(cloth[lo:t + 52, x])[0]
         if len(ys): first[x] = lo + ys[0]
-    # where the neck enters the garment (gown: the skin between the collar edges)
-    ref_neck = neck_span(hm & is_skin(ref), rt + HEAD_ROWS - 1) or neck_span(hm, rt + HEAD_ROWS - 1)
+    dy = t - rt
+    base = None
     if coat:
         rs = np.median(np.where(is_red(ref)[rt + HEAD_ROWS - 2:rt + HEAD_ROWS + 8])[1])
         ts = np.median(np.where(is_red(a)[t + HEAD_ROWS - 2:t + HEAD_ROWS + 8])[1])
         dx = int(round(ts - rs))
-        base_y, base_c = None, None
     else:
-        sk = is_skin(a)
-        base_y = None
-        for y in range(t + HEAD_ROWS, t + 44):
-            gx = np.where(cloth[y])[0]
-            sx = np.where(sk[y])[0]
-            if len(gx) >= 3 and len(sx):
-                inside = sx[(sx > gx.min())] if len(sx[(sx > gx.min())]) else sx
-                base_y, base_c = y, (inside.min() + inside.max()) / 2
+        # the head where the frame's head was (centre of the skull and hair)
+        th = np.zeros((H, W), bool); th[t:t + 17] = True; th &= a[..., 3] > 0
+        rh = hm.copy(); rh[rt + 17:] = False
+        dx = int(round(np.where(th)[1].mean() - np.where(rh)[1].mean()))
+        # where the frame's neck enters the collar
+        for y in range(t + HEAD_ROWS - 2, t + 44):
+            if (cloth[y].sum() >= 3) and (run := skin_run(a, y, cloth)):
+                base = (y, run)
                 break
-        rc = (ref_neck[0] + ref_neck[1]) / 2
-        dx = int(round(base_c - rc)) if base_y is not None else 0
-    dy = t - rt
     # clear the old head and neck: per column, everything above the garment
     for x in range(W):
         stop = first[x] if first[x] >= 0 else t + HEAD_ROWS + (6 if coat else 10)
@@ -597,25 +610,39 @@ def graft_head(a, ref):
     ty, tx = ys + dy, xs + dx
     ok = (tx >= 0) & (tx < W) & (ty >= 0) & (ty < H)
     a[ty[ok], tx[ok]] = ref[ys[ok], xs[ok]]
-    # continue the neck down to where the garment starts (no gap, no cut chin)
+    if coat or base is None:
+        return a
+    # the neck: from under the new jaw to the collar, at the frame's own angle
     last = rt + HEAD_ROWS - 1
-    span = None if coat else ref_neck
-    if span is not None:
-        # the throat sits a little behind the jaw line
-        span = (span[0], max(span[0] + 4, span[1] - 2))
-        row = ref[last, span[0]:span[1] + 1].copy()
-        y = last + dy + 1
-        while y < H and y < t + 52:
-            x0 = span[0] + dx
-            need = False
-            for i, c in enumerate(row):
-                x = x0 + i
-                if 0 <= x < W and not cloth[y, x] and a[y, x, 3] == 0:
-                    if first[x] < 0 or y < first[x] or (not coat and base_y is not None and y <= base_y):
-                        a[y, x] = c; need = True
-            if not need or (base_y is not None and y >= base_y) or (coat and y > t + HEAD_ROWS + 6):
-                break
-            y += 1
+    span = neck_span(hm & is_skin(ref), last) or neck_span(hm, last)
+    span = (span[0], max(span[0] + 4, span[1] - 2))  # the throat sits behind the jaw line
+    src = ref[last, span[0]:span[1] + 1].copy()
+    y0, l0, r0 = last + dy, span[0] + dx, span[1] + dx
+    by, (bl, br) = base
+    sw = r0 - l0
+    # keep the neck about as thick as the reference one where it meets the collar
+    if br - bl > sw + 2:
+        c = (bl + br) / 2; bl, br = int(round(c - sw / 2)), int(round(c + sw / 2))
+    by = max(by, y0 + 2)
+
+    def put(y, l, r):
+        for x in range(l, r + 1):
+            if 0 <= x < W and 0 <= y < H and not cloth[y, x]:
+                k = 0 if r == l else (x - l) / (r - l)
+                a[y, x] = src[min(len(src) - 1, int(round(k * (len(src) - 1))))]
+
+    for y in range(y0 + 1, by + 1):
+        k = (y - y0) / (by - y0)
+        put(y, int(round(l0 + (bl - l0) * k)), int(round(r0 + (br - r0) * k)))
+    # and on into the collar opening, so it never floats above the gown
+    for y in range(by + 1, t + 52):
+        cols = [x for x in range(bl, br + 1) if 0 <= x < W and (first[x] < 0 or y < first[x])]
+        if not cols:
+            break
+        for x in cols:
+            if a[y, x, 3] == 0 or not cloth[y, x]:
+                k = (x - bl) / max(1, br - bl)
+                a[y, x] = src[min(len(src) - 1, int(round(k * (len(src) - 1))))]
     return a
 
 

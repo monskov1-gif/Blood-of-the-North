@@ -336,17 +336,31 @@ export class PortraitFlash {
 export class Card {
   constructor(root) {
     this.el = el('div', 'card-title', root);
+    this.num = el('div', 'ct-num', this.el);
     this.main = el('div', 'ct-main', this.el);
+    this.en = el('div', 'ct-en', this.el);
     this.sub = el('div', 'ct-sub', this.el);
   }
 
-  async show(text, { sub = '', ms = 2200, bg = true } = {}) {
+  /**
+   * `num` — chapter numeral ('I' → "Chapter I") or a word ('Prologue') over the title;
+   * `en` — an English line under the title in a script face;
+   * `style` — font pairing: 'chapter' (Cinzel Decorative / Playfair SC / Pinyon Script),
+   * 'chapter-b' (bold Cinzel / Playfair SC / MonteCarlo), 'time' (Playfair SC italic over
+   * a large MonteCarlo watermark). Russian text is always Playfair Display SC (the script
+   * faces have no Cyrillic).
+   */
+  async show(text, { sub = '', ms = 2200, bg = true, num = '', en = '', style } = {}) {
+    style = style || (num ? 'chapter' : en ? 'time' : 'plain');
+    this.el.className = `card-title st-${style}`;
+    this.num.textContent = num ? (/^[IVXLC]+$/.test(num) ? `Chapter ${num}` : num) : '';
     this.main.textContent = text;
+    this.en.textContent = en;
     this.sub.textContent = sub;
     this.el.classList.toggle('bg', bg);
     void this.el.offsetWidth;
     this.el.classList.add('show');
-    await wait(ms);
+    await wait(ms + (num ? 900 : 0));
     this.el.classList.remove('show');
     await wait(700);
   }

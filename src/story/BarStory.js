@@ -205,6 +205,8 @@ export class BarStory {
     // Julian starts at the door (placed before the fade, so he never pops back)
     this.julian.placeAt(-12.2, -2.1, 1);
     g.cameraSys.snap();
+    await g.card.show('Северная Роза', { num: 'Prologue', en: 'The Northern Rose', sub: 'УАЙТХОРС · ЮКОН', ms: 2200 });
+    if (S !== this.session) return;
     const fade = g.fader.to(false, 2200);
     await sleep(0.9);
     if (S !== this.session) return;

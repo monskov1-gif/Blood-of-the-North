@@ -1,5 +1,13 @@
 @font-face { font-family: 'Citadel'; src: url('../assets/fonts/citadel-of-blackrose.ttf') format('truetype'); font-display: swap; }
 @font-face { font-family: 'Adelia'; src: url('../assets/fonts/adelia.ttf') format('truetype'); font-display: swap; }
+/* chapter cards (OFL; subset to Latin + Cyrillic). Only Playfair Display SC has Cyrillic. */
+@font-face { font-family: 'Playfair SC'; src: url('../assets/fonts/playfairdisplaysc-regular.woff2') format('woff2'); font-weight: 400; font-display: swap; }
+@font-face { font-family: 'Playfair SC'; src: url('../assets/fonts/playfairdisplaysc-italic.woff2') format('woff2'); font-weight: 400; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Playfair SC'; src: url('../assets/fonts/playfairdisplaysc-bold.woff2') format('woff2'); font-weight: 700; font-display: swap; }
+@font-face { font-family: 'Cinzel Deco'; src: url('../assets/fonts/cinzeldecorative-regular.woff2') format('woff2'); font-weight: 400; font-display: swap; }
+@font-face { font-family: 'Cinzel Deco'; src: url('../assets/fonts/cinzeldecorative-bold.woff2') format('woff2'); font-weight: 700; font-display: swap; }
+@font-face { font-family: 'Pinyon'; src: url('../assets/fonts/pinyonscript-regular.woff2') format('woff2'); font-display: swap; }
+@font-face { font-family: 'MonteCarlo'; src: url('../assets/fonts/montecarlo-regular.woff2') format('woff2'); font-display: swap; }
 
 /* Title lockup: BLOOD / of the / NORTH — decorative serif + script, dark crimson (title refs) */
 .title-lockup { display: inline-flex; flex-direction: column; align-items: center; line-height: 1.12; color: #a3121b; filter: drop-shadow(0 0 22px rgba(160, 10, 20, 0.35)) drop-shadow(0 3px 10px rgba(0,0,0,0.85)); }
@@ -358,3 +366,25 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .card-title.show { opacity: 1; }
 .card-title .ct-main { font-family: var(--serif); font-style: italic; font-size: clamp(26px, calc(4 * var(--vw)), 44px); color: #efe3cd; letter-spacing: 0.04em; }
 .card-title .ct-sub { font-family: var(--sc); font-size: 12px; letter-spacing: 0.4em; color: rgba(233,220,197,0.5); }
+.card-title .ct-num:empty, .card-title .ct-en:empty, .card-title .ct-sub:empty { display: none; }
+.card-title > div { opacity: 0; transform: translateY(6px); transition: opacity 1.1s ease, transform 1.6s ease, letter-spacing 2.4s ease-out; }
+.card-title.show > div { opacity: 1; transform: none; }
+.card-title.show .ct-num { transition-delay: 0.1s; }
+.card-title.show .ct-main { transition-delay: 0.45s; }
+.card-title.show .ct-en { transition-delay: 0.9s; }
+.card-title.show .ct-sub { transition-delay: 1.25s; }
+/* chapter opening: decorative numeral, small-caps title, script line, a thin rule */
+.st-chapter .ct-num, .st-chapter-b .ct-num { font-family: 'Cinzel Deco', var(--sc); font-size: clamp(14px, calc(1.6 * var(--vw)), 20px); letter-spacing: 0.5em; color: #b58e4f; text-transform: none; }
+.st-chapter .ct-num::after, .st-chapter-b .ct-num::after { content: ''; display: block; width: 46px; height: 1px; margin: 14px auto 2px; background: linear-gradient(90deg, transparent, rgba(181,142,79,0.8), transparent); }
+.st-chapter .ct-main, .st-chapter-b .ct-main { font-family: 'Playfair SC', var(--serif); font-style: normal; font-size: clamp(30px, calc(4.6 * var(--vw)), 58px); letter-spacing: 0.08em; color: #efe3cd; line-height: 1.15; }
+.st-chapter-b .ct-main { font-weight: 700; color: #e9d9bf; }
+.st-chapter-b .ct-num { font-weight: 700; color: #a3121b; }
+.st-chapter .ct-en { font-family: 'Pinyon', cursive; font-size: clamp(26px, calc(3.2 * var(--vw)), 42px); color: rgba(200,160,110,0.85); margin-top: -4px; }
+.st-chapter-b .ct-en { font-family: 'MonteCarlo', cursive; font-size: clamp(30px, calc(3.6 * var(--vw)), 48px); color: rgba(176,22,29,0.85); margin-top: -2px; }
+.st-chapter .ct-sub, .st-chapter-b .ct-sub { margin-top: 10px; }
+.card-title.show.st-chapter .ct-num, .card-title.show.st-chapter-b .ct-num { letter-spacing: 0.32em; }
+/* time skips: italic small caps over a big faint script word */
+.st-time { gap: 6px; }
+.st-time .ct-main { position: relative; z-index: 1; font-family: 'Playfair SC', var(--serif); font-style: italic; font-size: clamp(28px, calc(4.2 * var(--vw)), 52px); letter-spacing: 0.06em; color: #efe3cd; }
+.st-time .ct-en { order: -1; font-family: 'MonteCarlo', cursive; font-size: clamp(64px, calc(10 * var(--vw)), 150px); line-height: 0.6; height: 0.6em; color: rgba(181,142,79,0.16); margin-bottom: -0.05em; }
+.card-title.show.st-time .ct-en { transition-delay: 0s; transition-duration: 2.4s; }

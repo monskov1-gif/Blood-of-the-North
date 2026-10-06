@@ -82,6 +82,7 @@ const methods = {
       a.loop('amb.vent', { volume: 0.6, fade: 4 });
       a.loop('amb.morning', { fade: 2 });
       a.loop('inner.breath', { fade: 3 });
+      a.music('morning', 8); // barely there: a held note, a few cold bells
     }, 1600);
   },
 
@@ -165,7 +166,9 @@ const methods = {
         await g.view.flash(n.speaker, n.text, 1500 + n.text.length * 40);
       }
     };
-    await sleep(0.6);
+    await g.card.show('Утро', { en: 'Morning', sub: 'СЕВЕРНАЯ РОЗА', ms: 1900 });
+    if (S !== this.session) return;
+    await sleep(0.4);
     if (S !== this.session) return;
     g.audio.play('inner.heartbeat', { volume: 0.3 });
     const ring = g.audio.loop('inner.ring', { volume: 0.6, fade: 3 });
@@ -383,6 +386,7 @@ const methods = {
     g.keyScene = true;
     // a distant siren; he freezes
     const siren = g.audio.loop('amb.siren', { volume: 0.05, fade: 2 });
+    g.audio.music('police', 4);
     await sleep(1.5);
     if (S !== this.session) return;
     this.julian.face(-1);

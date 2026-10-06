@@ -4,6 +4,14 @@ import { CharacterState } from '../characters/CharacterState.js';
 import { CHARACTERS, JULIAN_OUTFITS } from '../../data/characters.js';
 
 const GOWN_STAGES = new Set(['hospital_day', 'hospital_evening', 'hospital_night', 'hospital_return', 'recovery']);
+// script line under the time-skip cards
+const CARD_EN = { 'День второй': 'Day Two', 'День третий': 'Day Three', 'День четвёртый': 'Day Four', 'День пятый': 'Day Five' };
+// each stage has its own score (MusicEngine moods); some change again inside the stage
+const STAGE_MUSIC = {
+  car: 'car', station: 'station', interrogation: 'interrogation', medical: 'clinic',
+  hospital_day: 'hospital_day', hospital_evening: 'hospital_evening', hospital_night: 'hospital_night',
+  hospital_return: 'hospital_night', recovery: 'recovery', street: 'street',
+};
 import { glow } from '../world/props.js';
 import { sleep } from './Director.js';
 
@@ -51,7 +59,7 @@ const methods = {
     const g = this.g;
     for (const [who, text, pose] of list) {
       if (S !== this.session) return false;
-      if (who === 'card') { await g.card.show(text, { ms: 1800 }); continue; }
+      if (who === 'card') { await g.card.show(text, { en: CARD_EN[text], ms: 1800 }); continue; }
       const ch = this.chars.get(who) || this.custodyCast?.get(who);
       if (pose && ch) ch.setPose(pose);
       g.dialogue.history.push({ speaker: who, text });
@@ -98,6 +106,7 @@ const methods = {
     this.resetJulian();
     if (stage) g.state.setStage(stage);
     this.setOutfit(GOWN_STAGES.has(stage) ? 'gown' : 'coat');
+    if (STAGE_MUSIC[stage]) g.audio.music(STAGE_MUSIC[stage], 2.5);
   },
 
   /** Coat or hospital gown: sprites, lying frame and the VN portrait. */
@@ -245,12 +254,11 @@ const methods = {
     w.vnHide = [driver.root]; // the painted VN backdrop shows the cabin, she is on the portrait
     w.bottle.visible = false;
     this.setAmbience(['amb.car']);
-    g.audio.music('none', 1);
     g.player.setGaze({ x: -0.9, z: -0.3, minX: -1.9, maxX: 2.3, y: 1.0 });
     this.gazeReticle(w);
     g.hud.show(false);
     g.player.enabled = false;
-    await g.card.show('Утро. Полицейская машина', { sub: 'WHITEHORSE · YUKON', ms: 2000 });
+    await g.card.show('Полицейская машина', { num: 'I', en: 'The Ride', sub: 'УТРО · WHITEHORSE, YUKON', ms: 2200 });
     if (S !== this.session) return;
     await g.fader.to(false, 1800);
     await g.dialogue.start('car_intro');
@@ -328,7 +336,7 @@ const methods = {
     nurse.setVisible(!!g.state.get('survivors_questioned'));
     this.stationCast = { sg, noah, leo, chef, tommy, nurse };
     g.cameraSys.snap();
-    await g.card.show('Участок КККП, Уайтхорс', { sub: 'RCMP DETACHMENT', ms: 1900 });
+    await g.card.show('Участок', { num: 'II', en: 'The Detachment', sub: 'RCMP · WHITEHORSE', ms: 2200, style: 'chapter-b' });
     if (S !== this.session) return;
     await g.fader.to(false, 1500);
     g.hud.show(true);
@@ -512,7 +520,7 @@ const methods = {
     g.keyScene = true;
     g.cameraSys.setShot({ x: -4.5, y: 1.55, z: -1.2, lookX: -4.5, lookY: 1.1, lookZ: -6.2, fov: 40 }, 1);
     g.cameraSys.snap();
-    await g.card.show('Городская больница. Обследование', { sub: 'WHITEHORSE GENERAL', ms: 2000 });
+    await g.card.show('Городская больница', { num: 'III', en: 'Whitehorse General', sub: 'ОБСЛЕДОВАНИЕ', ms: 2200 });
     if (S !== this.session) return;
     g.renderer.setLayer('wake', { blur: 0.5, vignette: 0.3 });
     await g.fader.to(false, 1400);
@@ -568,7 +576,7 @@ const methods = {
     w.onBeat = (m) => { if (m === w.wardA.mon && Math.abs(J.position.x - m.halo.getWorldPosition(new THREE.Vector3()).x) < 6) g.audio.play('sfx.beep', { volume: 0.35 }); };
     g.cameraSys.setShot({ x: 18.6, y: 1.7, z: 1.4, lookX: 18.6, lookY: 0.9, lookZ: -6.0, fov: 42 }, 1);
     g.cameraSys.snap();
-    await g.card.show('Палата 109', { sub: 'ПОЛДЕНЬ', ms: 1800 });
+    await g.card.show('Палата 109', { en: 'Noon', sub: 'ПОЛДЕНЬ', ms: 2000 });
     if (S !== this.session) return;
     await g.fader.to(false, 1600);
     await g.dialogue.start('h_wake');
@@ -650,7 +658,7 @@ const methods = {
     g.cameraSys.snap();
     g.hud.show(false);
     g.keyScene = true;
-    await g.card.show('Вечер', { ms: 1500 });
+    await g.card.show('Вечер', { en: 'Evening', ms: 1800 });
     if (S !== this.session) return;
     await g.fader.to(false, 1400);
     await kow.walkTo([{ x: 16.9, z: -4.6 }, { x: w.wardA.bedSpot.x + 1.6, z: w.wardA.bedSpot.z + 0.9 }], { speed: 1.0 });
@@ -696,22 +704,33 @@ const methods = {
     g.hud.show(false);
     g.player.enabled = false;
     g.keyScene = true;
-    g.cameraSys.setShot({ x: 18.2, y: 1.5, z: -0.6, lookX: 18.0, lookY: 0.9, lookZ: -6.0, fov: 44 }, 1);
+    // open on Julian in bed with the monitor beside him, then drift in on the
+    // monitor while the pulse slows. The camera looks through the glass front,
+    // right of the door, so the door post never covers the screen.
+    const mp = mon.halo.getWorldPosition(new THREE.Vector3());
+    const wide = { x: 18.9, y: 1.6, z: -2.2, lookX: 18.3, lookY: 1.05, lookZ: -6.3, fov: 38 };
+    // from the right of the bed: clear of the door post and of the drip stand
+    const close = { x: mp.x + 2.0, y: mp.y + 0.05, z: mp.z + 3.5, lookX: mp.x, lookY: mp.y - 0.02, lookZ: mp.z, fov: 22 };
+    const between = (k) => Object.fromEntries(Object.keys(wide).map((key) => [key, wide[key] + (close[key] - wide[key]) * k]));
+    g.cameraSys.setShot(wide, 1);
     g.cameraSys.snap();
-    await g.card.show('Ночь', { sub: '03:12', ms: 1600 });
+    await g.card.show('Ночь', { en: 'Night', sub: '03:12', ms: 1900 });
     if (S !== this.session) return;
     await g.fader.to(false, 2000);
     // the pulse slows… and stops
-    for (const bpm of [40, 33, 26, 18, 11]) {
-      mon.bpm = bpm;
+    const steps = [40, 33, 26, 18, 11];
+    for (let i = 0; i < steps.length; i++) {
+      mon.bpm = steps[i];
+      g.cameraSys.setShot(between((i + 1) / (steps.length + 1)), 0.35);
       await sleep(3.2);
       if (S !== this.session) return;
     }
     mon.bpm = 0;
     mon.flat = true;
     g.state.set('flatline', true);
+    g.audio.music('none', 0.6); // only the flatline
     const flat = g.audio.loop('sfx.flatline', { fade: 0.05 });
-    g.cameraSys.setShot({ x: 17.6, y: 1.35, z: -2.6, lookX: 17.0, lookY: 1.3, lookZ: -6.9, fov: 30 }, 0.6);
+    g.cameraSys.setShot(close, 0.6);
     await sleep(3.5);
     if (S !== this.session) return;
     g.fader.set(true);
@@ -721,6 +740,7 @@ const methods = {
     if (S !== this.session) return;
     // he wakes — the thirst
     g.audio.setMasterVolume(1, 0.05);
+    g.audio.music('thirst', 1);
     g.audio.play('sfx.whoosh');
     g.audio.play('inner.heartbeat', { volume: 1 });
     g.renderer.setLayer('thirst', { redPulse: 0.35, vignette: 0.45, ca: 0.8, saturation: -0.35, blur: 0.25, wave: 0.3 });
@@ -851,6 +871,7 @@ const methods = {
     if (S !== this.session) return;
     // instant clarity: every effect drops, sound snaps back
     for (const k of ['blood', 'thirst']) g.renderer.clearLayer(k);
+    g.audio.music('hospital_night', 5); // the thirst is quiet now
     g.audio.setMuffle(0, 0.05);
     g.cameraSys.sway = 0;
     g.player.impair = 0;
@@ -956,7 +977,7 @@ const methods = {
       if (S !== this.session) return;
       if (who === 'card') {
         await g.fader.to(true, 600);
-        await g.card.show(text, { ms: 1500 });
+        await g.card.show(text, { en: CARD_EN[text], ms: 1700 });
         beat++;
         scene(beat);
         await g.fader.to(false, 900);
@@ -980,13 +1001,12 @@ const methods = {
     const J = this.julian;
     J.placeAt(w.anchors.door.x, w.anchors.door.z, 1);
     this.setAmbience(['amb.wind']);
-    g.audio.music('none', 1);
     g.hud.show(false);
     g.player.enabled = false;
     g.keyScene = true;
     g.cameraSys.setShot({ x: 1.5, y: 2.0, z: 8.0, lookX: 1.5, lookY: 1.4, lookZ: -1.5, fov: 34 }, 1);
     g.cameraSys.snap();
-    await g.card.show('Выписка', { sub: 'ДЕНЬ ШЕСТОЙ', ms: 1700 });
+    await g.card.show('Выписка', { num: 'IV', en: 'Discharge', sub: 'ДЕНЬ ШЕСТОЙ', ms: 2200, style: 'chapter-b' });
     if (S !== this.session) return;
     g.audio.play('sfx.door', { volume: 0.5 });
     await g.fader.to(false, 2200);

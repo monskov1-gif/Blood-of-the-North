@@ -382,7 +382,10 @@ export class Game {
     if (!data) return;
     await this.beginPlay();
     this.saves.apply(data);
-    this.audio.music(data.audio?.swing ? 'jukebox' : 'lounge', 2);
+    // the bar's evening score; morning and custody stages pick their own when they load
+    const st = this.state.stage;
+    const evening = ['explore', 'talk1', 'talk2', 'escape'].includes(st);
+    this.audio.music(evening ? (data.audio?.swing ? 'jukebox' : 'lounge') : 'none', 2);
     this.story.startAmbient();
     this.updateControl();
     this.hud.setObjective(this.state.get('objective'));

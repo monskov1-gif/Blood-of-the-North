@@ -1,4 +1,4 @@
-# Blood of the North — демо (пролог) · v0.07
+# Blood of the North — демо (пролог) · v0.08
 
 Визуальная новелла / narrative adventure. Демо «Северная Роза»: бар на окраине
 Уайтхорса (Юкон). 3D-окружение + полностью 2D-персонажи с глубиной, исследование,
@@ -89,6 +89,19 @@ tools/                   пайплайн арта: extract_sprites.py, process_
 Кириллицы в них нет, поэтому русский текст остаётся в Cormorant. Лицензия Citadel of Blackrose —
 `assets/fonts/LICENSE-citadel-of-blackrose.txt` (платная лицензия на проект).
 
+Заставки глав (`Card.show` в `src/ui/Overlays.js`): русское название — Playfair Display SC
+(единственный из новых шрифтов с кириллицей), номер главы — Cinzel Decorative, английская строка —
+Pinyon Script или MonteCarlo. Стили: `chapter`, `chapter-b`, `time` (смена времени суток / дня).
+Шрифты урезаны до латиницы + кириллицы (WOFF2), лицензии OFL — рядом в `assets/fonts/`.
+
+### Музыка
+
+`src/audio/MusicEngine.js` — процедурная партитура, у каждой локации своя тема, у некоторых несколько:
+бар (lounge / jukebox → tense → hallucination), утро после (morning → police), машина (car),
+участок (station), допросная (interrogation), обследование (clinic), больница (hospital_day /
+hospital_evening / hospital_night, жажда — thirst), выздоровление (recovery), улица (street).
+Этапы связаны с темами в `STAGE_MUSIC` (`src/story/CustodySequence.js`).
+
 ### Как расширять
 
 * **Новая локация** — класс мира (как `BarScene`) + сценарий (как `BarStory`), регистрация в
@@ -105,6 +118,9 @@ tools/                   пайплайн арта: extract_sprites.py, process_
 * **Портреты** — файлы `assets/portraits/<id>_<0|1|2>.webp`; выбор кадра — `DialogueView.drawSlot`.
 * **Толпа** — `data/crowd.js`: кто, где сидит/стоит, куда смотрит.
 * **Новый арт** — `python3 tools/process_art.py <папка с листами> .` вырезает фон, делает портреты
-  и пиксельные спрайты (1 px = 1 см), затем `build_sprites.py` пересобирает атлас.
+  и пиксельные спрайты (1 px = 1 см), затем `build_sprites.py` пересобирает атлас. Следующие партии —
+  `process_art2.py` (v0.06–0.07) и `process_art3.py` (v0.08: Уайатт и Куинн в профиль, бабушка из 107).
+* **Голова Джулиана** — у всех его кадров голова с верхом шеи берётся с `jul_idle`
+  (`graft_head` в `build_sprites.py`): в пальто вместе с верхом шарфа, в халате шея дотягивается до ворота.
 
 Окружение, текстуры, фоны диалогов, иллюстрация коктейля и весь звук генерируются кодом; персонажи и портреты — из предоставленного арта.
