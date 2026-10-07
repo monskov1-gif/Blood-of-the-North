@@ -263,7 +263,7 @@ const methods = {
     const pane = new THREE.Mesh(new THREE.PlaneGeometry(w + 0.8, h + 0.8), viewMat);
     pane.position.set(cx, cy, z - 0.3); root.add(pane);
     // the glare of the glass itself (washes the view out by day)
-    const glareMat = new THREE.MeshBasicMaterial({ color: profile.color, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false });
+    const glareMat = new THREE.MeshBasicMaterial({ color: profile.color, transparent: true, opacity: 0.32, blending: THREE.AdditiveBlending, depthWrite: false });
     const glare = new THREE.Mesh(new THREE.PlaneGeometry(w, h), glareMat);
     glare.position.set(cx, cy, z - 0.05); glare.renderOrder = 2; root.add(glare);
     // frame, mullions, sill
@@ -297,7 +297,7 @@ const methods = {
     };
     this.windowLights.push(zone);
     this.expNight.push((night) => {
-      glareMat.opacity = night ? 0.14 : 0.55;
+      glareMat.opacity = night ? 0.14 : 0.32;
       glareMat.color.set(night ? 0x5070b0 : profile.color);
       shaftMat.opacity = night ? profile.shaft * 0.45 : profile.shaft;
       shaftMat.color.set(night ? 0x5a78c0 : profile.color);
@@ -687,7 +687,7 @@ const methods = {
  * C through blinds, long streaks, weak; D the strong morning one, near blinding.
  */
 export const PROFILES = {
-  A: { id: 'A', color: 0xffd8a0, triggerDistance: 3.4, fadeDistance: 2.2, intensity: 1.0, exposure: 0.22, bloom: 0.35, shaft: 0.22, patch: 0.28,
+  A: { id: 'A', color: 0xffd8a0, triggerDistance: 3.4, fadeDistance: 2.2, intensity: 1.0, exposure: 0.16, bloom: 0.22, shaft: 0.2, patch: 0.28,
     flareSize: 1.0, starburstIntensity: 1.0, ghostIntensity: 0.8, ghostCount: 6, ghostSpacing: 0.42, ringIntensity: 0.5, colorTint: [1.0, 0.86, 0.6], ghostTints: [[0.5, 1.0, 0.6], [0.8, 1.0, 0.5], [1.0, 0.7, 0.3]], maxScreenOpacity: 0.85, old: true },
   B: { id: 'B', color: 0xdfe8ff, triggerDistance: 2.8, fadeDistance: 1.8, intensity: 0.7, exposure: 0.12, bloom: 0.2, shaft: 0.14, patch: 0.18,
     flareSize: 0.75, starburstIntensity: 0.45, ghostIntensity: 0.6, ghostCount: 5, ghostSpacing: 0.5, ringIntensity: 0.6, colorTint: [0.85, 0.92, 1.0], ghostTints: [[0.5, 0.6, 1.0], [0.8, 0.5, 1.0], [0.6, 0.9, 1.0]], maxScreenOpacity: 0.6 },

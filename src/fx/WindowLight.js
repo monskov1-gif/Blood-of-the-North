@@ -119,7 +119,7 @@ export class WindowLight {
     }
     const fx = this.settings?.get?.('effects') ?? 1;
     const calm = keyScene ? 0.35 : 1;
-    if (exposure > 0.001) this.renderer.setLayer('windowLight', { exposure: Math.min(0.5, exposure) * (0.6 + 0.4 * calm), bloom: Math.min(0.8, bloom) * calm, tint });
+    if (exposure > 0.001) this.renderer.setLayer('windowLight', { exposure: Math.min(0.42, exposure) * (0.6 + 0.4 * calm), bloom: Math.min(0.8, bloom) * calm, tint });
     else this.renderer.clearLayer('windowLight');
     this.draw(draws, camera, julian, fx * calm);
   }
@@ -151,7 +151,11 @@ export class WindowLight {
     }
     const overJ = (x, y, r) => jb && x + r > jb.x0 && x - r < jb.x1 && y + r > jb.y0 && y - r < jb.y1;
     const camPos = camera.position;
+    // one lens, one dominant flare: the strongest window gets the full chain,
+    // the others only a softer core (stacked flares wash the frame to white)
+    const top = draws.reduce((m, d) => (d[1].w * d[0].intensity > m[1].w * m[0].intensity ? d : m), draws[0]);
     for (const [z, s] of draws) {
+      const minor = s !== top[1];
       const S = toScreen(z.position);
       if (S.z > 1 || S.z < -1) continue;
       const facing = z.dir.x * (camPos.x - z.position.x) + z.dir.z * (camPos.z - z.position.z);
@@ -159,7 +163,7 @@ export class WindowLight {
       const edge = 1 - smooth(1.0, 1.45, Math.max(Math.abs(S.nx), Math.abs(S.ny)));
       // Julian standing in front of the window shadows the source
       const occl = overJ(S.x, S.y, 0) ? 0.3 : 1;
-      const A = Math.min(z.maxScreenOpacity, s.w * z.intensity * edge * occl * gain);
+      const A = Math.min(z.maxScreenOpacity, s.w * z.intensity * edge * occl * gain) * (minor ? 0.45 : 1);
       if (A < 0.01) continue;
       const U = Hh; // unit: screen height
       const put = (img, x, y, r, a, rot = 0) => {
@@ -173,6 +177,7 @@ export class WindowLight {
       put(this.halo(ct), S.x, S.y, U * 0.36 * z.flareSize, A * 0.5);
       if (z.starburstIntensity > 0) put(this.burst(z.id, ct), S.x, S.y, U * 0.4 * z.flareSize, A * Math.min(1, 0.6 * z.starburstIntensity), s.rot + S.nx * s.spin);
       put(this.core(ct), S.x, S.y, U * 0.1 * z.flareSize, A * 0.8);
+      if (minor) continue;
       // --- streaks through blinds: thin horizontal lines
       if (z.streaks) for (let i = -2; i <= 2; i++) {
         const lw = U * (0.55 - Math.abs(i) * 0.09) * z.flareSize;

@@ -1,4 +1,4 @@
-# Blood of the North — демо (пролог) · v0.08
+# Blood of the North — демо (пролог) · v0.09
 
 Визуальная новелла / narrative adventure. Демо «Северная Роза»: бар на окраине
 Уайтхорса (Юкон). 3D-окружение + полностью 2D-персонажи с глубиной, исследование,
@@ -58,7 +58,8 @@ src/characters/          Character2D (2D-спрайт внутри 3D, depth buf
 src/interaction/         InteractionSystem — точки интереса с подсказкой
 src/dialogue/            DialogueSystem — данные, флаги, выборы, чекпоинты, журнал
 src/story/               Director (команды), BarStory (сцена бара: катсцены, NPC, финал)
-src/fx/                  Hallucination — 6 фаз отравления
+src/fx/                  Hallucination — 6 фаз отравления; WindowLight — свет окон (экспозиция,
+                         bloom) и блик объектива по оси «окно → центр экрана»
 src/audio/               AudioManager (шины, глушение, плейсхолдеры), MusicEngine, sounds.js
 src/ui/                  HUD, экран диалогов (VN), меню, телефон, финал, сенсорное управление
 data/                    персонажи, толпа (crowd.js) и диалоги (dialogue/bar.js — весь текст сцены)
@@ -66,6 +67,20 @@ assets/sprites/          атлас пиксельных спрайтов (+ jso
 assets/portraits/        портреты для экрана диалога: <id>_0 нейтральный, _1 говорит, _2 взгляд вниз
 tools/                   пайплайн арта: extract_sprites.py, process_art.py, build_sprites.py, raw/
 ```
+
+### Больница: расширение (v0.09)
+
+`src/world/scenes/HospitalExpansion.js` — модульный кит, устанавливается на `HospitalScene`
+(палаты 107/109 и все скриптовые события не тронуты). Коридор продолжается за 109:
+крыло пациентов (x 23–37: палаты 111/113 со шторками OPEN/PARTIAL/CLOSED, бельевая,
+ожидание под окном B, 115), тяжёлый проём-портал на x 37 (передний план, гаснет, если
+закрывает Джулиана), старое крыло (x 37–57: ретро-плитка, деревянные двери, архив,
+закрытое отделение Б, окна A/C, заколоченный боковой коридор), старая операционная
+за иллюминаторами и смотровым окном, окно D в торце. Окна — `windowLights` с профилями
+A/B/C/D (`PROFILES`): `triggerDistance`, `fadeDistance`, `exposure`, `bloom`, `flareSize`,
+`starburstIntensity`, `ghostIntensity`, `ghostCount`, `ghostSpacing`, `ringIntensity`,
+`colorTint`, `maxScreenOpacity`. Днём — санитар и посетительница, ночью — только дежурный свет.
+Звуковые зоны: гулкий тон и эхо шагов в старом крыле, объявления по громкой связи днём.
 
 ### Утро: BAR_MORNING_CRIME_SCENE
 
