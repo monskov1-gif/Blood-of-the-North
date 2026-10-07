@@ -263,7 +263,7 @@ const methods = {
     w.vnHide = [driver.root]; // the painted VN backdrop shows the cabin, she is on the portrait
     w.bottle.visible = false;
     this.setAmbience(['amb.car']);
-    g.player.setGaze({ x: w.cx(-0.9), z: -0.3, minX: w.cx(-1.9), maxX: w.cx(2.3), y: 1.0 });
+    g.player.setGaze({ x: w.anchors.cuffs.x, z: -0.3, minX: w.gazeRange.minX, maxX: w.gazeRange.maxX, y: 1.0 });
     this.gazeReticle(w);
     g.hud.show(false);
     g.player.enabled = false;
@@ -281,13 +281,14 @@ const methods = {
   carInteractables(w) {
     const say = (id) => () => g.dialogue.start(id);
     const g = this.g;
-    const at = (x) => ({ x: w.cx(x), z: -0.3 }); // cabin coordinates as modelled → world
+    const at = (a) => ({ x: a.x, z: -0.3 }); // gaze positions along the cabin
+    const A = w.anchors;
     return [
-      { id: 'car_window', label: 'Окно', at: at(-1.4), radius: 0.4, anchor: w.anchors.window, run: say('car_window') },
-      { id: 'car_cuffs', label: 'Наручники', at: at(-0.75), radius: 0.3, anchor: w.anchors.cuffs, run: say('car_cuffs') },
-      { id: 'car_cage', label: 'Решётка', at: at(0.5), radius: 0.35, anchor: w.anchors.cage, run: say('car_cage') },
-      { id: 'car_driver', label: 'Куинн', at: at(1.2), radius: 0.35, anchor: w.anchors.driverHead, run: () => this.carTalk() },
-      { id: 'car_radio', label: 'Рация', at: at(2.05), radius: 0.3, anchor: w.anchors.radio, run: say('car_radio') },
+      { id: 'car_window', label: 'Окно', at: { x: -0.98, z: -0.3 }, radius: 0.18, anchor: A.window, run: say('car_window') },
+      { id: 'car_cuffs', label: 'Наручники', at: { x: -0.62, z: -0.3 }, radius: 0.16, anchor: A.cuffs, run: say('car_cuffs') },
+      { id: 'car_cage', label: 'Решётка', at: at(A.cage), radius: 0.14, anchor: A.cage, run: say('car_cage') },
+      { id: 'car_driver', label: 'Куинн', at: { x: 0.08, z: -0.3 }, radius: 0.2, anchor: A.driverHead, run: () => this.carTalk() },
+      { id: 'car_radio', label: 'Рация', at: { x: 0.7, z: -0.3 }, radius: 0.22, anchor: A.radio, run: say('car_radio') },
     ];
   },
 
