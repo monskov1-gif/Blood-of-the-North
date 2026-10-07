@@ -103,6 +103,9 @@ const methods = {
     this.stopAmbient();
     g.interactions.setItems([]);
     await g.setLocation(location, { state });
+    // a new place starts on its own framing, not halfway out of the previous shot
+    g.cameraSys.setShot(null, 1);
+    g.cameraSys.snap();
     this.resetJulian();
     if (stage) g.state.setStage(stage);
     this.setOutfit(GOWN_STAGES.has(stage) ? 'gown' : 'coat');
@@ -133,7 +136,7 @@ const methods = {
 
   gazeReticle(world) {
     if (!this.reticle) {
-      this.reticle = glow(0xffe0b0, 0.22, 0.85);
+      this.reticle = glow(0xffe0b0, 0.13, 0.55); // a soft point of attention, not an orb
       this.reticle.renderOrder = 20;
     }
     world.root.add(this.reticle);
@@ -179,8 +182,14 @@ const methods = {
       reattach: () => {
         const w = g.world;
         g.audio.play('sfx.cuffs', { volume: 0.3 });
-        if (w.wardA) { w.wardA.iv.userData.tube.visible = true; w.wardA.mon.flat = false; w.wardA.mon.bpm = 64; }
+        // the leads go back on — and read nothing: he has no pulse to give them
+        if (w.wardA) { w.wardA.iv.userData.tube.visible = true; Object.assign(w.wardA.mon, { flat: false, fault: true, bpm: 0 }); }
         g.audio.loops.get('sfx.flatline')?.stop(0.3);
+      },
+      monitorOff: () => {
+        const w = g.world;
+        g.audio.play('sfx.cuffs', { volume: 0.2 });
+        if (w.wardA) Object.assign(w.wardA.mon, { fault: false, flat: false, off: true, bpm: 0 });
       },
       drinkWater: async () => {
         g.audio.play('sfx.water');
@@ -254,7 +263,7 @@ const methods = {
     w.vnHide = [driver.root]; // the painted VN backdrop shows the cabin, she is on the portrait
     w.bottle.visible = false;
     this.setAmbience(['amb.car']);
-    g.player.setGaze({ x: -0.9, z: -0.3, minX: -1.9, maxX: 2.3, y: 1.0 });
+    g.player.setGaze({ x: w.cx(-0.9), z: -0.3, minX: w.cx(-1.9), maxX: w.cx(2.3), y: 1.0 });
     this.gazeReticle(w);
     g.hud.show(false);
     g.player.enabled = false;
@@ -272,12 +281,12 @@ const methods = {
   carInteractables(w) {
     const say = (id) => () => g.dialogue.start(id);
     const g = this.g;
-    const at = (x) => ({ x, z: -0.3 });
+    const at = (x) => ({ x: w.cx(x), z: -0.3 }); // cabin coordinates as modelled → world
     return [
       { id: 'car_window', label: 'Окно', at: at(-1.4), radius: 0.4, anchor: w.anchors.window, run: say('car_window') },
       { id: 'car_cuffs', label: 'Наручники', at: at(-0.75), radius: 0.3, anchor: w.anchors.cuffs, run: say('car_cuffs') },
       { id: 'car_cage', label: 'Решётка', at: at(0.5), radius: 0.35, anchor: w.anchors.cage, run: say('car_cage') },
-      { id: 'car_driver', label: 'Куинн', at: at(1.2), radius: 0.35, anchor: new THREE.Vector3(1.2, 1.6, -0.1), run: () => this.carTalk() },
+      { id: 'car_driver', label: 'Куинн', at: at(1.2), radius: 0.35, anchor: w.anchors.driverHead, run: () => this.carTalk() },
       { id: 'car_radio', label: 'Рация', at: at(2.05), radius: 0.3, anchor: w.anchors.radio, run: say('car_radio') },
     ];
   },
@@ -553,7 +562,7 @@ const methods = {
     const w = g.world;
     const J = this.julian;
     this.lieInBed(w.wardA.bedSpot);
-    w.wardA.mon.bpm = 54; w.wardA.mon.flat = false;
+    Object.assign(w.wardA.mon, { bpm: 54, flat: false, fault: false, off: false });
     w.wardA.iv.userData.bag.visible = true;
     w.wardB.iv.userData.bag.visible = true;
     w.wardB.iv.userData.tube.visible = true;
@@ -646,7 +655,7 @@ const methods = {
     const w = g.world;
     const J = this.julian;
     this.lieInBed(w.wardA.bedSpot);
-    w.wardA.mon.bpm = 50; w.wardA.mon.flat = false;
+    Object.assign(w.wardA.mon, { bpm: 50, flat: false, fault: false, off: false });
     for (const c of ['doc', 'psy', 'nurse', 'nurse2']) this.hospCast?.[c]?.setVisible(false);
     const kow = this.castIn(w, 'quinn');
     kow.setPose('side'); // painted standing profile: she walks in and stands by the bed
@@ -699,7 +708,7 @@ const methods = {
     if (g.world) g.world.vnHide = [];
     this.setAmbience(['amb.hospital_night']);
     const mon = w.wardA.mon;
-    mon.bpm = 46; mon.flat = false;
+    Object.assign(mon, { bpm: 46, flat: false, fault: false, off: false });
     w.onBeat = (m) => { if (m === mon) g.audio.play('sfx.beep', { volume: 0.5 }); };
     g.hud.show(false);
     g.player.enabled = false;
@@ -746,10 +755,12 @@ const methods = {
     g.renderer.setLayer('thirst', { redPulse: 0.35, vignette: 0.45, ca: 0.8, saturation: -0.35, blur: 0.25, wave: 0.3 });
     g.cameraSys.shake = 1.2;
     g.fader.set(false);
-    mon.flat = false; mon.bpm = 0;
+    // he is awake, and the line stays flat: the heart did not start again
+    mon.flat = true; mon.bpm = 0;
     if (!(await this.lines(g.dialogue.dialogues.n_wake))) return;
     g.audio.play('sfx.tear');
     w.wardA.iv.userData.tube.visible = false;
+    Object.assign(mon, { flat: false, fault: true }); // the leads torn off
     await J.riseUp(1.2);
     J.root.position.y = 0;
     J.placeAt(w.wardA.inside.x, w.wardA.inside.z, -1);
@@ -902,7 +913,7 @@ const methods = {
     g.hud.show(false);
     g.interactions.setItems([]);
     this.lieInBed(w.wardA.bedSpot);
-    w.wardA.mon.flat = true; w.wardA.mon.bpm = 0;
+    Object.assign(w.wardA.mon, { flat: false, fault: true, off: false, bpm: 0 });
     g.cameraSys.setShot({ x: 18.4, y: 1.7, z: 1.0, lookX: 18.4, lookY: 0.9, lookZ: -6.0, fov: 44 }, 0.8);
     const nurse = this.castIn(w, 'nurse');
     nurse.placeAt(10.5, -1.6, 1);
@@ -936,7 +947,8 @@ const methods = {
     w.openWardB(false);
     w.wardB.iv.userData.bag.visible = true;
     w.wardB.iv.userData.tube.visible = true;
-    w.wardA.mon.bpm = 68;
+    // the "broken" monitor was taken away: an empty arm, the screen dead
+    Object.assign(w.wardA.mon, { off: true, fault: false, flat: false, bpm: 0 });
     w.onBeat = null;
     this.setAmbience(['amb.hospital_day']);
     g.hud.show(false);

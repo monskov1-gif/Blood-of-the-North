@@ -242,7 +242,7 @@ export class LocationBase {
     g.add(halo);
     g.position.set(x, y, z);
     this.root.add(g);
-    const mon = { canvas: c, ctx: c.getContext('2d'), tex, bpm: 72, t: 0, trace: new Float32Array(256), head: 0, flat: false, halo, beat: 0 };
+    const mon = { canvas: c, ctx: c.getContext('2d'), tex, bpm: 72, t: 0, trace: new Float32Array(256), head: 0, flat: false, fault: false, off: false, halo, beat: 0 };
     this.monitors = this.monitors || [];
     this.monitors.push(mon);
     return mon;
@@ -267,10 +267,23 @@ export class LocationBase {
       for (let i = 0; i < steps; i++) { m.trace[m.head] = v; m.head = (m.head + 1) % m.trace.length; }
       if ((m.f = (m.f || 0) + 1) % 2) continue;
       const { ctx, canvas } = m;
+      if (m.off) {
+        // switched off for the night: a dead grey screen, no glow
+        if (!m.offDrawn) {
+          ctx.fillStyle = '#0a0c0c'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.fillStyle = 'rgba(120,130,130,0.06)'; ctx.fillRect(8, 8, canvas.width - 16, 30);
+          m.tex.needsUpdate = true; m.offDrawn = true;
+          m.halo.visible = false;
+        }
+        continue;
+      }
+      if (m.offDrawn) { m.offDrawn = false; m.halo.visible = true; }
       ctx.fillStyle = '#031208'; ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.strokeStyle = 'rgba(40,120,60,0.25)'; ctx.lineWidth = 1;
       for (let gx = 0; gx < canvas.width; gx += 32) { ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, canvas.height); ctx.stroke(); }
-      ctx.strokeStyle = m.flat ? '#ff5050' : '#4dff8a'; ctx.lineWidth = 2.5;
+      // fault: the leads are on but the machine reads nothing — amber, "no signal"
+      const col = m.fault ? '#ffb040' : m.flat ? '#ff5050' : '#4dff8a';
+      ctx.strokeStyle = col; ctx.lineWidth = 2.5;
       ctx.beginPath();
       for (let i = 0; i < m.trace.length; i++) {
         const idx = (m.head + i) % m.trace.length;
@@ -278,12 +291,13 @@ export class LocationBase {
         i ? ctx.lineTo(i, yy) : ctx.moveTo(i, yy);
       }
       ctx.stroke();
-      ctx.fillStyle = m.flat ? '#ff5050' : '#4dff8a';
+      ctx.fillStyle = col;
       ctx.font = 'bold 26px monospace';
-      ctx.fillText(m.flat || m.bpm <= 0 ? '---' : String(Math.round(m.bpm)), 180, 34);
+      ctx.fillText(m.fault || m.flat || m.bpm <= 0 ? '---' : String(Math.round(m.bpm)), 180, 34);
       ctx.font = '12px monospace'; ctx.fillText('HR', 160, 18);
+      if (m.fault && (m.t % 1.2) < 0.8) { ctx.font = 'bold 14px monospace'; ctx.fillText('NO SIGNAL', 12, 140); }
       m.tex.needsUpdate = true;
-      m.halo.material.color.set(m.flat ? 0xff3030 : 0x40ff90);
+      m.halo.material.color.set(m.fault ? 0xffa030 : m.flat ? 0xff3030 : 0x40ff90);
     }
   }
 

@@ -476,8 +476,8 @@ for n in ['jul_idle', 'jul_talk', 'jul_idle_walk1', 'jul_idle_walk2',
 # v0.08: one head for Julian. The painted frames each had their own head (the walk
 # frames bowed, in shadow, ~4% shorter): the walk frames are scaled to the idle
 # height, then every frame gets the head + upper neck of the first painted frame
-# (jul_idle) — in the coat with the top of the scarf, in the gown with the neck
-# continued down into the collar.
+# (jul_idle) — in the coat with the top of the scarf; in the gown it sits on the
+# frame's own painted neck.
 def bbox(a):
     ys, xs = np.where(a[..., 3] > 0)
     return ys.min(), ys.max(), xs.min(), xs.max()
@@ -546,26 +546,12 @@ def neck_span(m, y):
     return (xs.min(), xs.max()) if len(xs) else None
 
 
-def skin_run(a, y, cloth):
-    """The neck at row y: the run of skin inside the collar opening (left, right)."""
-    sk = is_skin(a)[y]
-    gx = np.where(cloth[y])[0]
-    xs = np.where(sk)[0]
-    if len(gx) >= 3:
-        xs = xs[xs > gx.min()]
-    if not len(xs):
-        return None
-    # the contiguous run around the middle of the skin pixels
-    runs = np.split(xs, np.where(np.diff(xs) > 1)[0] + 1)
-    run = max(runs, key=len)
-    return int(run.min()), int(run.max())
-
-
-def graft_head(a, ref):
-    """Replaces the head and neck of a frame with the reference head (+ upper
-    neck). Coat: aligned on the scarf, with the top of the reference scarf.
-    Gown: the head goes where the frame's own head was, and the neck runs at the
-    frame's own angle from under the new jaw down into the collar."""
+def graft_head(a, ref, neck_top=None):
+    """Replaces the head of a frame with the reference head.
+    Coat: head + upper neck + the top of the scarf, aligned on the scarf.
+    Gown: the frame keeps its own painted neck from `neck_top` (rows from the
+    top of the figure, the first clean neck row under the old chin) down; the
+    reference head (+ its upper neck) is set on top of it, aligned on the neck."""
     a = a.copy()
     t = bbox(a)[0]
     H, W = a.shape[:2]
@@ -577,77 +563,150 @@ def graft_head(a, ref):
     if n > 1:
         sizes = nd.sum(cloth, lab, range(1, n + 1))
         cloth = cloth & np.isin(lab, 1 + np.where(sizes >= 0.2 * sizes.max())[0])
-    lo = t + (18 if coat else 16)
-    # first garment row per column (scarf / gown collar) below the face
-    first = np.full(W, -1)
-    for x in range(W):
-        ys = np.where(cloth[lo:t + 52, x])[0]
-        if len(ys): first[x] = lo + ys[0]
-    dy = t - rt
-    base = None
     if coat:
+        lo = t + 18
+        first = np.full(W, -1)
+        for x in range(W):
+            ys = np.where(cloth[lo:t + 52, x])[0]
+            if len(ys): first[x] = lo + ys[0]
         rs = np.median(np.where(is_red(ref)[rt + HEAD_ROWS - 2:rt + HEAD_ROWS + 8])[1])
         ts = np.median(np.where(is_red(a)[t + HEAD_ROWS - 2:t + HEAD_ROWS + 8])[1])
-        dx = int(round(ts - rs))
+        dx, dy = int(round(ts - rs)), t - rt
+        for x in range(W):
+            stop = first[x] if first[x] >= 0 else t + HEAD_ROWS + 6
+            col = slice(t, stop)
+            a[col, x][~cloth[col, x]] = 0
     else:
-        # the head where the frame's head was (centre of the skull and hair)
-        th = np.zeros((H, W), bool); th[t:t + 17] = True; th &= a[..., 3] > 0
-        rh = hm.copy(); rh[rt + 17:] = False
-        dx = int(round(np.where(th)[1].mean() - np.where(rh)[1].mean()))
-        # where the frame's neck enters the collar
-        for y in range(t + HEAD_ROWS - 2, t + 44):
-            if (cloth[y].sum() >= 3) and (run := skin_run(a, y, cloth)):
-                base = (y, run)
-                break
-    # clear the old head and neck: per column, everything above the garment
-    for x in range(W):
-        stop = first[x] if first[x] >= 0 else t + HEAD_ROWS + (6 if coat else 10)
-        col = slice(t, stop)
-        keep = cloth[col, x]
-        a[col, x][~keep] = 0
-    # paste the reference head
+        top = t + neck_top
+        xs = np.where(is_skin(a)[top])[0]
+        runs = np.split(xs, np.where(np.diff(xs) > 1)[0] + 1)
+        run = max(runs, key=len)
+        last = rt + HEAD_ROWS - 1
+        sl, sr = neck_span(hm & is_skin(ref), last)
+        dx = int(round((run.min() + run.max()) / 2 - (sl + sr) / 2))
+        dy = (top - 1) - last
+        # the old head and chin go; the gown and the neck below `top` stay
+        band = np.zeros((H, W), bool); band[t:top] = True
+        a[band & ~cloth] = 0
     ys, xs = np.where(hm)
     ty, tx = ys + dy, xs + dx
     ok = (tx >= 0) & (tx < W) & (ty >= 0) & (ty < H)
     a[ty[ok], tx[ok]] = ref[ys[ok], xs[ok]]
-    if coat or base is None:
-        return a
-    # the neck: from under the new jaw to the collar, at the frame's own angle
-    last = rt + HEAD_ROWS - 1
-    span = neck_span(hm & is_skin(ref), last) or neck_span(hm, last)
-    span = (span[0], max(span[0] + 4, span[1] - 2))  # the throat sits behind the jaw line
-    src = ref[last, span[0]:span[1] + 1].copy()
-    y0, l0, r0 = last + dy, span[0] + dx, span[1] + dx
-    by, (bl, br) = base
-    sw = r0 - l0
-    # keep the neck about as thick as the reference one where it meets the collar
-    if br - bl > sw + 2:
-        c = (bl + br) / 2; bl, br = int(round(c - sw / 2)), int(round(c + sw / 2))
-    by = max(by, y0 + 2)
-
-    def put(y, l, r):
-        for x in range(l, r + 1):
-            if 0 <= x < W and 0 <= y < H and not cloth[y, x]:
-                k = 0 if r == l else (x - l) / (r - l)
-                a[y, x] = src[min(len(src) - 1, int(round(k * (len(src) - 1))))]
-
-    for y in range(y0 + 1, by + 1):
-        k = (y - y0) / (by - y0)
-        put(y, int(round(l0 + (bl - l0) * k)), int(round(r0 + (br - r0) * k)))
-    # and on into the collar opening, so it never floats above the gown
-    for y in range(by + 1, t + 52):
-        cols = [x for x in range(bl, br + 1) if 0 <= x < W and (first[x] < 0 or y < first[x])]
-        if not cols:
-            break
-        for x in cols:
-            if a[y, x, 3] == 0 or not cloth[y, x]:
-                k = (x - bl) / max(1, br - bl)
-                a[y, x] = src[min(len(src) - 1, int(round(k * (len(src) - 1))))]
     return a
 
 
-def coarser(a, k=2):
-    """Same sprite on a k× coarser pixel grid (premultiplied box filter, own palette)."""
+def gown_mask(a):
+    c = is_gown(a)
+    lab, n = nd.label(c)
+    if n > 1:
+        sizes = nd.sum(c, lab, range(1, n + 1))
+        c = c & np.isin(lab, 1 + np.where(sizes >= 0.2 * sizes.max())[0])
+    return c
+
+def neck_centre(a, y):
+    xs = np.where(is_skin(a)[y])[0]
+    if not len(xs): return None
+    runs = np.split(xs, np.where(np.diff(xs) > 1)[0] + 1)
+    run = max(runs, key=len)
+    return (run.min() + run.max()) / 2
+
+def copy_head_to_shoulders(a, src, src_collar, collar, dx_adj=0):
+    """Paste src's head + neck (rows above its collar, gown left out) onto a,
+    with the neck's base dropped into a's collar."""
+    a = a.copy(); H, W = a.shape[:2]
+    ts, t = bbox(src)[0], bbox(a)[0]
+    sg, tg = gown_mask(src), gown_mask(a)
+    sy, ty = ts + src_collar, t + collar
+    sc = neck_centre(src, sy - 1)
+    tc = neck_centre(a, ty - 1)
+    dx = int(round(tc - sc)) + dx_adj
+    dy = ty - sy
+    # clear a's own head and neck above its collar (keep the gown)
+    band = np.zeros((H, W), bool); band[:ty] = True
+    a[band & ~tg] = 0
+    m = np.zeros(src.shape[:2], bool); m[:sy] = True
+    m &= (src[..., 3] > 0) & ~sg
+    ys, xs = np.where(m)
+    yy, xx = ys + dy, xs + dx
+    ok = (xx >= 0) & (xx < W) & (yy >= 0) & (yy < H)
+    a[yy[ok], xx[ok]] = src[ys[ok], xs[ok]]
+    return a, dx
+
+
+def chest_front(a, y0, y1):
+    """Front-most gown column over a band of rows (the chest line in profile)."""
+    g = gown_mask(a)
+    xs = [np.where(g[y])[0].max() for y in range(y0, y1) if g[y].any()]
+    return float(np.median(xs))
+
+
+def copy_neck_exact(a, src, src_collar, collar, below=6):
+    """Pixel-for-pixel head + whole neck of src onto a. The neck keeps its place
+    relative to the chest (aligned on the front line of the gown, not centred),
+    and the part of the neck that goes down into the collar comes along too."""
+    a = a.copy(); H, W = a.shape[:2]
+    ts, t = bbox(src)[0], bbox(a)[0]
+    sg, tg = gown_mask(src), gown_mask(a)
+    sy, ty = ts + src_collar, t + collar
+    dx = int(round(chest_front(a, ty + 4, ty + 12) - chest_front(src, sy + 4, sy + 12)))
+    dy = ty - sy
+    sk_t = is_skin(a)
+    # clear a's head + neck: everything above the collar except the gown, and its
+    # own neck skin in the collar opening
+    band = np.zeros((H, W), bool); band[:ty] = True
+    a[band & ~tg] = 0
+    low = np.zeros((H, W), bool); low[ty:ty + below] = True
+    a[low & sk_t & ~tg] = 0
+    m = np.zeros(src.shape[:2], bool); m[:sy] = True
+    m &= (src[..., 3] > 0) & ~sg
+    lows = np.zeros(src.shape[:2], bool); lows[sy:sy + below] = True
+    m |= lows & is_skin(src) & ~sg
+    ys, xs = np.where(m)
+    yy, xx = ys + dy, xs + dx
+    ok = (xx >= 0) & (xx < W) & (yy >= 0) & (yy < H)
+    a[yy[ok], xx[ok]] = src[ys[ok], xs[ok]]
+    return a, dx
+
+
+def copy_neck_collar(a, src, src_collar, collar, below=7, back=4):
+    """copy_neck_exact + the gown collar around the neck: every opaque source pixel
+    in the strip from just behind the nape to the chest front, down to `below`
+    rows under the collar, is copied as is (the neckline is the reference's)."""
+    a, dx = copy_neck_exact(a, src, src_collar, collar, below)
+    H, W = a.shape[:2]
+    ts, t = bbox(src)[0], bbox(a)[0]
+    sy, ty = ts + src_collar, t + collar
+    dy = ty - sy
+    sk = is_skin(src)
+    nl = np.where(sk[sy - 1])[0].min()
+    front = int(chest_front(src, sy + 4, sy + 12))
+    for y in range(sy - 6, sy + below):
+        for x in range(nl - back, front + 1):
+            if src[y, x, 3] > 0:
+                yy, xx = y + dy, x + dx
+                if 0 <= yy < H and 0 <= xx < W:
+                    a[yy, xx] = src[y, x]
+    return a, dx
+
+
+def drop_specks(a, max_px=3):
+    """Removes loose pixel specks (tiny islands not attached to the figure)."""
+    a = a.copy()
+    lab, n = nd.label(a[..., 3] > 0)
+    if n > 1:
+        sizes = nd.sum(np.ones_like(lab), lab, range(1, n + 1))
+        for k, sz in enumerate(sizes, 1):
+            if sz <= max_px: a[lab == k] = 0
+    return a
+
+
+# frames drawn with bigger pixels than 1 px = 1 cm (atlas meta `s`: cm per pixel)
+FRAME_SCALE = {}
+
+
+def coarser(a, k=2, keep_size=True):
+    """Same sprite on a k× coarser pixel grid (premultiplied box filter, own palette).
+    keep_size=False returns the small image (drawn k× larger at runtime, `s` = k)."""
     h, w = a.shape[:2]
     pm = a.copy(); pm[..., :3] *= pm[..., 3:4] / 255.0
     d = np.asarray(Image.fromarray(pm.clip(0, 255).astype(np.uint8), 'RGBA').resize(
@@ -660,6 +719,8 @@ def coarser(a, k=2):
     idx = np.argmin(((flat[:, None, :] - pal[None]) ** 2).sum(-1), 1)
     small = np.zeros(d.shape, float)
     small[alpha, :3] = pal[idx]; small[alpha, 3] = 255
+    if not keep_size:
+        return small
     return np.asarray(Image.fromarray(small.astype(np.uint8), 'RGBA').resize((w, h), Image.NEAREST)).astype(float)
 
 
@@ -667,19 +728,29 @@ for g in ['jul', 'julg']:
     for n in ['idle_walk1', 'idle_walk2']:
         frames[f'{g}_{n}'] = match_scale(frames[f'{g}_{n}'], frames[f'{g}_idle'])
 JUL_HEAD = frames['jul_idle'].copy()
-for n in ['jul_talk', 'jul_idle_walk1', 'jul_idle_walk2', 'julg_idle', 'julg_talk', 'julg_idle_walk1', 'julg_idle_walk2',
-          'julian_think', 'julian_seat']:
-    frames[n] = graft_head(frames[n], JUL_HEAD)
-# lying in bed he is seen close up: the same grid as the standing NPCs looks too fine
+# gown: the first walk frame keeps its own painted neck (first clean neck row under
+# the old chin) — that head, the whole neck and the neckline around it are then
+# copied pixel for pixel onto the other gown frames, lined up on the chest front
+# (the neck sits forward, as in the reference), collars given in rows from the top
+GOWN_NECK_TOP = {'julg_idle_walk1': 28}
+GOWN_SRC, GOWN_SRC_COLLAR = 'julg_idle_walk1', 27
+GOWN_COLLAR = {'julg_idle': 27, 'julg_talk': 27, 'julg_idle_walk2': 28}
+for n in ['jul_talk', 'jul_idle_walk1', 'jul_idle_walk2', 'julg_idle_walk1', 'julian_think', 'julian_seat']:
+    frames[n] = graft_head(frames[n], JUL_HEAD, GOWN_NECK_TOP.get(n))
+for n, collar in GOWN_COLLAR.items():
+    frames[n] = copy_neck_collar(frames[n], frames[GOWN_SRC], GOWN_SRC_COLLAR, collar)[0]
+for n in ['julg_idle', 'julg_talk', 'julg_idle_walk1', 'julg_idle_walk2']:
+    frames[n] = drop_specks(frames[n])
 for n in ['jul_idle', 'jul_talk', 'julg_idle', 'julg_talk']:
     ALIASES[f'{n}_sit'] = 'julian_seat'
 # v0.08: Wyatt and Quinn standing in profile (walk source), the old woman of 107 lying
 for n in ['wyatt_side', 'quinn_side', 'lie_granny']:
     frames[n] = load(n)
-# the hospital beds are seen close up: the lying patients go on a 2× coarser grid,
-# like the standing cast reads at that distance
+# the hospital beds are seen close up: the lying patients go on a 1.5× coarser grid
+# (1 px = 1.5 cm, stored small and drawn 1.5× larger — even pixels, no doubling)
 for n in ['lie_julian_gown', 'lie_granny']:
-    frames[n] = coarser(frames[n])
+    frames[n] = coarser(frames[n], 1.5, keep_size=False)
+    FRAME_SCALE[n] = 1.5
 if os.path.exists(f'{RAW}/raw_quinn_drive.png'):
     frames['quinn_drive'] = load('quinn_drive')
 else:
@@ -758,6 +829,7 @@ for n in order:
     cols_ = np.where(band)[1]
     ax = float(np.median(cols_)) if len(cols_) else w / 2
     meta[n] = dict(x=x, y=y, w=w, h=h, ax=round(ax, 1))
+    if n in FRAME_SCALE: meta[n]['s'] = FRAME_SCALE[n]
     x += w + PAD; rowh = max(rowh, h)
 H = 1
 while H < y + rowh:

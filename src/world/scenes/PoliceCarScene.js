@@ -17,8 +17,19 @@ import { Snow } from '../Particles.js';
 
 const FLOOR = 0.29;   // top of the cabin floor
 const FAR = -1.45;    // far side wall (inside face)
-const WIN_Y0 = 0.97, WIN_Y1 = 1.57;
+const WIN_Y0 = 0.9, WIN_Y1 = 1.62;   // beltline at the seated shoulders, tall glass
 const ROAD = -0.28;   // road surface
+// the cabin is modelled large and scaled to sedan proportions (x: length, y: height)
+const CAR_SX = 0.65, CAR_SY = 0.86;
+// sedan profile, modelled coords: roof span, rear deck and cowl (where the glass meets the body)
+const ROOF_X0 = -1.55, ROOF_X1 = 1.7;
+const DECK_X = -2.4, DECK_Y = 1.2;
+const COWL_X = 2.62, COWL_Y = 1.15;
+// side windows: rear door (sloped rear edge under the C pillar), front door (raked A pillar)
+const WINDOWS = [
+  [[-2.0, WIN_Y0], [-0.15, WIN_Y0], [-0.15, WIN_Y1], [-1.5, WIN_Y1]],
+  [[0.25, WIN_Y0], [2.38, WIN_Y0], [1.88, WIN_Y1], [0.25, WIN_Y1]],
+];
 
 // ------------------------------------------------------------------ pixel textures
 
@@ -324,9 +335,9 @@ export class PoliceCarScene extends LocationBase {
     super(opts);
     this.id = 'car';
     this.title = 'Полицейская машина';
-    this.background = 0x0a0d12;
-    this.camera = { distance: 4.6, height: 1.35, lookHeight: 1.0, lookZ: -0.2, fov: 34, minWidth: 4.2 };
-    this.bounds = { walk: { minX: -1.9, maxX: 2.2, minZ: 0.2, maxZ: 0.2 }, camera: { minX: 0.1, maxX: 0.1 } };
+    this.background = 0x000000;
+    this.camera = { distance: 3.35, height: 1.05, lookHeight: 0.95, lookZ: -0.6, fov: 34, minWidth: 3.3 };
+    this.bounds = { walk: { minX: -1.3, maxX: 1.5, minZ: 0.2, maxZ: 0.2 }, camera: { minX: 0.08, maxX: 0.08 } };
     this.speed = 9; // m/s of the outside layers
   }
 
@@ -345,25 +356,68 @@ export class PoliceCarScene extends LocationBase {
   pmat(key, tex, opts = {}) { return this.mat(key, { map: tex, color: 0xffffff, roughness: 0.75, ...opts }); }
 
   build() {
+    // The cabin is modelled at a generous size, then the whole body is scaled to a
+    // real police sedan (~4.2 m of cabin-and-hood, headliner ~1.2 m over the floor).
+    // Everything outside the body is black: the city only shows through the glass.
+    const SX = CAR_SX, SY = CAR_SY;
+    const real = this.root;
+    this.car = new THREE.Group(); this.car.name = 'car-body';
+    real.add(this.car);
+    this.root = this.car;
     this.buildShell();
     this.buildRear();
     this.buildPartition();
     this.buildFront();
-    this.buildOutside();
     this.buildForeground();
+    this.root = real;
+    this.car.scale.set(SX, SY, 1);
+    this.buildOutside();
+    this.buildMatte();
     this.buildLighting();
 
-    this.anchors.julianSeat = new THREE.Vector3(-1.15, 0.3, -0.35);
-    this.anchors.driverSeat = new THREE.Vector3(1.2, 0.33, -0.1);
-    this.anchors.window = new THREE.Vector3(-1.1, 1.25, -1.4);
-    this.anchors.cuffs = new THREE.Vector3(-0.95, 0.95, -0.2);
-    this.anchors.outsideFront = new THREE.Vector3(1.2, 1.25, -1.4);
+    const P = (x, y, z) => new THREE.Vector3(x * SX, y * SY, z);
+    // seated sprites sit a little into the footwell: the near door sill hides the feet
+    this.anchors.julianSeat = new THREE.Vector3(-0.98, 0.1, -0.35);
+    this.anchors.driverSeat = new THREE.Vector3(0.66, 0.11, -0.1);
+    this.anchors.window = P(-1.1, 1.25, -1.4);
+    this.anchors.cuffs = P(-0.95, 0.95, -0.2);
+    this.anchors.outsideFront = P(1.2, 1.25, -1.4);
     // painted VN backdrop: from the back seat, past the cage to the dash and the road
-    this.shots = { car: { pos: [-1.6, 1.25, 0.15], look: [0.9, 1.1, -0.9], fov: 62 } };
+    this.shots = { car: { pos: [-1.6 * SX, 1.25 * SY, 0.15], look: [0.9 * SX, 1.1 * SY, -0.9], fov: 62 } };
     this.vnHide = [];
-    this.anchors.cage = new THREE.Vector3(0.52, 1.25, -0.2);
-    this.anchors.radio = new THREE.Vector3(2.05, 1.1, -0.95);
+    this.anchors.cage = P(0.52, 1.25, -0.2);
+    this.anchors.radio = P(2.05, 1.1, -0.95);
+    this.anchors.driverHead = P(1.2, 1.6, -0.1);
     return this.root;
+  }
+
+  /** Flat wall from a polygon outline with polygon holes (x/y in the wall plane). */
+  polyWall(outline, holes, z, mat) {
+    const shape = new THREE.Shape(outline.map(([x, y]) => new THREE.Vector2(x, y)));
+    for (const h of holes) shape.holes.push(new THREE.Path(h.map(([x, y]) => new THREE.Vector2(x, y))));
+    const geo = new THREE.ShapeGeometry(shape);
+    const uv = geo.attributes.uv, pos = geo.attributes.position;
+    for (let i = 0; i < pos.count; i++) uv.setXY(i, pos.getX(i) / 2, pos.getY(i) / 2);
+    const m = new THREE.Mesh(geo, mat);
+    m.position.z = z;
+    m.receiveShadow = true;
+    this.root.add(m);
+    return m;
+  }
+
+  /** Cabin x (as modelled) → world x. */
+  cx(x) { return x * CAR_SX; }
+
+  /** Black all around the body, open only where the side windows are. */
+  buildMatte() {
+    const black = new THREE.MeshBasicMaterial({ color: 0x000000, fog: false });
+    black.userData.noLightingState = true;
+    // the same window shapes as the far wall, in world units
+    this.polyWall([[-30, -10], [30, -10], [30, 20], [-30, 20]],
+      WINDOWS.map((w) => w.map(([x, y]) => [x * CAR_SX, y * CAR_SY])), -1.58, black);
+    // and in front: the floor of the frame under the body (no road, no wheels)
+    const under = new THREE.Mesh(new THREE.PlaneGeometry(60, 20), black);
+    under.position.set(0, 0.25 * CAR_SY - 10.0, 0.4); this.root.add(under);
   }
 
   // ---------------------------------------------------------------- body shell
@@ -371,7 +425,8 @@ export class PoliceCarScene extends LocationBase {
   buildShell() {
     const root = this.root;
     const body = this.mat('carInterior', { color: 0x2e3238, roughness: 0.8 });
-    const paint = this.mat('carPaint', { color: 0xe6e9ec, roughness: 0.35, metalness: 0.2 });
+    // the cut body edges stay near-black: only the cabin is lit, not the shell
+    const paint = this.mat('carShellCut', { color: 0x15171b, roughness: 0.6 });
     const trim = this.pmat('carTrim', trimTex());
     const head = this.pmat('carHead', headTex(), { roughness: 0.95 });
     const rubber = this.mat('carSeal', { color: 0x111214, roughness: 0.7 });
@@ -383,10 +438,24 @@ export class PoliceCarScene extends LocationBase {
     this.B(1.9, 0.012, 1.7, mat, 1.45, FLOOR + 0.006, -0.6);
     this.B(0.3, 0.04, 1.2, this.mat('carDark', { color: 0x141518, roughness: 0.7 }), 0.32, FLOOR + 0.02, -0.8); // partition footing
     // roof: headliner + steel + paint, cut face toward the camera
-    this.B(5.0, 0.04, 1.8, head, 0.2, 1.71, -0.6);
-    this.B(5.0, 0.03, 1.82, body, 0.2, 1.745, -0.6);
-    this.B(5.1, 0.05, 1.86, paint, 0.2, 1.785, -0.6);
-    this.B(5.1, 0.012, 0.012, rubber, 0.2, 1.73, 0.31); // seal line on the cut
+    // sedan profile (modelled coords): roof from the rear glass to the windscreen,
+    // rear deck at the back, cowl/hood line at the front
+    const RX0 = ROOF_X0, RX1 = ROOF_X1, RL = RX1 - RX0, RC = (RX0 + RX1) / 2;
+    this.B(RL, 0.04, 1.8, head, RC, 1.71, -0.6);
+    this.B(RL, 0.03, 1.82, body, RC, 1.745, -0.6);
+    this.B(RL + 0.1, 0.05, 1.86, paint, RC, 1.785, -0.6);
+    this.B(RL + 0.1, 0.012, 0.012, rubber, RC, 1.73, 0.31); // seal line on the cut
+    // rear glass and windscreen as sloped slabs at the roof ends
+    const slab = (x0, y0, x1, y1, th, mat, z = -0.6, d = 1.8) => {
+      const L = Math.hypot(x1 - x0, y1 - y0);
+      const m = this.B(th, L, d, mat, (x0 + x1) / 2, (y0 + y1) / 2, z);
+      m.rotation.z = Math.atan2(x0 - x1, y1 - y0);
+      return m;
+    };
+    this.slab = slab;
+    slab(DECK_X, DECK_Y, RX0, 1.75, 0.05, paint);
+    slab(DECK_X + 0.06, DECK_Y - 0.02, RX0 + 0.04, 1.7, 0.03, this.mat('carGlassRear', { color: 0x10161c, roughness: 0.1, metalness: 0.3 }));
+    slab(COWL_X, COWL_Y, RX1, 1.75, 0.05, paint);
     // roof light bar (seen end-on) + antenna
     const lb = new THREE.Group();
     this.B(0.34, 0.06, 1.5, this.mat('lbBase', { color: 0x1a1c20, roughness: 0.5 }), 0, 0.03, 0, lb);
@@ -395,23 +464,24 @@ export class PoliceCarScene extends LocationBase {
     lb.position.set(0.3, 1.81, -0.6);
     root.add(lb);
     this.lightBar = lb;
-    this.B(0.01, 0.5, 0.01, rubber, -1.8, 2.05, -0.9).rotation.z = 0.25;
+    lb.visible = false; // above the roof = outside the frame (black)
 
     // far side wall with window openings (trim-plastic texture)
     const wallTex = trimTex().clone(); wallTex.needsUpdate = true; wallTex.repeat.set(6, 6);
-    const far = this.wall(-2.4, 2.8, 1.5, FAR, this.mat('carWall', { map: wallTex, color: 0xb8bcc4, roughness: 0.8 }), [
-      { x0: -2.0, x1: -0.15, y0: WIN_Y0 - 0.25, y1: WIN_Y1 - 0.25 },
-      { x0: 0.25, x1: 2.2, y0: WIN_Y0 - 0.25, y1: WIN_Y1 - 0.25 },
-    ]);
-    far.position.y = 0.25;
+    const far = this.polyWall([[-2.4, 0.25], [2.8, 0.25], [2.8, COWL_Y], [COWL_X, COWL_Y], [ROOF_X1, 1.73], [ROOF_X0, 1.73], [DECK_X, DECK_Y]],
+      WINDOWS, FAR, this.mat('carWall', { map: wallTex, color: 0xb8bcc4, roughness: 0.8 }));
+    void far;
     // rear bulkhead (behind the bench) and window seals
-    this.B(0.08, 1.45, 1.8, body, -2.4, 0.98, -0.6);
-    for (const [x0, x1] of [[-2.0, -0.15], [0.25, 2.2]]) {
+    this.B(0.08, DECK_Y - 0.25, 1.8, body, -2.4, (DECK_Y + 0.25) / 2, -0.6);
+    for (const win of WINDOWS) {
+      const xs = win.map((p) => p[0]);
+      const x0 = Math.min(...xs), x1 = Math.max(...xs);
       const cx = (x0 + x1) / 2, w = x1 - x0;
-      this.B(w + 0.06, 0.035, 0.05, rubber, cx, WIN_Y1 + 0.017, FAR + 0.02);
-      this.B(w + 0.06, 0.05, 0.08, rubber, cx, WIN_Y0 - 0.02, FAR + 0.03);
-      this.B(0.035, WIN_Y1 - WIN_Y0, 0.05, rubber, x0 - 0.017, (WIN_Y0 + WIN_Y1) / 2, FAR + 0.02);
-      this.B(0.035, WIN_Y1 - WIN_Y0, 0.05, rubber, x1 + 0.017, (WIN_Y0 + WIN_Y1) / 2, FAR + 0.02);
+      // seals along each edge of the (sloped) opening
+      for (let k = 0; k < win.length; k++) {
+        const [ax, ay] = win[k], [bx, by] = win[(k + 1) % win.length];
+        slab(ax, ay, bx, by, 0.035, rubber, FAR + 0.02, 0.05);
+      }
       // tinted glass, frost and condensation
       const glass = this.plane(w, WIN_Y1 - WIN_Y0, this.mat('carGlassSide', { color: 0x9ab0c4, transparent: true, opacity: 0.12, roughness: 0.05, depthWrite: false }), cx, (WIN_Y0 + WIN_Y1) / 2, FAR - 0.01);
       glass.renderOrder = 3;
@@ -422,7 +492,7 @@ export class PoliceCarScene extends LocationBase {
       sheen.rotation.z = -0.6; sheen.renderOrder = 4;
     }
     // headliner side strip above the windows + grab handles
-    this.B(4.6, 0.12, 0.04, head, 0.2, 1.63, FAR + 0.02);
+    this.B(ROOF_X1 - ROOF_X0 - 0.2, 0.12, 0.04, head, (ROOF_X0 + ROOF_X1) / 2, 1.63, FAR + 0.02);
     for (const x of [-1.1, 1.25]) {
       const h = this.mat('grab', { color: 0x3a3e44, roughness: 0.6 });
       this.B(0.26, 0.03, 0.035, h, x, 1.585, FAR + 0.07);
@@ -433,12 +503,11 @@ export class PoliceCarScene extends LocationBase {
     this.B(0.24, 0.025, 0.14, this.mat('dome', { color: 0xc8c4b8, emissive: 0x3a3428, roughness: 0.4 }), 0.25, 1.68, -0.6);
     // pillars (B and C trim on the far wall, A pillar sloping at the front)
     this.B(0.24, 0.8, 0.06, trim, 0.05, 1.29, FAR + 0.03);
-    this.B(0.4, 1.3, 0.06, trim, -2.2, 1.0, FAR + 0.03);
-    const aP = this.B(0.14, 0.9, 0.08, trim, 2.42, 1.32, FAR + 0.04);
-    aP.rotation.z = -0.62;
-    // windscreen (angled) with frost at the base
-    const ws = this.box(0.04, 0.85, 1.8, this.mat('carGlass', { color: 0x22303c, transparent: true, opacity: 0.3, roughness: 0.05, depthWrite: false }), 2.72, 1.38, -0.6);
-    ws.rotation.z = -0.62;
+    slab(DECK_X + 0.1, DECK_Y - 0.05, ROOF_X0 + 0.12, 1.7, 0.3, trim, FAR + 0.03, 0.06); // C pillar
+    this.B(0.3, DECK_Y - 0.3, 0.06, trim, -2.25, (DECK_Y + 0.3) / 2, FAR + 0.03);
+    slab(COWL_X - 0.06, COWL_Y, ROOF_X1 - 0.04, 1.7, 0.14, trim, FAR + 0.04, 0.08); // A pillar
+    // windscreen (raked back toward the roof)
+    slab(COWL_X + 0.03, COWL_Y + 0.02, ROOF_X1 + 0.03, 1.74, 0.04, this.mat('carGlass', { color: 0x22303c, transparent: true, opacity: 0.3, roughness: 0.05, depthWrite: false }));
   }
 
   // ---------------------------------------------------------------- rear compartment
@@ -466,7 +535,7 @@ export class PoliceCarScene extends LocationBase {
     this.B(0.05, 0.03, 0.02, steel, -1.68, 0.76, FAR + 0.09);
 
     // rear door card: no handles, no switches — blanked off with screwed plates
-    this.B(1.9, 0.64, 0.05, trim, -1.05, 0.65, FAR + 0.025);
+    this.B(1.9, WIN_Y0 - 0.35, 0.05, trim, -1.05, (WIN_Y0 + 0.31) / 2, FAR + 0.025);
     this.B(1.7, 0.05, 0.08, trim, -1.05, 0.87, FAR + 0.05); // armrest ridge
     const plate = this.mat('blankPlate', { color: 0x202226, roughness: 0.5, metalness: 0.4 });
     for (const [x, y, w] of [[-0.42, 0.79, 0.15], [-1.5, 0.93, 0.1]]) {
@@ -536,10 +605,10 @@ export class PoliceCarScene extends LocationBase {
       this.B(0.62, 0.14, 0.55, seat, 1.15, 0.55, z);
       this.B(0.62, 0.05, 0.08, seat, 1.15, 0.64, z - 0.24); // far bolster
       this.B(0.5, 0.18, 0.5, dark, 1.15, 0.39, z);
-      const bk = this.B(0.15, 0.76, 0.55, seat, 0.8, 0.98, z); bk.rotation.z = 0.1;
-      this.B(0.16, 0.6, 0.06, seat, 0.82, 0.95, z - 0.25).rotation.z = 0.1;
-      this.B(0.17, 0.2, 0.3, seat, 0.74, 1.47, z);
-      for (const dz of [-0.08, 0.08]) this.B(0.012, 0.08, 0.012, chrome, 0.76, 1.34, z + dz);
+      const bk = this.B(0.14, 0.58, 0.52, seat, 0.82, 0.9, z); bk.rotation.z = 0.12;
+      this.B(0.15, 0.46, 0.06, seat, 0.84, 0.88, z - 0.24).rotation.z = 0.12;
+      this.B(0.13, 0.17, 0.26, seat, 0.76, 1.33, z);
+      for (const dz of [-0.07, 0.07]) this.B(0.012, 0.07, 0.012, chrome, 0.77, 1.22, z + dz);
       this.B(0.18, 0.05, 0.03, plastic, 1.3, 0.46, z + (near ? 0.27 : -0.27)); // recline lever / side trim
     }
     // passenger seat clutter: clipboard with forms, flashlight, ticket book
@@ -555,8 +624,8 @@ export class PoliceCarScene extends LocationBase {
     fl.rotation.z = Math.PI / 2; fl.rotation.y = 0.5; fl.position.set(1.3, 0.645, -1.26); root.add(fl);
 
     // front door card: armrest, chrome handle, switch pack, map pocket with papers, speaker
-    this.B(1.95, 0.64, 0.05, trim, 1.25, 0.65, FAR + 0.025);
-    this.B(0.7, 0.06, 0.12, trim, 1.15, 0.9, FAR + 0.07);
+    this.B(1.95, WIN_Y0 - 0.35, 0.05, trim, 1.25, (WIN_Y0 + 0.31) / 2, FAR + 0.025);
+    this.B(0.7, 0.06, 0.12, trim, 1.15, WIN_Y0 - 0.06, FAR + 0.07);
     this.B(0.12, 0.03, 0.02, chrome, 0.7, 1.0, FAR + 0.06);
     this.B(0.14, 0.02, 0.06, dark, 1.4, 0.935, FAR + 0.08);
     for (let i = 0; i < 2; i++) this.B(0.02, 0.012, 0.025, plastic, 1.36 + i * 0.05, 0.95, FAR + 0.08);
@@ -611,7 +680,7 @@ export class PoliceCarScene extends LocationBase {
     this.B(0.18, 0.01, 0.12, this.mat('paperWhite', { color: 0xe8e6de, roughness: 0.95 }), 2.48, 1.235, -1.1).rotation.z = -0.22;
     // steering wheel, hub, column
     const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.19, 0.025, 8, 24), plastic);
-    wheel.position.set(1.85, 1.15, -0.3); wheel.rotation.y = Math.PI / 2; wheel.rotation.x = 0.4;
+    wheel.position.set(1.85, 1.1, -0.3); wheel.rotation.order = 'ZYX'; wheel.rotation.y = Math.PI / 2; wheel.rotation.z = -0.6; // raked ~35°
     root.add(wheel);
     this.wheel = wheel;
     const hub = this.B(0.08, 0.12, 0.12, dark, 1.88, 1.12, -0.3);
@@ -693,17 +762,7 @@ export class PoliceCarScene extends LocationBase {
     town.position.y = ROAD + 13 / 2 - 0.1;
     const bank = layer(bankTex(), 18, 1.4, 0, ROAD + 0.55, -5.0, 2.2, 6.5, 0xe8eef4);
     void bank;
-    // ground plane (road + verge), scrolling with the car's true speed
-    const rt = roadTex().clone(); rt.needsUpdate = true; rt.repeat.set(30 / 2.4, 1);
-    const road = new THREE.Mesh(new THREE.PlaneGeometry(30, 7.2), new THREE.MeshStandardMaterial({ map: rt, color: 0xc8ccd2, roughness: 0.85 }));
-    road.rotation.x = -Math.PI / 2; road.position.set(0, ROAD, -1.4); root.add(road);
-    this.roadTex = rt;
-    // double yellow centre line, worn
-    const line = new THREE.Mesh(new THREE.PlaneGeometry(30, 0.12), new THREE.MeshBasicMaterial({ color: 0xb09030, transparent: true, opacity: 0.45 }));
-    line.rotation.x = -Math.PI / 2; line.position.set(0, ROAD + 0.005, -2.1); root.add(line);
-    // shadow under the car
-    const sh = new THREE.Mesh(new THREE.PlaneGeometry(6.4, 2.6), new THREE.MeshBasicMaterial({ color: 0x000000, alphaMap: glowTexture(), transparent: true, opacity: 0.7, depthWrite: false }));
-    sh.rotation.x = -Math.PI / 2; sh.position.set(0.2, ROAD + 0.01, -0.5); root.add(sh);
+    // (no road plane under the car: outside the glass everything is black)
 
     // near parallax units: power pole + wires to the next pole, a street lamp, spruce
     const S = 7.0, UNITS = 4;
@@ -776,7 +835,7 @@ export class PoliceCarScene extends LocationBase {
     const pos = new Float32Array(n * 6);
     this.streakBoxes = [];
     for (let i = 0; i < n; i++) {
-      const above = i % 4 === 0;
+      const above = false; // only what passes the windows
       const box = above ? [-4, 4, 1.95, 3.2, -1.4, 0.6] : [-6, 6, ROAD, 3.4, -4.8, -1.6];
       this.streakBoxes.push(box);
       const x = box[0] + Math.random() * (box[1] - box[0]), y = box[2] + Math.random() * (box[3] - box[2]), z = box[4] + Math.random() * (box[5] - box[4]);
@@ -796,36 +855,34 @@ export class PoliceCarScene extends LocationBase {
   // ---------------------------------------------------------------- foreground (near side cut)
 
   buildForeground() {
-    const paint = this.mat('carPaint', { color: 0xe6e9ec, roughness: 0.35, metalness: 0.2 });
+    const paint = this.mat('carShellCut', { color: 0x15171b, roughness: 0.6 });
     const navy = this.mat('carStripe', { color: 0x1a2a5a, roughness: 0.4, metalness: 0.2 });
     const gold = this.mat('carStripeGold', { color: 0xc8a040, roughness: 0.4, metalness: 0.4 });
     const tire = this.mat('tire', { color: 0x141416, roughness: 0.9 });
     const dark = this.mat('carDark', { color: 0x141518, roughness: 0.7 });
 
-    // rocker panel + wheels: below the seats, never above Julian's feet
+    // the near door's lower trim, seen from the cut: covers the footwells (the
+    // seated sprites sit a little into them) — no wheels, no paint, no road
     const sill = new THREE.Group(); sill.name = 'fg-sill';
-    this.B(4.7, 0.27, 0.06, paint, 0.15, 0.17, 0.3, sill);
-    this.B(4.7, 0.05, 0.065, navy, 0.15, 0.12, 0.302, sill);
-    this.B(4.7, 0.012, 0.066, gold, 0.15, 0.155, 0.303, sill);
-    this.B(4.7, 0.03, 0.07, dark, 0.15, 0.03, 0.31, sill);
+    const doorTrim = this.mat('carDoorTrim', { color: 0x1c1e22, roughness: 0.75 });
+    this.B(4.7, 0.36, 0.06, doorTrim, 0.15, 0.2, 0.3, sill);
+    this.B(4.7, 0.025, 0.065, this.mat('carTrimEdge', { color: 0x34383e, roughness: 0.5 }), 0.15, 0.38, 0.302, sill);
+    for (const x of [-1.2, 1.25]) this.B(0.5, 0.1, 0.02, this.mat('carDoorPocket', { color: 0x101114, roughness: 0.8 }), x, 0.27, 0.335, sill);
     this.wheels = [];
-    for (const x of [-1.62, 1.95]) {
-      const arch = new THREE.Mesh(new THREE.CircleGeometry(0.43, 16, 0, Math.PI), dark);
-      arch.position.set(x, 0.0, 0.335); sill.add(arch);
-      const tyre = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.22, 18), tire);
-      tyre.rotation.x = Math.PI / 2; tyre.position.set(x, ROAD + 0.34, 0.32); sill.add(tyre);
-      const hub = new THREE.Mesh(new THREE.CircleGeometry(0.21, 16), new THREE.MeshLambertMaterial({ map: hubTex(), transparent: true, alphaTest: 0.5 }));
-      hub.position.set(x, ROAD + 0.34, 0.432); sill.add(hub);
-      this.wheels.push(hub);
-    }
     this.root.add(sill);
     this.foregroundGroups.push(sill);
 
     // near pillars framing the shot (A at the right edge, C at the left edge)
     const pil = new THREE.Group(); pil.name = 'fg-pillars';
-    const a = this.B(0.12, 1.0, 0.07, paint, 2.62, 1.3, 0.32, pil); a.rotation.z = -0.62;
-    this.B(0.3, 1.45, 0.07, paint, -2.32, 1.02, 0.32, pil);
-    this.B(0.06, 1.45, 0.075, dark, -2.16, 1.02, 0.32, pil);
+    const pslab = (x0, y0, x1, y1, th, mat) => {
+      const L = Math.hypot(x1 - x0, y1 - y0);
+      const m = this.B(th, L, 0.07, mat, (x0 + x1) / 2, (y0 + y1) / 2, 0.32, pil);
+      m.rotation.z = Math.atan2(x0 - x1, y1 - y0);
+    };
+    pslab(COWL_X + 0.02, COWL_Y, ROOF_X1 + 0.02, 1.78, 0.12, paint);           // A pillar
+    pslab(DECK_X, DECK_Y, ROOF_X0, 1.78, 0.3, paint);                          // C pillar
+    this.B(0.3, DECK_Y - 0.3, 0.07, paint, -2.25, (DECK_Y + 0.3) / 2, 0.32, pil); // rear quarter
+    this.B(0.06, DECK_Y - 0.3, 0.075, dark, -2.09, (DECK_Y + 0.3) / 2, 0.32, pil);
     this.root.add(pil);
     this.foregroundGroups.push(pil);
   }
@@ -866,7 +923,6 @@ export class PoliceCarScene extends LocationBase {
     const t = this.time;
     const v = this.speed;
     for (const L of this.layers) L.tex.offset.x += dt * L.speed * (v / 9);
-    this.roadTex.offset.x += dt * v / 2.4;
     for (const u of this.units) {
       u.position.x -= dt * v * 0.75;
       if (u.position.x < -12) u.position.x += this.loop;
@@ -909,7 +965,7 @@ export class PoliceCarScene extends LocationBase {
     // wheels, engine/road vibration, steering corrections
     for (const w of this.wheels) w.rotation.z -= dt * v / 0.34;
     this.root.position.y = Math.sin(t * 23) * 0.004 + Math.sin(t * 3.1) * 0.006;
-    this.wheel.rotation.x = 0.4 + Math.sin(t * 0.7) * 0.06;
+    this.wheel.rotation.x = Math.sin(t * 0.7) * 0.06; // small steering corrections
     this.radioLed.material.emissiveIntensity = Math.random() < 0.02 ? 6 : 3;
     this.sirenLed.material.opacity = (Math.floor(t * 1.2) % 2) ? 0.8 : 0.25;
     this.screenGlow.material.opacity = 0.2 + Math.sin(t * 7.3) * 0.015;

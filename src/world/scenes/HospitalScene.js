@@ -1648,10 +1648,8 @@ export class HospitalScene extends LocationBase {
       geo.setIndex([0, 2, 1, 1, 2, 3]);
       const m = new THREE.MeshBasicMaterial({ map: shaftTexture(), color: 0xffa860, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
       this.wedge = new THREE.Mesh(geo, m); this.wedge.renderOrder = 3; this.root.add(this.wedge);
-      // the doorway itself glows
-      this.doorGlow = glow(0xffb070, 2.4, 0.0);
-      this.doorGlow.material = this.doorGlow.material.clone();
-      this.doorGlow.position.set(9.95, 1.1, -4.3); this.root.add(this.doorGlow);
+      // (no glow billboard in the doorway: Julian walks through it — the warm
+      // room light and the floor wedge carry the doorway on their own)
     }
   }
 
@@ -1665,7 +1663,6 @@ export class HospitalScene extends LocationBase {
         this.spill.material.opacity += ((this.wardBOpen ? 0.35 : 0) - this.spill.material.opacity) * Math.min(1, dt * 2);
         const k = this.spill.material.opacity / 0.35;
         this.wedge.material.opacity = k * 0.95;
-        this.doorGlow.material.opacity = k * 0.55;
       }
     }
     if (this.night) {

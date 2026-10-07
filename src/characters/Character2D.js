@@ -127,10 +127,12 @@ export class Character2D {
       map.offset.set(f.x / W, 1 - (f.y + f.h) / H);
       map.repeat.set(f.w / W, f.h / H);
       // painted frames lie head-left: flip when the head goes to the right
-      L.scale.set(f.w * PX * (dir > 0 ? -1 : 1), f.h * PX, 1);
-      L.position.set(dir * f.w * PX * 0.5, 0.004, 0.002);
+      // (`s`: some frames use bigger pixels — cm per pixel)
+      const px = PX * (f.s || 1);
+      L.scale.set(f.w * px * (dir > 0 ? -1 : 1), f.h * px, 1);
+      L.position.set(dir * f.w * px * 0.5, 0.004, 0.002);
       L.userData.frame = this.lieFrameName; L.userData.dir = dir;
-      L.userData.w = f.w * PX; L.userData.h = f.h * PX;
+      L.userData.w = f.w * px; L.userData.h = f.h * px;
     }
     this.lieAmount = amount;
     L.visible = amount > 0.001;
@@ -182,10 +184,11 @@ export class Character2D {
     const [W, H] = this.atlas.size;
     this.tex.offset.set(f.x / W, 1 - (f.y + f.h) / H);
     this.tex.repeat.set(f.w / W, f.h / H);
-    this.sprite.scale.set(f.w * PX * this.facing, f.h * PX, 1);
+    const px = PX * (f.s || 1);
+    this.sprite.scale.set(f.w * px * this.facing, f.h * px, 1);
     // anchor: keep the torso centre over the root position whatever the frame width
-    this.sprite.position.x = (f.w / 2 - f.ax) * PX * this.facing;
-    this.frameH = f.h * PX;
+    this.sprite.position.x = (f.w / 2 - f.ax) * px * this.facing;
+    this.frameH = f.h * px;
   }
 
   setPose(pose) { if (this.poses[pose]) this.pose = pose; }
