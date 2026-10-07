@@ -668,13 +668,14 @@ def copy_neck_exact(a, src, src_collar, collar, below=6):
     return a, dx
 
 
-def copy_neck_collar(a, src, src_collar, collar, below=7, back=4):
+def copy_neck_collar(a, src, src_collar, collar, below=7, back=9):
     """copy_neck_exact + the gown collar around the neck: every opaque source pixel
-    in the strip from just behind the nape to the chest front, down to `below`
-    rows under the collar, is copied as is (the neckline is the reference's)."""
+    in the strip from behind the nape to the chest front, down to `below` rows
+    under the collar, is copied as is (the neckline is the reference's)."""
+    t = bbox(a)[0]  # the frame's own top, before its head is replaced
     a, dx = copy_neck_exact(a, src, src_collar, collar, below)
     H, W = a.shape[:2]
-    ts, t = bbox(src)[0], bbox(a)[0]
+    ts = bbox(src)[0]
     sy, ty = ts + src_collar, t + collar
     dy = ty - sy
     sk = is_skin(src)
@@ -728,19 +729,18 @@ for g in ['jul', 'julg']:
     for n in ['idle_walk1', 'idle_walk2']:
         frames[f'{g}_{n}'] = match_scale(frames[f'{g}_{n}'], frames[f'{g}_idle'])
 JUL_HEAD = frames['jul_idle'].copy()
-# gown: the first walk frame keeps its own painted neck (first clean neck row under
-# the old chin) — that head, the whole neck and the neckline around it are then
-# copied pixel for pixel onto the other gown frames, lined up on the chest front
-# (the neck sits forward, as in the reference), collars given in rows from the top
-GOWN_NECK_TOP = {'julg_idle_walk1': 28}
-GOWN_SRC, GOWN_SRC_COLLAR = 'julg_idle_walk1', 27
+# the old 'think' frame is ~10 cm shorter than the repainted coat frames: same height now
+frames['julian_think'] = match_scale(frames['julian_think'], frames['jul_idle'])
+# gown: the client's reference is the ORIGINAL painted gown walk frame (its own
+# head, bowed a little, and its own neck). That frame stays as painted; its head
+# with the whole neck and the neckline around it is copied pixel for pixel onto
+# the other gown frames, lined up on the chest front (the neck sits forward)
+GOWN_SRC, GOWN_SRC_COLLAR = 'julg_idle_walk1', 28
 GOWN_COLLAR = {'julg_idle': 27, 'julg_talk': 27, 'julg_idle_walk2': 28}
-for n in ['jul_talk', 'jul_idle_walk1', 'jul_idle_walk2', 'julg_idle_walk1', 'julian_think', 'julian_seat']:
-    frames[n] = graft_head(frames[n], JUL_HEAD, GOWN_NECK_TOP.get(n))
+for n in ['jul_talk', 'jul_idle_walk1', 'jul_idle_walk2', 'julian_think', 'julian_seat']:
+    frames[n] = graft_head(frames[n], JUL_HEAD)
 for n, collar in GOWN_COLLAR.items():
     frames[n] = copy_neck_collar(frames[n], frames[GOWN_SRC], GOWN_SRC_COLLAR, collar)[0]
-for n in ['julg_idle', 'julg_talk', 'julg_idle_walk1', 'julg_idle_walk2']:
-    frames[n] = drop_specks(frames[n])
 for n in ['jul_idle', 'jul_talk', 'julg_idle', 'julg_talk']:
     ALIASES[f'{n}_sit'] = 'julian_seat'
 # v0.08: Wyatt and Quinn standing in profile (walk source), the old woman of 107 lying

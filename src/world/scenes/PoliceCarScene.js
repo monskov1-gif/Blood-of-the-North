@@ -336,7 +336,7 @@ export class PoliceCarScene extends LocationBase {
     this.id = 'car';
     this.title = 'Полицейская машина';
     this.background = 0x000000;
-    this.camera = { distance: 3.35, height: 1.05, lookHeight: 0.95, lookZ: -0.6, fov: 34, minWidth: 3.3 };
+    this.camera = { distance: 2.85, height: 1.05, lookHeight: 0.95, lookZ: -0.6, fov: 34, minWidth: 3.35 };
     this.bounds = { walk: { minX: -1.3, maxX: 1.5, minZ: 0.2, maxZ: 0.2 }, camera: { minX: 0.08, maxX: 0.08 } };
     this.speed = 9; // m/s of the outside layers
   }
@@ -425,8 +425,8 @@ export class PoliceCarScene extends LocationBase {
   buildShell() {
     const root = this.root;
     const body = this.mat('carInterior', { color: 0x2e3238, roughness: 0.8 });
-    // the cut body edges stay near-black: only the cabin is lit, not the shell
-    const paint = this.mat('carShellCut', { color: 0x15171b, roughness: 0.6 });
+    // the cut body edges stay black: only the cabin is lit, not the shell
+    const paint = new THREE.MeshBasicMaterial({ color: 0x08090b }); paint.userData.noLightingState = true;
     const trim = this.pmat('carTrim', trimTex());
     const head = this.pmat('carHead', headTex(), { roughness: 0.95 });
     const rubber = this.mat('carSeal', { color: 0x111214, roughness: 0.7 });
@@ -500,7 +500,7 @@ export class PoliceCarScene extends LocationBase {
       this.B(0.03, 0.05, 0.05, h, x + 0.12, 1.61, FAR + 0.05);
     }
     // dome light + overhead console
-    this.B(0.24, 0.025, 0.14, this.mat('dome', { color: 0xc8c4b8, emissive: 0x3a3428, roughness: 0.4 }), 0.25, 1.68, -0.6);
+    this.B(0.24, 0.025, 0.14, this.mat('dome', { color: 0x6a665e, emissive: 0x1a1610, roughness: 0.4 }), 0.25, 1.68, -0.6);
     // pillars (B and C trim on the far wall, A pillar sloping at the front)
     this.B(0.24, 0.8, 0.06, trim, 0.05, 1.29, FAR + 0.03);
     slab(DECK_X + 0.1, DECK_Y - 0.05, ROOF_X0 + 0.12, 1.7, 0.3, trim, FAR + 0.03, 0.06); // C pillar
@@ -543,19 +543,20 @@ export class PoliceCarScene extends LocationBase {
       for (const s of [-1, 1]) this.B(0.01, 0.01, 0.01, steel, x + s * (w / 2 - 0.015), y, FAR + 0.068);
     }
     // bars on the inside of the rear window
-    for (let i = 0; i < 7; i++) this.B(0.014, WIN_Y1 - WIN_Y0 + 0.02, 0.014, steel, -1.85 + i * 0.27, (WIN_Y0 + WIN_Y1) / 2, FAR + 0.06);
-    this.B(1.86, 0.02, 0.02, steel, -1.07, WIN_Y0 + 0.04, FAR + 0.06);
-    this.B(1.86, 0.02, 0.02, steel, -1.07, WIN_Y1 - 0.04, FAR + 0.06);
+    // (no bars on the rear side glass: a sedan, not a prisoner bus — the cage is the partition)
     // sticker
     const st = this.textSign('NO SMOKING', { w: 0.16, h: 0.05, bg: '#c8b030', fg: '#1a1a1a' });
     st.position.set(-0.32, 0.72, FAR + 0.056); this.root.add(st);
 
-    // floor: slush melting off boots, grit, a crumpled receipt
+    // floor: wet off the boots, grit, a crumpled receipt
     const wet = new THREE.Mesh(new THREE.CircleGeometry(0.22, 10), this.mat('slush', { color: 0x30363c, roughness: 0.08, metalness: 0.3, transparent: true, opacity: 0.7 }));
     wet.rotation.x = -Math.PI / 2; wet.scale.set(1.6, 0.8, 1); wet.position.set(-0.6, FLOOR + 0.014, -0.45); this.root.add(wet);
-    const snowMat = this.mat('slushSnow', { color: 0xd8e0e8, roughness: 0.9 });
-    for (const [x, z, s] of [[-0.48, -0.36, 0.05], [-0.7, -0.6, 0.035], [-0.55, -0.52, 0.025]]) this.B(s * 1.4, s * 0.6, s, snowMat, x, FLOOR + 0.02, z);
-    const paper = new THREE.Mesh(new THREE.IcosahedronGeometry(0.035, 0), this.mat('crumple', { color: 0xd8d4c8, roughness: 0.95, flatShading: true }));
+    // late autumn: a wet leaf and mud off the boots, not snow
+    const leafMat = this.mat('wetLeaf', { color: 0x6a3a14, roughness: 0.4 });
+    const mudMat = this.mat('mud', { color: 0x2a2620, roughness: 0.6 });
+    this.B(0.05, 0.004, 0.035, leafMat, -0.48, FLOOR + 0.016, -0.36).rotation.y = 0.6;
+    for (const [x, z, s] of [[-0.7, -0.6, 0.035], [-0.55, -0.52, 0.025]]) this.B(s * 1.4, s * 0.3, s, mudMat, x, FLOOR + 0.016, z);
+    const paper = new THREE.Mesh(new THREE.IcosahedronGeometry(0.035, 0), this.mat('crumple', { color: 0x8a867c, roughness: 0.95, flatShading: true }));
     paper.position.set(-0.25, FLOOR + 0.03, -1.1); paper.scale.set(1, 0.7, 1.2); this.root.add(paper);
   }
 
@@ -659,7 +660,7 @@ export class PoliceCarScene extends LocationBase {
     const laptop = new THREE.Group();
     this.B(0.32, 0.025, 0.24, this.mat('laptopBody', { color: 0x2a2c30, roughness: 0.5, metalness: 0.3 }), 0, 0, 0, laptop);
     this.B(0.32, 0.22, 0.02, this.mat('laptopBody', { color: 0x2a2c30, roughness: 0.5, metalness: 0.3 }), 0, 0.11, -0.12, laptop).rotation.x = -0.25;
-    const scr = new THREE.Mesh(new THREE.PlaneGeometry(0.28, 0.18), new THREE.MeshBasicMaterial({ map: terminalTex(), color: 0xd8e8ff }));
+    const scr = new THREE.Mesh(new THREE.PlaneGeometry(0.28, 0.18), new THREE.MeshBasicMaterial({ map: terminalTex(), color: 0x7a8aa0 }));
     scr.position.set(0, 0.112, -0.107); scr.rotation.x = -0.25; laptop.add(scr);
     laptop.position.set(1.84, 1.26, -0.58); laptop.rotation.y = -1.0;
     root.add(laptop);
@@ -855,7 +856,7 @@ export class PoliceCarScene extends LocationBase {
   // ---------------------------------------------------------------- foreground (near side cut)
 
   buildForeground() {
-    const paint = this.mat('carShellCut', { color: 0x15171b, roughness: 0.6 });
+    const paint = new THREE.MeshBasicMaterial({ color: 0x08090b }); paint.userData.noLightingState = true;
     const navy = this.mat('carStripe', { color: 0x1a2a5a, roughness: 0.4, metalness: 0.2 });
     const gold = this.mat('carStripeGold', { color: 0xc8a040, roughness: 0.4, metalness: 0.4 });
     const tire = this.mat('tire', { color: 0x141416, roughness: 0.9 });
@@ -891,13 +892,13 @@ export class PoliceCarScene extends LocationBase {
 
   buildLighting() {
     const root = this.root;
-    const hemi = new THREE.HemisphereLight(0x9aabc2, 0x1a1c20, 1.15);
+    const hemi = new THREE.HemisphereLight(0x8a9ab2, 0x141618, 0.8);
     const day = new THREE.DirectionalLight(0xd0dcef, 0.9);
     day.position.set(-1, 4, 3);
     // window light spilling onto the rear bench (Julian) and the driver
-    const fill = new THREE.PointLight(0xc4d2e8, 4.5, 3.6, 1.3);
+    const fill = new THREE.PointLight(0xc4d2e8, 2.6, 3.0, 1.4); // cool window light on Julian, low
     fill.position.set(-0.7, 1.2, 0.8);
-    const front = new THREE.PointLight(0xc4d2e8, 4, 3.2, 1.4);
+    const front = new THREE.PointLight(0xffe2c0, 3.0, 2.6, 1.5); // a small warm pool over the front seats
     front.position.set(1.15, 1.3, -0.5);
     const dash = new THREE.PointLight(0x5a9ac8, 3, 2.2, 1.6);
     dash.position.set(1.85, 1.3, -0.45);
@@ -911,7 +912,7 @@ export class PoliceCarScene extends LocationBase {
     sweep.position.set(4, 1.0, FAR + 0.09); root.add(sweep);
     this.sweep = sweep; this.sweepT = 3; this.sweepRun = -1;
     // cabin dust in the window light
-    this.dust(new THREE.Box3(new THREE.Vector3(-1.9, 0.6, -1.3), new THREE.Vector3(2.2, 1.65, 0.1)), 50, 0xdfe8ff);
+    // (no floating cabin dust: in this small space it read as snow inside the car)
   }
 
   // ---------------------------------------------------------------- per frame
