@@ -165,7 +165,7 @@ export class StreetScene extends LocationBase {
     const bark = this.mat('birchBark', { color: 0xe2ded4, roughness: 0.8 });
     const twig = this.mat('birchTwig', { color: 0x4a3c34, roughness: 0.9 });
     const leafCols = [0xd8a020, 0xe0b830, 0xc86a1c, 0xb8401c];
-    const leafGeo = new THREE.PlaneGeometry(0.09, 0.07);
+    const leafGeo = new THREE.PlaneGeometry(0.13, 0.1);
     const leafMats = leafCols.map((c, i) => this.mat(`leaf${i}`, { color: c, roughness: 0.8, side: THREE.DoubleSide }));
     const leaves = leafMats.map(() => []);
     const tree = (x, z, s) => {
@@ -184,13 +184,16 @@ export class StreetScene extends LocationBase {
       // the last leaves: small clusters on about half the branch tips
       for (const [tx, ty, tz] of tips) {
         if (r() < 0.45) continue;
-        for (let k = 0; k < 7; k++) leaves[Math.floor(r() * 4)].push([x + (tx + (r() - 0.5) * 0.4) * s, (ty + (r() - 0.5) * 0.35) * s, z + tz * s + (r() - 0.5) * 0.3]);
+        for (let k = 0; k < 16; k++) leaves[r() < 0.8 ? (r() < 0.5 ? 0 : 1) : (r() < 0.7 ? 2 : 3)].push([x + (tx * 0.8 + (r() - 0.5) * 0.55) * s, (ty - 0.1 + (r() - 0.5) * 0.45) * s, z + tz * s + (r() - 0.5) * 0.4]);
       }
       for (let k = 0; k < 18; k++) leaves[Math.floor(r() * 4)].push([x + (r() - 0.5) * 2.4, 0.02, z + (r() - 0.5) * 1.6, true]);
     };
-    for (const [x, z, s] of [[-8.2, -4.6, 1.1], [12.6, -4.2, 1.0], [17.4, -6.2, 1.3], [-19.0, -5.2, 1.2], [8.2, -6.5, 0.9]]) tree(x, z, s);
+    // two in the frame by the entrance (one before the brick wing, one by the bench), the rest behind
+    for (const [x, z, s] of [[6.6, -2.35, 1.05], [-5.6, -2.4, 0.95], [12.6, -4.2, 1.0], [17.4, -6.2, 1.3], [-19.0, -5.2, 1.2], [-9.5, -4.8, 1.1]]) tree(x, z, s);
     // leaves blown onto the sidewalk and the plaza
-    for (let k = 0; k < 60; k++) leaves[k % 4].push([-14 + r() * 30, 0.012, -2.4 + r() * 4.6, true]);
+    for (let k = 0; k < 140; k++) leaves[k % 4].push([-14 + r() * 30, 0.012, -2.4 + r() * 4.6, true]);
+    // piled against the bins, the bench legs and the curb
+    for (const [px, pz] of [[2.9, -2.7], [4.0, -2.5], [1.0, 2.3], [-2.0, 2.3], [5.6, 2.0]]) for (let k = 0; k < 14; k++) leaves[k % 4].push([px + (r() - 0.5) * 0.7, 0.014, pz + (r() - 0.5) * 0.3, true]);
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
     leaves.forEach((list, i) => {
       if (!list.length) return;
@@ -216,7 +219,7 @@ export class StreetScene extends LocationBase {
     const im = new THREE.InstancedMesh(geo, this.mat('snowLump', { color: 0xc4c8cc, roughness: 0.5 }), list.length);
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
     // late autumn: what was a plowed bank is a low line of slush
-    list.forEach(([x, y, z, sx, sy, sz, ry], i) => { q.setFromEuler(e.set(0, ry, 0)); m.compose(new THREE.Vector3(x, y, z), q, new THREE.Vector3(sx, sy * 0.28, sz)); im.setMatrixAt(i, m); });
+    list.forEach(([x, y, z, sx, sy, sz, ry], i) => { q.setFromEuler(e.set(0, ry, 0)); m.compose(new THREE.Vector3(x, y, z), q, new THREE.Vector3(sx * 0.7, sy * 0.25, sz * 0.7)); im.setMatrixAt(i, m); });
     if (name) im.name = name;
     parent.add(im);
     return im;

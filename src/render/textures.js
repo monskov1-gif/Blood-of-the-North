@@ -355,17 +355,30 @@ export function autumnTree(ctx, r, x, y, s, night = false, kind = 'birch') {
   };
   for (let k = 0; k < 4; k++) branch(x, y - s * (0.45 + k * 0.14), Math.PI / 2 + (k % 2 ? 0.55 : -0.55) + (r() - 0.5) * 0.3, s * (0.32 - k * 0.04), 0);
   branch(x, y - s, Math.PI / 2 + (r() - 0.5) * 0.3, s * 0.18, 1);
-  // what is left of the leaves: small clusters at the twig tips, about half the tips bare
+  // what is left of the leaves: irregular golden clumps over the lower and inner
+  // crown (birch and aspen go yellow here; a little orange), the top twigs bare
   for (const [tx, ty] of tips) {
-    if (r() < 0.45) continue;
-    for (let k = 0; k < 5 + r() * 6; k++) {
-      ctx.fillStyle = leaves[Math.floor(r() * leaves.length)];
-      const ls = Math.max(1.5, s * 0.025);
-      ctx.fillRect(tx + (r() - 0.5) * s * 0.12, ty + (r() - 0.5) * s * 0.1, ls, ls);
+    const high = ty < y - s * 0.95;
+    if (r() < (high ? 0.75 : 0.25)) continue;
+    const cx = (tx + x) / 2 + (tx - x) * 0.25, cy = ty + s * 0.04;
+    for (let k = 0; k < 14 + r() * 10; k++) {
+      const pick = r();
+      ctx.fillStyle = pick < 0.82 ? leaves[pick < 0.4 ? 0 : pick < 0.62 ? 1 : 4] : leaves[2 + Math.floor(r() * 2)];
+      const ls = Math.max(1.5, s * (0.02 + r() * 0.02));
+      ctx.fillRect(cx + (r() - 0.5) * s * 0.26, cy + (r() - 0.5) * s * 0.16, ls * (1 + r()), ls);
     }
   }
   // fallen leaves around the foot
   for (let k = 0; k < 10; k++) { ctx.fillStyle = leaves[Math.floor(r() * leaves.length)]; ctx.fillRect(x + (r() - 0.5) * s * 0.7, y - r() * 3, Math.max(1.5, s * 0.02), Math.max(1, s * 0.012)); }
+}
+
+/** Re-renders a painted canvas on a k× coarser pixel grid (nearest), like the sprites. */
+export function pixelate(ctx, w, h, k = 3) {
+  const sw = Math.max(1, Math.round(w / k)), sh = Math.max(1, Math.round(h / k));
+  const small = document.createElement('canvas'); small.width = sw; small.height = sh;
+  const sc = small.getContext('2d');
+  sc.imageSmoothingEnabled = true; sc.drawImage(ctx.canvas, 0, 0, sw, sh);
+  ctx.save(); ctx.imageSmoothingEnabled = false; ctx.clearRect(0, 0, w, h); ctx.drawImage(small, 0, 0, w, h); ctx.restore();
 }
 
 /** Dead grass and earth with the first thin snow lying in patches, leaves on top. */
@@ -380,7 +393,7 @@ export function autumnGround(ctx, r, x0, y0, w, h, night = false, snow = 0.45) {
     ctx.fillRect(x0 + r() * w, y0 + r() * h, 2, 3 + r() * 4);
   }
   // snow: thin, broken drifts of small flecks (more in the shade, toward the back)
-  for (let i = 0; i < w * h * snow / 2600; i++) {
+  for (let i = 0; i < w * h * snow / 5200; i++) {
     const px = x0 + r() * w, py = y0 + Math.pow(r(), 1.6) * h, len = 10 + r() * 40;
     for (let k = 0; k < len / 2; k++) {
       ctx.fillStyle = night ? `rgba(120,134,158,${0.35 + r() * 0.4})` : `rgba(238,242,246,${0.45 + r() * 0.45})`;
@@ -544,12 +557,15 @@ export function streetTexture(time = 'night', view = 'bar') {
     ctx.fillStyle = night ? '#05070a' : '#2a2c30'; ctx.fillRect(lx, h * 0.26, 9, ground - h * 0.26 + 10);
     ctx.fillRect(lx - 30, h * 0.26, 60, 7);
     if (night) {
-      const lg = ctx.createRadialGradient(lx + 4, h * 0.27, 4, lx + 4, h * 0.27, 260);
-      lg.addColorStop(0, 'rgba(255,220,170,0.95)'); lg.addColorStop(0.08, 'rgba(255,190,120,0.5)'); lg.addColorStop(1, 'rgba(255,170,90,0)');
-      ctx.fillStyle = lg; ctx.fillRect(0, 0, w, h);
-      const pool = ctx.createRadialGradient(lx, h * 0.86, 10, lx, h * 0.86, 260);
-      pool.addColorStop(0, 'rgba(255,200,140,0.35)'); pool.addColorStop(1, 'rgba(255,200,140,0)');
-      ctx.fillStyle = pool; ctx.fillRect(0, h * 0.6, w, h * 0.4);
+      const lg = ctx.createRadialGradient(lx + 4, h * 0.27, 2, lx + 4, h * 0.27, 70);
+      lg.addColorStop(0, 'rgba(255,225,175,0.95)'); lg.addColorStop(0.25, 'rgba(255,190,120,0.35)'); lg.addColorStop(1, 'rgba(255,170,90,0)');
+      ctx.fillStyle = lg; ctx.fillRect(lx - 80, h * 0.27 - 80, 170, 160);
+      // a cone of light down to a pool on the wet road
+      ctx.fillStyle = 'rgba(255,200,140,0.08)';
+      ctx.beginPath(); ctx.moveTo(lx - 6, h * 0.28); ctx.lineTo(lx + 14, h * 0.28); ctx.lineTo(lx + 150, h * 0.9); ctx.lineTo(lx - 140, h * 0.9); ctx.fill();
+      const pool = ctx.createRadialGradient(lx, h * 0.88, 6, lx, h * 0.88, 150);
+      pool.addColorStop(0, 'rgba(255,200,140,0.38)'); pool.addColorStop(1, 'rgba(255,200,140,0)');
+      ctx.fillStyle = pool; ctx.fillRect(lx - 160, h * 0.8, 320, h * 0.2);
     } else {
       // morning frost haze
       const fog = ctx.createLinearGradient(0, h * 0.3, 0, h);
@@ -560,6 +576,7 @@ export function streetTexture(time = 'night', view = 'bar') {
     ctx.fillStyle = night ? 'rgba(230,240,255,0.5)' : 'rgba(255,255,255,0.7)';
     for (let i = 0; i < 260; i++) { const sz = r() < 0.15 ? 3 : 1.6; ctx.fillRect(r() * w, r() * h, sz, sz + r() * 2); }
     for (let i = 0; i < 24; i++) { ctx.fillStyle = (night ? LEAVES_NIGHT : LEAVES_DAY)[i % 6]; ctx.fillRect(r() * w, r() * h * 0.8, 4, 3); }
+    pixelate(ctx, w, h, 4);
   });
 }
 
@@ -600,13 +617,14 @@ function viewTexture(time, view) {
       box(0, h * 0.65, w, h * 0.02, night ? '#5a6476' : '#b8bec6'); // slush at the curb
       for (const tx of [120, 470, 830]) autumnTree(ctx, r, tx, h * 0.72, 150, night, tx % 2 ? 'aspen' : 'birch');
       // parked cars right under the window, at eye level
-      for (let i = 0; i < 5; i++) {
-        const x = 30 + i * 210, y = h * 0.74;
-        box(x, y, 160, 60, night ? '#1a1e26' : ['#5a2a24', '#2a3a5a', '#4a4a50'][i % 3]);
-        box(x + 24, y - 30, 108, 34, night ? '#141820' : '#3a4450');
-        box(x + 30, y - 26, 44, 24, night ? '#202838' : '#9ab0c4'); box(x + 82, y - 26, 44, 24, night ? '#202838' : '#9ab0c4');
-        box(x + 24, y - 33, 108, 3, snow);
-        box(x + 18, y + 52, 26, 20, '#101214'); box(x + 116, y + 52, 26, 20, '#101214');
+      // parked cars of different kinds and colours, irregular gaps
+      const cars = [[20, 150, 'sedan', '#5a2a24'], [215, 180, 'pickup', '#3a4a3a'], [470, 150, 'sedan', '#d8d8d4'], [700, 190, 'suv', '#2a3a5a'], [940, 150, 'sedan', '#4a4a50']];
+      for (const [x, cw, kind, col] of cars) {
+        const y = h * 0.74 + (kind === 'suv' ? -10 : 0), bh = kind === 'suv' ? 70 : 58;
+        box(x, y, cw, bh, night ? '#1a1e26' : col);
+        if (kind === 'pickup') { box(x + 8, y - 34, cw * 0.42, 36, night ? '#141820' : col); box(x + 14, y - 28, cw * 0.32, 22, night ? '#202838' : '#9ab0c4'); box(x + 8, y - 37, cw * 0.42, 3, snow); }
+        else { const cab = kind === 'suv' ? 0.78 : 0.62; box(x + cw * (1 - cab) / 2, y - 32, cw * cab, 34, night ? '#141820' : '#3a4450'); box(x + cw * (1 - cab) / 2 + 6, y - 27, cw * cab / 2 - 9, 22, night ? '#202838' : '#9ab0c4'); box(x + cw / 2 + 3, y - 27, cw * cab / 2 - 9, 22, night ? '#202838' : '#9ab0c4'); box(x + cw * (1 - cab) / 2, y - 35, cw * cab, 3, snow); }
+        box(x + 16, y + bh - 8, 26, 20, '#101214'); box(x + cw - 42, y + bh - 8, 26, 20, '#101214');
       }
       autumnGround(ctx, r, 0, h * 0.94, w, h * 0.06, night, 0.5);
     } else if (view === 'ward107') {
@@ -624,7 +642,7 @@ function viewTexture(time, view) {
       }
       box(w * 0.55, h * 0.8, 150, 12, dark); box(w * 0.55 + 10, h * 0.81, 8, 34, dark); box(w * 0.55 + 132, h * 0.81, 8, 34, dark); box(w * 0.55 - 4, h * 0.79, 158, 8, snow);
       box(w * 0.3, h * 0.42, 8, h * 0.44, dark);
-      if (night) { const g = ctx.createRadialGradient(w * 0.3 + 4, h * 0.43, 2, w * 0.3 + 4, h * 0.43, 180); g.addColorStop(0, 'rgba(255,210,150,0.8)'); g.addColorStop(1, 'rgba(255,190,120,0)'); ctx.fillStyle = g; ctx.fillRect(0, 0, w, h); }
+      if (night) { const g = ctx.createRadialGradient(w * 0.3 + 4, h * 0.43, 2, w * 0.3 + 4, h * 0.43, 60); g.addColorStop(0, 'rgba(255,210,150,0.85)'); g.addColorStop(1, 'rgba(255,190,120,0)'); ctx.fillStyle = g; ctx.fillRect(w * 0.3 - 60, h * 0.43 - 60, 130, 120); const pl = ctx.createRadialGradient(w * 0.3, h * 0.86, 4, w * 0.3, h * 0.86, 110); pl.addColorStop(0, 'rgba(255,200,140,0.3)'); pl.addColorStop(1, 'rgba(255,200,140,0)'); ctx.fillStyle = pl; ctx.fillRect(w * 0.3 - 120, h * 0.78, 240, h * 0.2); }
     } else {
       // station: the RCMP lot — cruisers, a flagpole, the garage
       for (let k = 0; k < 2; k++) {
@@ -656,11 +674,12 @@ function viewTexture(time, view) {
       box(w * 0.4, h * 0.12, 5, h * 0.6, dark); // flagpole
       box(w * 0.4 + 5, h * 0.13, 70, 40, '#d81e1e'); box(w * 0.4 + 23, h * 0.13, 34, 40, '#f4f4f4');
       ctx.fillStyle = '#d81e1e'; ctx.beginPath(); ctx.moveTo(w * 0.4 + 40, h * 0.13 + 8); ctx.lineTo(w * 0.4 + 48, h * 0.13 + 24); ctx.lineTo(w * 0.4 + 32, h * 0.13 + 24); ctx.fill();
-      if (night) { const g = ctx.createRadialGradient(w * 0.75, h * 0.3, 2, w * 0.75, h * 0.3, 260); g.addColorStop(0, 'rgba(255,220,170,0.7)'); g.addColorStop(1, 'rgba(255,190,120,0)'); ctx.fillStyle = g; ctx.fillRect(0, 0, w, h); }
+      if (night) { const g = ctx.createRadialGradient(w * 0.75, h * 0.3, 2, w * 0.75, h * 0.3, 70); g.addColorStop(0, 'rgba(255,220,170,0.75)'); g.addColorStop(1, 'rgba(255,190,120,0)'); ctx.fillStyle = g; ctx.fillRect(w * 0.75 - 75, h * 0.3 - 75, 150, 150); }
     }
     if (!night) { const fog = ctx.createLinearGradient(0, h * 0.2, 0, h); fog.addColorStop(0, 'rgba(220,228,236,0)'); fog.addColorStop(1, 'rgba(220,228,236,0.3)'); ctx.fillStyle = fog; ctx.fillRect(0, 0, w, h); }
     ctx.fillStyle = night ? 'rgba(230,240,255,0.45)' : 'rgba(255,255,255,0.65)';
     for (let i = 0; i < 150; i++) { const sz = r() < 0.15 ? 3 : 1.5; ctx.fillRect(r() * w, r() * h, sz, sz + r() * 2); }
+    pixelate(ctx, w, h, 3);
   });
 }
 
