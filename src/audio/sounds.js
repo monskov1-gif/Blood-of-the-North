@@ -270,6 +270,44 @@ export const SOUND_DEFS = {
       return () => { alive = false; vent(); };
     },
   },
+  /** The old wing: a hollow high room — low tone, the building settling, a far drip with its echo. */
+  'amb.oldwing': {
+    bus: 'ambience', volume: 0.6,
+    loop(am, out) {
+      const room = noiseBed(am, out, { type: 'lowpass', freq: 140, q: 0.5, vol: 0.45, wobble: 0.25, rate: 0.04 });
+      let alive = true;
+      const tick = () => {
+        if (!alive) return;
+        const t = am.ctx.currentTime + 0.05;
+        const r = Math.random();
+        if (r < 0.35) { // drip, answered by the tiles
+          const f = 1300 + Math.random() * 500;
+          [0, 0.23, 0.47].forEach((d, i) => tone(am, out, t + d, { freq: f, dur: 0.05, vol: 0.035 / (i * 1.8 + 1), attack: 0.001 }));
+        } else if (r < 0.6) { // a long creak of old wood / a radiator ticking
+          tone(am, out, t, { freq: 95 + Math.random() * 40, slide: 70, type: 'sawtooth', dur: 0.9, vol: 0.012, attack: 0.25 });
+          noise(am, out, t, { type: 'bandpass', freq: 380, q: 9, dur: 0.8, vol: 0.02, attack: 0.3 });
+        } else if (r < 0.75) {
+          for (let i = 0; i < 5; i++) tone(am, out, t + i * (0.3 + Math.random() * 0.4), { freq: 2400, type: 'square', dur: 0.01, vol: 0.012 });
+        }
+        setTimeout(tick, 2500 + Math.random() * 5000);
+      };
+      tick();
+      return () => { alive = false; room(); };
+    },
+  },
+  /** Public address: chime, then a muffled voice through a ceiling speaker. */
+  'sfx.announce': {
+    bus: 'ambience', volume: 0.55,
+    synth: (am, out, t) => {
+      [784, 659, 523].forEach((f, i) => tone(am, out, t + i * 0.42, { freq: f, dur: 0.6, vol: 0.05, attack: 0.01 }));
+      let x = t + 1.6;
+      for (let w = 0; w < 14; w++) {
+        const d = 0.08 + Math.random() * 0.16;
+        noise(am, out, x, { type: 'bandpass', freq: 600 + Math.random() * 600, q: 5, dur: d, vol: 0.05, attack: 0.02 });
+        x += d + (Math.random() < 0.2 ? 0.25 : 0.04);
+      }
+    },
+  },
   'sfx.flatline': {
     bus: 'inner', volume: 0.25,
     loop(am, out) {

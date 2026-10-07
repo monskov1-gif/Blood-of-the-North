@@ -118,7 +118,9 @@ export class SafeZones {
     for (const m of f.meshes) {
       for (const mat of Array.isArray(m.material) ? m.material : [m.material]) {
         const b = mat.userData.fgBase;
-        mat.transparent = fade || b.transparent;
+        const tr = fade || b.transparent;
+        // three.js bakes "opaque" (alpha forced to 1) into the program: recompile when it flips
+        if (mat.transparent !== tr) { mat.transparent = tr; mat.needsUpdate = true; }
         mat.opacity = b.opacity * f.opacity;
         mat.depthWrite = fade ? false : b.depthWrite;
       }

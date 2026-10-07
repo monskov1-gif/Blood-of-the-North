@@ -3,6 +3,7 @@ import { Reflector } from 'three/addons/objects/Reflector.js';
 import { LocationBase, tiled } from '../LocationBase.js';
 import { streetTexture, canvasTexture, rng } from '../../render/textures.js';
 import { glow, lightPool } from '../props.js';
+import { installExpansion, X_END } from './HospitalExpansion.js';
 
 /**
  * Whitehorse General — ground floor, side-on cut-away. States: 'day' / 'night'.
@@ -495,7 +496,7 @@ export class HospitalScene extends LocationBase {
     this.camera = { distance: 8.0, height: 2.3, lookHeight: 1.3, lookZ: -1.0 };
     this.wardBOpen = false;
     const areas = [
-      { minX: -21.5, maxX: 21.4, minZ: -2.6, maxZ: 1.8 },          // main corridor
+      { minX: -21.5, maxX: X_END - 0.6, minZ: -2.6, maxZ: 1.8 },     // main corridor + patient wing + old wing
       { minX: -0.9, maxX: 0.9, minZ: -9.0, maxZ: -2.5 },            // side corridor
       { minX: -5.6, maxX: -3.4, minZ: -6.4, maxZ: -2.5 },           // procedure room
       { minX: 16.3, maxX: 20.8, minZ: -7.4, maxZ: -4.4 },           // ward 109 (Julian)
@@ -503,7 +504,7 @@ export class HospitalScene extends LocationBase {
       { minX: 9.2, maxX: 12.8, minZ: -7.4, maxZ: -4.4, enabled: () => this.wardBOpen },
       { minX: 9.55, maxX: 10.45, minZ: -4.6, maxZ: -2.5, enabled: () => this.wardBOpen },
     ];
-    this.bounds = { walk: { areas }, camera: { minX: -17.5, maxX: 17.5 } };
+    this.bounds = { walk: { areas }, camera: { minX: -17.5, maxX: X_END - 4.5 } };
     this._batches = new Map();
     this.nightOnly = [];   // [{ m: material, day, night }] opacity / emissive toggles
     this.moonFx = [];
@@ -604,12 +605,14 @@ export class HospitalScene extends LocationBase {
     this.anchors.wardBDoor = new THREE.Vector3(10.0, 1.9, BACK + 0.15);
     this.anchors.wardADoor = new THREE.Vector3(16.9, 1.9, BACK + 0.15);
 
+    this.buildExpansion(); // patient wing, old wing, operating area (HospitalExpansion.js)
+
     this.buildSignage();
     this.buildLights();
     this.buildForeground();
     this.flushBatches();
 
-    this.dustFx = this.dust(new THREE.Box3(new THREE.Vector3(-22, 0.3, -3.5), new THREE.Vector3(22, 2.8, 2)), 300);
+    this.dustFx = this.dust(new THREE.Box3(new THREE.Vector3(-22, 0.3, -3.5), new THREE.Vector3(X_END - 1, 2.8, 2)), 520);
     this.setState('day');
     // painted VN backdrop: ward 109 seen from the corridor
     this.shots = { ward: { pos: [18.4, 1.6, -1.4], look: [18.8, 1.15, -6.8], fov: 56 } };
@@ -655,7 +658,7 @@ export class HospitalScene extends LocationBase {
       { x0: 14.0, x1: 15.0, y0: 0, y1: 2.2 },     // staff-only door
     ];
     this.wall(-23, 23, H, BACK, wallMat, holes);
-    for (const x of [-23, 23]) this.plane(15, H, wallMat, x, H / 2, -2.5, x < 0 ? Math.PI / 2 : -Math.PI / 2);
+    this.plane(15, H, wallMat, -23, H / 2, -2.5, Math.PI / 2); // the far end is open: the corridor goes on (HospitalExpansion)
 
     // lower wall protection, rails, skirting, wall stripe, corner guards
     // wall dressing runs only between openings (it used to run across the doors)
@@ -1630,6 +1633,7 @@ export class HospitalScene extends LocationBase {
     if (this.sheen) this.sheen.material.uniforms.uStrength.value = night ? 0.42 : 0.2;
     this.setClocks(night ? 3 : 12, night ? 12 : 40);
     if (this.dustFx) this.dustFx.material.opacity = night ? 0.12 : 0.25;
+    for (const f of this.expNight || []) f(night);
   }
 
   /** Ward 107 door opens: warm light spills into the dark corridor. */
@@ -1655,6 +1659,7 @@ export class HospitalScene extends LocationBase {
 
   update(dt) {
     super.update(dt);
+    this.updateExpansion(dt);
     this.updateMonitors(dt, (m) => this.onBeat?.(m));
     if (this.wardBDoorTarget != null) {
       const h = this.wardB.hinge;
@@ -1676,3 +1681,5 @@ export class HospitalScene extends LocationBase {
     }
   }
 }
+
+installExpansion(HospitalScene, { TX, BACK, H, shaftTexture });

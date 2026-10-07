@@ -26,7 +26,7 @@ import { sleep } from './Director.js';
 
 export const CUSTODY_STAGES = ['car', 'station', 'interrogation', 'medical', 'hospital_day', 'hospital_evening', 'hospital_night', 'hospital_return', 'recovery', 'street'];
 
-const AMBIENCES = ['amb.crowd', 'amb.vent', 'amb.wind', 'amb.room', 'amb.morning', 'inner.breath', 'amb.siren', 'inner.drone', 'inner.ring',
+const AMBIENCES = ['amb.oldwing', 'amb.crowd', 'amb.vent', 'amb.wind', 'amb.room', 'amb.morning', 'inner.breath', 'amb.siren', 'inner.drone', 'inner.ring',
   'amb.car', 'amb.station', 'amb.interrogation', 'amb.hospital_day', 'amb.hospital_night', 'sfx.flatline'];
 
 const methods = {
@@ -214,6 +214,10 @@ const methods = {
     zones.addZone({ id: 'julian (key scene)', radius: 0.5, maxOcclusion: 0.34, priority: 3,
       get: () => jpos.copy(this.julian.root.getWorldPosition(jpos)).add(V(0, 0.9, 0)),
       active: () => g.mode === 'play' && (g.keyScene || !g.player.enabled) && this.julian.root.parent === world.root });
+    // free walk in the long hospital: a column or door post may cross Julian, but never hide him
+    if (world.id === 'hospital') zones.addZone({ id: 'julian (walk)', radius: 0.42, maxOcclusion: 0.55, priority: 1,
+      get: () => jpos.copy(this.julian.root.getWorldPosition(jpos)).add(V(0, 0.95, 0)),
+      active: () => g.mode === 'play' && g.player.enabled && !g.keyScene && this.julian.root.parent === world.root });
     zones.addZone({ id: 'focused interactable', radius: 0.32, maxOcclusion: 0.12, priority: 2,
       get: () => g.interactions.focused?.anchor || null, active: () => !!g.interactions.focused && g.world === world });
     const st = () => g.state.stage;
@@ -581,7 +585,13 @@ const methods = {
     // a second nurse behind the station counter, busy with charts
     const nurse2 = this.castIn(w, 'nurse2');
     nurse2.placeAt(6.2, -3.55, -1);
-    this.hospCast = { doc, psy, nurse, nurse2, patient };
+    // the rest of the floor goes on with its day: an orderly walks the long
+    // corridor into the old wing, a visitor waits by the window in the nook
+    const orderly = this.castIn(w, 'medic', 'orderly');
+    orderly.placeAt(44, -1.2, -1);
+    const visitor = this.castIn(w, 'patronA', 'visitor');
+    visitor.placeAt(32.25, -2.95, 1);
+    this.hospCast = { doc, psy, nurse, nurse2, patient, orderly, visitor };
     this.setAmbience(['amb.hospital_day']);
     w.onBeat = (m) => { if (m === w.wardA.mon && Math.abs(J.position.x - m.halo.getWorldPosition(new THREE.Vector3()).x) < 6) g.audio.play('sfx.beep', { volume: 0.35 }); };
     g.cameraSys.setShot({ x: 18.6, y: 1.7, z: 1.4, lookX: 18.6, lookY: 0.9, lookZ: -6.0, fov: 42 }, 1);
@@ -601,6 +611,7 @@ const methods = {
     this.hospT = 0;
     // the nurse makes rounds
     this.nurseRounds();
+    this.orderlyRounds();
     g.interactions.setItems(this.hospitalDayInteractables(w));
   },
 
@@ -613,6 +624,43 @@ const methods = {
       i = (i + 1) % spots.length;
       await n.walkTo(spots[i]);
       await sleep(3 + Math.random() * 5);
+    }
+  },
+
+  async orderlyRounds() {
+    const S = this.session;
+    const o = this.hospCast.orderly;
+    const spots = [{ x: 52.5, z: -1.4 }, { x: 40.5, z: -2.3 }, { x: 26.0, z: -1.7 }, { x: 46.0, z: -1.2 }];
+    let i = 0;
+    while (S === this.session && this.g.state.stage === 'hospital_day') {
+      await o.walkTo(spots[i]);
+      i = (i + 1) % spots.length;
+      await sleep(4 + Math.random() * 6);
+    }
+  },
+
+  /**
+   * Sound zones of the long ground floor: the old wing has its own hollow
+   * room tone (and the main hum thins out), the PA speaks now and then by day
+   * in the newer part. Steps echo in the old wing (see Game onStep → echoAt).
+   */
+  updateHospitalSound(dt) {
+    const g = this.g, a = g.audio;
+    if (!a.ready || g.world?.id !== 'hospital') return;
+    const st = g.state.stage;
+    if (!st.startsWith('hospital')) return;
+    const x = this.julian.position.x;
+    const old = Math.min(1, Math.max(0, (x - 36.5) / 2.5));
+    const night = g.world.night;
+    const v = Math.round(old * 20) / 20;
+    if (v !== this.oldWingV || !a.loops.has('amb.oldwing')) {
+      this.oldWingV = v;
+      a.loop('amb.oldwing', { fade: 2, volume: 0 })?.setVolume(v * (night ? 1.25 : 1), 1.2);
+      a.loops.get(night ? 'amb.hospital_night' : 'amb.hospital_day')?.setVolume(1 - v * 0.65, 1.2);
+    }
+    if (st === 'hospital_day' && g.player.enabled && !g.dialogue.busy) {
+      this.paT = (this.paT ?? 40) - dt;
+      if (this.paT <= 0) { this.paT = 70 + Math.random() * 80; a.play('sfx.announce', { volume: 1 - old * 0.75 }); }
     }
   },
 
@@ -657,7 +705,7 @@ const methods = {
     const J = this.julian;
     this.lieInBed(w.wardA.bedSpot);
     Object.assign(w.wardA.mon, { bpm: 50, flat: false, fault: false, off: false });
-    for (const c of ['doc', 'psy', 'nurse', 'nurse2']) this.hospCast?.[c]?.setVisible(false);
+    for (const c of ['doc', 'psy', 'nurse', 'nurse2', 'orderly', 'visitor']) this.hospCast?.[c]?.setVisible(false);
     const kow = this.castIn(w, 'quinn');
     kow.setPose('side'); // painted standing profile: she walks in and stands by the bed
     w.vnHide = [kow.root];
@@ -704,7 +752,7 @@ const methods = {
     w.wardA.iv.userData.tube.visible = true;
     const patient = this.castIn(w, 'patient');
     this.lieInBed.call({ julian: patient }, w.wardB.bedSpot);
-    for (const c of ['doc', 'psy', 'nurse', 'nurse2']) this.hospCast?.[c]?.setVisible(false);
+    for (const c of ['doc', 'psy', 'nurse', 'nurse2', 'orderly', 'visitor']) this.hospCast?.[c]?.setVisible(false);
     this.custodyCast.get('quinn')?.setVisible(false);
     if (g.world) g.world.vnHide = [];
     this.setAmbience(['amb.hospital_night']);
@@ -1061,6 +1109,7 @@ const methods = {
         g.dialogue.start('st_called');
       }
     }
+    this.updateHospitalSound(dt);
     // by day his drip rolls along with him (he tears it off at night)
     const iv = g.world?.wardA?.iv;
     if (iv) {

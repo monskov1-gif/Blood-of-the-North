@@ -15,6 +15,7 @@ import { InteractionSystem } from '../interaction/InteractionSystem.js';
 import { DialogueSystem } from '../dialogue/DialogueSystem.js';
 import { Director } from '../story/Director.js';
 import { Hallucination } from '../fx/Hallucination.js';
+import { WindowLight } from '../fx/WindowLight.js';
 import { HUD } from '../ui/HUD.js';
 import { DialogueView, preloadPortraits } from '../ui/DialogueView.js';
 import { TouchControls } from '../ui/TouchControls.js';
@@ -109,6 +110,7 @@ export class Game {
     this.director.registerAll(this.story.custodyCommands());
     this.interactions.setItems(this.story.interactables());
     this.view.bgProvider = (key) => this.story.paintBackground(key);
+    this.windowLight = new WindowLight({ renderer: this.renderer, settings: this.settings, canvas: this.renderer.canvas });
     this.hallucination = new Hallucination({
       renderer: this.renderer, audio: this.audio, cameraSys: this.cameraSys, scene: this.world,
       characters: this.characters, player: this.player, view: this.view, settings: this.settings,
@@ -120,7 +122,12 @@ export class Game {
           const dx = ch.position.x - this.cameraSys.camera.position.x;
           if (Math.abs(dx) < 7) this.audio.play('sfx.step', { volume: 0.25, pan: Math.max(-1, Math.min(1, dx / 7)) });
         }
-        if (ch === this.story.julian && ch.stepAcc % 22 === 0) this.audio.play('sfx.step', { volume: 0.6 });
+        if (ch === this.story.julian && ch.stepAcc % 22 === 0) {
+          this.audio.play('sfx.step', { volume: 0.6 });
+          // hard old floors and high ceilings answer back
+          const echo = this.world.echoAt?.(ch.position.x) || 0;
+          if (echo > 0.05) this.audio.play('sfx.step', { volume: 0.22 * echo, delay: 0.17, rate: 0.92 });
+        }
       };
     }
 
@@ -426,6 +433,7 @@ export class Game {
       this.hud.update(this.cameraSys.camera);
       // the dialogue screen covers everything: skip the 3D render to save power
       const covered = this.view.mode === 'vn' && !this.view.vn.classList.contains('hidden') && this.view.vn.classList.contains('show');
+      this.windowLight.update(dt, { world: this.world, julian: this.story.julian, camera: this.cameraSys.camera, keyScene: this.keyScene, active: this.mode === 'play' && !covered });
       if (!covered || this.frame % 20 === 0) this.renderer.render(dt);
     };
     requestAnimationFrame(tick);
