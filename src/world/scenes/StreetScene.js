@@ -7,7 +7,7 @@ import { skyTex, mountainTex, treeTex, townTex, roadTex } from './PoliceCarScene
 
 /**
  * Outside Whitehorse General: the hospital's main entrance on a grey winter
- * day after a snowfall. Side-on, like every other location.
+ * late-October day with the first thin snow. Side-on, like every other location.
  *   x -20 … -9.5  neighbouring lot: houses, spruce, a power pole, the hills
  *   x  -9 …  4.5  main block (2 storeys): canopy, sliding doors, lit lobby
  *   x  4.5 … 22   one-storey wing: ramp to a staff door, bike rack, ER bay
@@ -55,15 +55,17 @@ const paverTex = () => PX('pavers', 32, 32, (ctx, w, h) => {
   for (let i = 0; i < 6; i++) { ctx.fillStyle = 'rgba(220,226,234,0.5)'; ctx.fillRect(r() * w, r() * h, 3 + r() * 5, 2 + r() * 3); }
 });
 
-/** Fresh snow: blue-white, crusty, glints. */
+/** Late autumn ground: dead grass and earth, the first snow in thin patches, leaves. */
 const snowTex = () => PX('snow', 64, 64, (ctx, w, h) => {
   const r = rng(44);
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-    const n = (r() - 0.5) * 8 + Math.sin(x * 0.2 + y * 0.13) * 3;
-    ctx.fillStyle = rgb(226 + n, 232 + n, 240 + n); ctx.fillRect(x, y, 1, 1);
+    const n = (r() - 0.5) * 14 + Math.sin(x * 0.2 + y * 0.13) * 4;
+    ctx.fillStyle = rgb(120 + n, 106 + n, 80 + n * 0.8); ctx.fillRect(x, y, 1, 1);
   }
-  for (let i = 0; i < 60; i++) { ctx.fillStyle = 'rgba(160,176,196,0.25)'; ctx.fillRect(r() * w, r() * h, 2 + r() * 3, 1); }
-  for (let i = 0; i < 30; i++) { ctx.fillStyle = '#ffffff'; ctx.fillRect(r() * w, r() * h, 1, 1); }
+  for (let i = 0; i < 90; i++) { ctx.fillStyle = r() < 0.5 ? 'rgba(160,140,96,0.8)' : 'rgba(84,74,56,0.7)'; ctx.fillRect(r() * w, r() * h, 1, 2 + r() * 2); }
+  for (let i = 0; i < 26; i++) { ctx.fillStyle = `rgba(236,240,244,${0.55 + r() * 0.4})`; ctx.fillRect(r() * w, r() * h, 2 + r() * 6, 1 + r() * 2); }
+  const leaf = ['#d8a020', '#c86a1c', '#b8401c', '#e0b830'];
+  for (let i = 0; i < 22; i++) { ctx.fillStyle = leaf[i % 4]; ctx.fillRect(r() * w, r() * h, 2, 1); }
 });
 
 /** Window interiors: 0 dark glass reflecting sky, 1 lit ward with blinds, 2 lit office, 3 warm curtains. */
@@ -140,9 +142,65 @@ export class StreetScene extends LocationBase {
     this.buildProps();
     this.buildForeground();
     this.flushLumps();
+    this.buildAutumn();
     this.buildAtmosphere();
     this.anchors.door = { x: -1.0, z: -2.4 };
     return this.root;
+  }
+
+  /**
+   * Late October: the snow boxes (sills, rails, roofs, cars) become a thin
+   * dusting, and half-bare birches and aspens with the last yellow/orange
+   * leaves stand among the spruces; leaves on the ground.
+   */
+  buildAutumn() {
+    const thin = new Set(['sillSnow', 'snowGround2'].map((k) => this.mats.cache.get(k)).filter(Boolean));
+    this.root.traverse((o) => {
+      if (!o.isMesh || !thin.has(o.material) || !o.geometry.parameters?.height) return;
+      const h = o.geometry.parameters.height * o.scale.y;
+      o.scale.y *= 0.3;
+      o.position.y -= h * 0.35; // keep it sitting on what it lay on
+    });
+    const r = rng(81);
+    const bark = this.mat('birchBark', { color: 0xe2ded4, roughness: 0.8 });
+    const twig = this.mat('birchTwig', { color: 0x4a3c34, roughness: 0.9 });
+    const leafCols = [0xd8a020, 0xe0b830, 0xc86a1c, 0xb8401c];
+    const leafGeo = new THREE.PlaneGeometry(0.09, 0.07);
+    const leafMats = leafCols.map((c, i) => this.mat(`leaf${i}`, { color: c, roughness: 0.8, side: THREE.DoubleSide }));
+    const leaves = leafMats.map(() => []);
+    const tree = (x, z, s) => {
+      const g = new THREE.Group();
+      this.B(0.12, 3.2, 0.12, bark, 0, 1.6, 0, g);
+      const tips = [];
+      for (let k = 0; k < 7; k++) {
+        const y = 1.5 + k * 0.28, side = k % 2 ? 1 : -1, L = 0.9 - k * 0.08;
+        const b = this.B(0.04, L, 0.04, twig, side * L * 0.32, y + L * 0.35, (r() - 0.5) * 0.3, g);
+        b.rotation.z = -side * 0.75;
+        tips.push([side * L * 0.62, y + L * 0.7, b.position.z]);
+      }
+      tips.push([0, 3.3, 0]);
+      g.position.set(x, 0, z); g.scale.setScalar(s);
+      this.root.add(g);
+      // the last leaves: small clusters on about half the branch tips
+      for (const [tx, ty, tz] of tips) {
+        if (r() < 0.45) continue;
+        for (let k = 0; k < 7; k++) leaves[Math.floor(r() * 4)].push([x + (tx + (r() - 0.5) * 0.4) * s, (ty + (r() - 0.5) * 0.35) * s, z + tz * s + (r() - 0.5) * 0.3]);
+      }
+      for (let k = 0; k < 18; k++) leaves[Math.floor(r() * 4)].push([x + (r() - 0.5) * 2.4, 0.02, z + (r() - 0.5) * 1.6, true]);
+    };
+    for (const [x, z, s] of [[-8.2, -4.6, 1.1], [12.6, -4.2, 1.0], [17.4, -6.2, 1.3], [-19.0, -5.2, 1.2], [8.2, -6.5, 0.9]]) tree(x, z, s);
+    // leaves blown onto the sidewalk and the plaza
+    for (let k = 0; k < 60; k++) leaves[k % 4].push([-14 + r() * 30, 0.012, -2.4 + r() * 4.6, true]);
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
+    leaves.forEach((list, i) => {
+      if (!list.length) return;
+      const im = new THREE.InstancedMesh(leafGeo, leafMats[i], list.length);
+      list.forEach(([x, y, z, flat], j) => {
+        q.setFromEuler(e.set(flat ? -Math.PI / 2 : r() * 6, r() * 6, r() * 6));
+        m4.compose(new THREE.Vector3(x, y, z), q, new THREE.Vector3(1, 1, 1)); im.setMatrixAt(j, m4);
+      });
+      this.root.add(im);
+    });
   }
 
   /** Queue a low-poly snow lump (all merged into one InstancedMesh). */
@@ -155,9 +213,10 @@ export class StreetScene extends LocationBase {
     const r = rng(list.length + 7);
     for (let i = 0; i < p.count; i++) { const k = 1 + (r() - 0.5) * 0.08; p.setXYZ(i, p.getX(i) * k, Math.max(-0.3, p.getY(i)) * k, p.getZ(i) * k); }
     geo.computeVertexNormals();
-    const im = new THREE.InstancedMesh(geo, this.mat('snowLump', { color: 0xe8eef6, roughness: 1 }), list.length);
+    const im = new THREE.InstancedMesh(geo, this.mat('snowLump', { color: 0xc4c8cc, roughness: 0.5 }), list.length);
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
-    list.forEach(([x, y, z, sx, sy, sz, ry], i) => { q.setFromEuler(e.set(0, ry, 0)); m.compose(new THREE.Vector3(x, y, z), q, new THREE.Vector3(sx, sy, sz)); im.setMatrixAt(i, m); });
+    // late autumn: what was a plowed bank is a low line of slush
+    list.forEach(([x, y, z, sx, sy, sz, ry], i) => { q.setFromEuler(e.set(0, ry, 0)); m.compose(new THREE.Vector3(x, y, z), q, new THREE.Vector3(sx, sy * 0.28, sz)); im.setMatrixAt(i, m); });
     if (name) im.name = name;
     parent.add(im);
     return im;
@@ -207,7 +266,7 @@ export class StreetScene extends LocationBase {
     for (let k = 0; k < 5; k++) {
       const rr = (1.25 - k * 0.22), y = 0.9 + k * 0.85;
       const c = new THREE.Mesh(new THREE.ConeGeometry(rr, 1.5, 7), needles); c.position.y = y; c.rotation.y = k; g.add(c);
-      const sn = new THREE.Mesh(new THREE.ConeGeometry(rr * 0.78, 0.38, 7), snow); sn.position.y = y + 0.42; sn.rotation.y = k; g.add(sn);
+      if (k === 4) { const sn = new THREE.Mesh(new THREE.ConeGeometry(rr * 0.5, 0.2, 7), snow); sn.position.y = y + 0.62; sn.rotation.y = k; g.add(sn); }
     }
     g.position.set(x, 0, z); g.scale.setScalar(s);
     parent.add(g);
@@ -322,6 +381,7 @@ export class StreetScene extends LocationBase {
       m.makeScale(1, L, 1); m.setPosition(x, MAIN_H - L / 2, FZ + 0.2); m.multiply(new THREE.Matrix4().makeRotationX(Math.PI));
       icicles.setMatrixAt(i, m);
     }
+    icicles.visible = false; // late October: too early for icicles (kept for a winter state)
     root.add(icicles);
     // main sign: raised letters on a dark band, backlit halo
     const sign = this.textSign('WHITEHORSE GENERAL HOSPITAL', { w: 4.8, h: 0.42, bg: '#123048', fg: '#f4f8fa', emissive: 0.35 });
@@ -422,7 +482,7 @@ export class StreetScene extends LocationBase {
     }
     const ice = this.mat('ice', { color: 0xdfeefa, roughness: 0.1, transparent: true, opacity: 0.85 });
     const r = rng(63);
-    for (let i = 0; i < 14; i++) { const L = 0.08 + r() * 0.25; const c = new THREE.Mesh(new THREE.ConeGeometry(0.025, L, 4), ice); c.rotation.x = Math.PI; c.position.set(-3.5 + r() * 5, 2.81 - L / 2, FZ + 2.58); root.add(c); }
+    // (no icicles under the canopy in late October)
     // warm pool on the plaza under the canopy + lobby spill
     this.pool(0xffe4c0, -1.0, FZ + 1.5, 5.0, 3.0, 0.22);
     this.pool(0xe8f0ff, -1.0, FZ + 0.6, 3.2, 1.6, 0.25);
@@ -614,7 +674,8 @@ export class StreetScene extends LocationBase {
 
   buildAtmosphere() {
     const root = this.root;
-    this.snow = new Snow(new THREE.Box3(new THREE.Vector3(-14, 0, -3), new THREE.Vector3(14, 7, 4.5)), this.low ? 400 : 1000);
+    // a light first snowfall, not a winter storm
+    this.snow = new Snow(new THREE.Box3(new THREE.Vector3(-14, 0, -3), new THREE.Vector3(14, 7, 4.5)), this.low ? 120 : 260);
     root.add(this.snow.points);
     this.animated.push(this.snow);
     // steam plumes (normal-blended soft sprites; additive would vanish against the sky)

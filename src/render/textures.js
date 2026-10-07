@@ -525,6 +525,7 @@ export function streetTexture(time = 'night', view = 'bar') {
     // verge: dead grass, first snow in patches, leaves; the wet road with slush in the ruts
     autumnGround(ctx, r, 0, ground - 6, w, h * 0.86 - ground + 6, night, 0.55);
     ctx.fillStyle = night ? '#1c2028' : '#5a5e64'; ctx.fillRect(0, h * 0.86, w, h * 0.07);
+    autumnGround(ctx, r, 0, h * 0.93, w, h * 0.07, night, 0.4); // the near verge
     ctx.fillStyle = night ? 'rgba(140,150,170,0.35)' : 'rgba(210,214,220,0.6)';
     ctx.fillRect(0, h * 0.862, w, 4); ctx.fillRect(0, h * 0.89, w, 5); ctx.fillRect(0, h * 0.925, w, 4);
     ctx.fillStyle = night ? 'rgba(30,34,44,0.6)' : 'rgba(70,74,82,0.5)';

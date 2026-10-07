@@ -211,7 +211,20 @@ export const treeTex = () => PX('trees', 256, 64, (ctx, w, h) => {
       }
     }
   }
-  ctx.fillStyle = '#c4ccd4'; ctx.fillRect(0, h - 6, w, 6);
+  // late autumn: birches and aspens, half bare, the last yellow/orange leaves
+  const leaf = ['#d8a020', '#e0b830', '#c86a1c', '#b8401c'];
+  for (let i = 0; i < 26; i++) {
+    const x = Math.floor(r() * w), base = Math.round(h * 0.66 + r() * 6), H = 12 + Math.floor(r() * 14);
+    ctx.fillStyle = i % 2 ? '#d8d4ca' : '#8a8478'; ctx.fillRect(x, base - H, 1, H);
+    for (let k = 0; k < 8; k++) { ctx.fillStyle = '#4a4038'; ctx.fillRect(x + Math.round((r() - 0.5) * 6), base - H + Math.floor(r() * H * 0.6), 1, 1); }
+    for (let k = 0; k < 6 + r() * 8; k++) { ctx.fillStyle = leaf[Math.floor(r() * 4)]; ctx.fillRect((x + Math.round((r() - 0.5) * 7) + w) % w, base - H + Math.floor(r() * H * 0.55), 1, 1); }
+  }
+  // the verge: dead grass with the first snow in patches
+  for (let x = 0; x < w; x++) for (let y = h - 6; y < h; y++) {
+    const snowy = r() < 0.35;
+    const v = snowy ? 220 + r() * 25 : 0;
+    ctx.fillStyle = snowy ? rgb(v, v + 3, v + 8) : rgb(122 + r() * 20, 108 + r() * 16, 80 + r() * 12); ctx.fillRect(x, y, 1, 1);
+  }
 });
 
 /** Whitehorse: clapboard houses, shops with lit windows, a log "skyscraper". */
@@ -225,11 +238,10 @@ export const townTex = () => PX('town', 256, 128, (ctx, w, h) => {
     ctx.fillStyle = '#d8dde2'; ctx.fillRect(x - 1, y - 1, ww + 2, wh + 2);
     ctx.fillStyle = l || '#2a3440'; ctx.fillRect(x, y, ww, wh);
     if (l) { ctx.fillStyle = 'rgba(120,50,30,0.6)'; ctx.fillRect(x, y, 1, wh); ctx.fillStyle = 'rgba(255,200,120,0.18)'; ctx.fillRect(x - 3, y - 3, ww + 6, wh + 6); }
-    ctx.fillStyle = '#f2f5f8'; ctx.fillRect(x - 1, y + wh + 1, ww + 2, 1);
   };
   const snowRoof = (x0, x1, y) => {
-    ctx.fillStyle = '#f0f3f6'; ctx.fillRect(x0 - 1, y - 2, x1 - x0 + 2, 3);
-    for (let x = x0; x < x1; x += 2 + Math.floor(r() * 3)) { ctx.fillStyle = 'rgba(230,240,250,0.9)'; ctx.fillRect(x, y + 1, 1, 1 + Math.floor(r() * 3)); }
+    // first snow: a thin broken line on the eaves
+    for (let x = x0 - 1; x < x1 + 1; x++) if (r() < 0.6) { ctx.fillStyle = 'rgba(236,240,244,0.85)'; ctx.fillRect(x, y - 1, 1, 1); }
   };
   const smoke = (x, y) => { for (let k = 0; k < 6; k++) { ctx.fillStyle = `rgba(226,230,236,${0.38 - k * 0.05})`; ctx.beginPath(); ctx.arc(x + k * 2 + Math.sin(k) * 2, y - k * 5, 2 + k, 0, Math.PI * 2); ctx.fill(); } };
   const house = (x, bw, bh, wall) => {
@@ -240,7 +252,7 @@ export const townTex = () => PX('town', 256, 128, (ctx, w, h) => {
     const peak = Math.round(bw * 0.38);
     for (let k = 0; k <= peak; k++) {
       const half = Math.round((bw / 2 + 3) * (k / peak));
-      ctx.fillStyle = k < 3 ? '#eef2f6' : '#3c3e44'; ctx.fillRect(x + bw / 2 - half, y - peak + k, half * 2, 1);
+      ctx.fillStyle = k < 1 ? '#d8dde2' : '#3c3e44'; ctx.fillRect(x + bw / 2 - half, y - peak + k, half * 2, 1);
     }
     snowRoof(x - 3, x + bw + 3, y);
     const cols = Math.max(1, Math.floor((bw - 6) / 10));
@@ -286,9 +298,10 @@ export const townTex = () => PX('town', 256, 128, (ctx, w, h) => {
   ];
   const widths = [34, 46, 30, 18, 44, 36, 40];
   plan.forEach((f, i) => { f(); x += widths[i] + 4 + Math.floor(r() * 3); });
-  // sidewalk snow, plowed lumps
-  ctx.fillStyle = '#e6ebf0'; ctx.fillRect(0, G, w, h - G);
-  for (let i = 0; i < 30; i++) { ctx.fillStyle = '#f4f7fa'; ctx.fillRect(r() * w, G - 1 - r() * 2, 3 + r() * 6, 2); }
+  // wet sidewalk, slush at the edges, fallen leaves
+  ctx.fillStyle = '#6a6e74'; ctx.fillRect(0, G, w, h - G);
+  for (let i = 0; i < 40; i++) { ctx.fillStyle = 'rgba(220,226,232,0.7)'; ctx.fillRect(r() * w, G + (r() < 0.5 ? 0 : h - G - 1), 2 + r() * 4, 1); }
+  for (let i = 0; i < 30; i++) { ctx.fillStyle = ['#c88a20', '#b8501c', '#d8b030'][i % 3]; ctx.fillRect(r() * w, G + r() * (h - G), 1, 1); }
 });
 
 export const roadTex = () => PX('road', 64, 64, (ctx, w, h) => {
@@ -311,9 +324,11 @@ export const bankTex = () => PX('bank', 256, 32, (ctx, w, h) => {
     const top = Math.round(8 + Math.sin(x * 0.09) * 3 + Math.sin(x * 0.31) * 2 + (r() < 0.1 ? -1 : 0));
     for (let y = top; y < h; y++) {
       const k = (y - top) / (h - top);
-      let v = 238 - k * 40 + (r() - 0.5) * 10;
-      let c = rgb(v, v + 4, v + 12);
-      if (k > 0.65 && r() < 0.5) c = rgb(120 + r() * 30, 116 + r() * 26, 110 + r() * 20); // plow spray, grit
+      // the verge in late autumn: dead grass and earth, first snow in thin patches
+      const snowy = r() < 0.3 * (1 - k);
+      let v = 230 - k * 30 + (r() - 0.5) * 10;
+      let c = snowy ? rgb(v, v + 4, v + 10) : rgb(110 + r() * 26 - k * 30, 98 + r() * 20 - k * 26, 72 + r() * 14 - k * 20);
+      if (!snowy && r() < 0.04) c = ['#c88a20', '#b8501c', '#d8b030'][Math.floor(r() * 3)];
       ctx.fillStyle = c; ctx.fillRect(x, y, 1, 1);
     }
   }
@@ -373,6 +388,7 @@ export class PoliceCarScene extends LocationBase {
     this.car.scale.set(SX, SY, 1);
     this.buildOutside();
     this.buildMatte();
+    this.buildBodySection();
     this.buildLighting();
 
     const P = (x, y, z) => new THREE.Vector3(x * SX, y * SY, z);
@@ -407,6 +423,38 @@ export class PoliceCarScene extends LocationBase {
 
   /** Cabin x (as modelled) → world x. */
   cx(x) { return x * CAR_SX; }
+
+  /**
+   * The cut face of the body on the near side, as one dark sedan section: a
+   * rounded roof that falls to the rear glass and the windscreen, a short trunk
+   * and hood. Only the cabin opening is cut out of it, so the car reads as a car
+   * and nothing of the cabin set shows outside its silhouette.
+   */
+  buildBodySection() {
+    const outer = [
+      [-2.02, 0.1], [-2.1, 0.5], [-2.06, 0.88], [-1.9, 0.98], [-1.62, 1.04],
+      [-1.38, 1.22], [-1.16, 1.4], [-0.96, 1.52], [-0.7, 1.58], [0.55, 1.58], [0.8, 1.55],
+      [1.0, 1.47], [1.3, 1.25], [1.68, 1.0], [2.0, 0.95], [2.3, 0.9], [2.42, 0.78], [2.44, 0.45], [2.38, 0.1],
+    ];
+    const inner = [
+      [-1.56, 0.2], [-1.56, 0.98], [-1.3, 1.18], [-1.1, 1.34], [-0.92, 1.44], [-0.68, 1.49],
+      [0.55, 1.49], [0.76, 1.46], [0.95, 1.38], [1.25, 1.18], [1.6, 0.96], [1.6, 0.2],
+    ];
+    const shape = new THREE.Shape(outer.map(([x, y]) => new THREE.Vector2(x, y)));
+    shape.holes.push(new THREE.Path(inner.map(([x, y]) => new THREE.Vector2(x, y))));
+    const mat = new THREE.MeshBasicMaterial({ color: 0x0f1013 }); mat.userData.noLightingState = true;
+    const sec = new THREE.Mesh(new THREE.ShapeGeometry(shape, 8), mat);
+    sec.position.z = 0.36; sec.renderOrder = 2;
+    this.root.add(sec);
+    // a thin cold rim along the outer line (street light on the paint) so the
+    // silhouette reads against the black
+    const rim = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(outer.map(([x, y]) => new THREE.Vector3(x, y, 0.37))),
+      new THREE.LineBasicMaterial({ color: 0x3c4654 }));
+    this.root.add(rim);
+    const innerRim = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(inner.map(([x, y]) => new THREE.Vector3(x, y, 0.37))),
+      new THREE.LineBasicMaterial({ color: 0x23272e }));
+    this.root.add(innerRim);
+  }
 
   /** Black all around the body, open only where the side windows are. */
   buildMatte() {
@@ -513,7 +561,7 @@ export class PoliceCarScene extends LocationBase {
   // ---------------------------------------------------------------- rear compartment
 
   buildRear() {
-    const bench = this.pmat('carBench', benchTex(), { roughness: 0.45, metalness: 0.05 });
+    const bench = this.pmat('carBench', benchTex(), { roughness: 0.45, metalness: 0.05, color: 0xc8ccd4 });
     const trim = this.pmat('carTrim', trimTex());
     const dark = this.mat('carDark', { color: 0x141518, roughness: 0.7 });
     const steel = this.mat('steel', { color: 0x9aa0a6, metalness: 0.9, roughness: 0.3 });
@@ -801,7 +849,7 @@ export class PoliceCarScene extends LocationBase {
         const tx = S * 0.25, tz = -6.8;
         for (let k = 0; k < 4; k++) {
           const c = new THREE.Mesh(new THREE.ConeGeometry(1.0 - k * 0.2, 1.6, 7), spruce); c.position.set(tx, ROAD + 1.3 + k * 0.9, tz); g.add(c);
-          const s = new THREE.Mesh(new THREE.ConeGeometry(0.75 - k * 0.17, 0.45, 7), snowy); s.position.set(tx, ROAD + 1.95 + k * 0.9, tz); g.add(s);
+          if (k === 3) { const s = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.18, 7), snowy); s.position.set(tx, ROAD + 2.15 + k * 0.9, tz); g.add(s); } // a little first snow on the tip
         }
       } else {
         // a road sign
@@ -902,7 +950,10 @@ export class PoliceCarScene extends LocationBase {
     front.position.set(1.15, 1.3, -0.5);
     const dash = new THREE.PointLight(0x5a9ac8, 3, 2.2, 1.6);
     dash.position.set(1.85, 1.3, -0.45);
-    root.add(hemi, day, fill, front, dash);
+    // cool light from the driver's window, behind her: a rim on head and shoulders
+    const rimL = new THREE.PointLight(0xa8c0e0, 2.4, 1.6, 1.6);
+    rimL.position.set(0.9, 1.3, -1.2);
+    root.add(hemi, day, fill, front, dash, rimL);
     this.lights = { hemi, day, fill, front, dash };
 
     // window light patches on seats/floor (fake bounce) + a travelling sweep

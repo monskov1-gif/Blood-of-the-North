@@ -47,7 +47,7 @@ export const CHARACTERS = {
   },
   radio: { id: 'radio', name: 'Рация', nameEn: 'RADIO', poses: { idle: 'officer_seat' } },
   // --- custody / station / hospital cast
-  driver: { id: 'driver', name: 'Куинн Торрес', nameEn: 'QUINN TORRES', portrait: 'quinn', poses: { idle: 'quinn_drive' } },
+  driver: { id: 'driver', name: 'Куинн Торрес', nameEn: 'QUINN TORRES', portrait: 'quinn', poses: { idle: 'quinn_drive' }, selfLight: 0xa49a92 },
   sergeant: { id: 'sergeant', name: 'Сержант Пелли', nameEn: 'SGT. PELLY', poses: { idle: 'officer_b', walk: 'officer_b' }, speed: 1.3 },
   // Wyatt Nicholas Lewis — Julian doesn't know him; his name is never put on screen
   interrogator: { id: 'interrogator', name: 'Офицер', nameEn: 'OFFICER', portrait: 'wyatt', poses: { idle: 'wyatt_side', sit: 'wyatt_seat' }, speed: 1.4 },
