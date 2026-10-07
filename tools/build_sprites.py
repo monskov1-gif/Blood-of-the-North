@@ -774,6 +774,22 @@ else:
         return out
     frames['quinn_drive'] = quinn_seated()
 
+
+
+def quantize(a, n=24):
+    """Flatten soft painted shading into a small palette (the chunky pixel
+    register of Julian's sprites); alpha is kept as it is."""
+    rgb = Image.fromarray(a[..., :3].clip(0, 255).astype(np.uint8), 'RGB')
+    q = np.asarray(rgb.quantize(colors=n, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE).convert('RGB')).astype(float)
+    out = a.copy()
+    m = a[..., 3] > 0
+    out[..., :3][m] = q[m]
+    return out
+
+
+# the driver was painted smooth: same flat-shaded register as the back seat
+frames['quinn_drive'] = quantize(frames['quinn_drive'], 22)
+
 # ---------------------------------------------------------------- walk cycle
 WALK_HIP = 112
 
