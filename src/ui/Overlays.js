@@ -1,6 +1,19 @@
 import { el, wait } from './dom.js';
 import { VERSION } from '../version.js';
 
+/** Cinematic bars (top and bottom) for key moments. */
+export class Letterbox {
+  constructor(root) {
+    this.el = el('div', 'letterbox', root);
+    el('div', 'lb-top', this.el); el('div', 'lb-bot', this.el);
+  }
+
+  set(on, ms = 900) {
+    this.el.style.setProperty('--lb', `${ms}ms`);
+    this.el.classList.toggle('on', on);
+  }
+}
+
 export class Fader {
   constructor(root) { this.el = el('div', 'fader', root); }
 

@@ -21,7 +21,7 @@ import { HUD } from '../ui/HUD.js';
 import { DialogueView, preloadPortraits } from '../ui/DialogueView.js';
 import { TouchControls } from '../ui/TouchControls.js';
 import { MainMenu, Panels } from '../ui/Menus.js';
-import { Fader, PhoneView, Insert, EndingScreen, PortraitFlash, Card } from '../ui/Overlays.js';
+import { Fader, PhoneView, Insert, EndingScreen, PortraitFlash, Card, Letterbox } from '../ui/Overlays.js';
 import { el } from '../ui/dom.js';
 import { SCENES, LOCATIONS } from '../world/scenes/index.js';
 import { DIALOGUES } from '../../data/dialogue/index.js';
@@ -84,6 +84,7 @@ export class Game {
     // UI
     const root = document.getElementById('ui');
     this.fader = new Fader(root);
+    this.letterbox = new Letterbox(root);
     this.fader.set(true);
     this.view = new DialogueView({ root, bus: this.bus, settings: this.settings, input: this.input, audio: this.audio, state: this.state });
     this.hud = new HUD({ root, bus: this.bus, input: this.input, state: this.state });
@@ -318,10 +319,17 @@ export class Game {
     this.hallucination.reset();
     this.story.resetPositions();
     this.story.julian.setVisible(false);
-    this.cameraSys.setShot({ x: 3.2, y: 2.3, z: 10.5, lookX: 1.5, lookY: 1.6, lookZ: -2, fov: 30 }, 1);
+    // the menu shows the place the player's autosave is in (the bar for a fresh start)
+    const place = await this.titlePlace();
+    this.titleView = place;
+    if (place.id === 'bar') {
+      this.cameraSys.setShot({ x: 3.2, y: 2.3, z: 10.5, lookX: 1.5, lookY: 1.6, lookZ: -2, fov: 30 }, 1);
+      this.story.startAmbient();
+    } else {
+      this.cameraSys.setShot(this.titleShot(0), 1);
+    }
     this.cameraSys.snap();
     this.renderer.setLayer('menu', { blur: 0.35, exposure: -0.18, vignette: 0.25 });
-    this.story.startAmbient();
     if (first) {
       await this.fader.to(false, 1600);
       this.tapToStart();
@@ -370,6 +378,7 @@ export class Game {
     this.renderer.clearLayer('menu');
     this.hallucination.reset();
     await this.returnToBar();
+    this.titleView = null;
     this.mode = 'play';
     this.story.julian.setVisible(true);
   }
@@ -445,9 +454,48 @@ export class Game {
   titleDrift(dt) {
     this.titleT = (this.titleT || 0) + dt;
     const t = this.titleT * 0.05;
+    if (this.titleView && this.titleView.id !== 'bar') { this.cameraSys.setShot(this.titleShot(t), 0.5); return; }
     this.cameraSys.setShot({ x: 1.5 + Math.sin(t) * 4.5, y: 2.3 + Math.sin(t * 1.7) * 0.15, z: 10.5, lookX: 1.5 + Math.sin(t) * 4.8, lookY: 1.6, lookZ: -2, fov: 30 }, 0.5);
   }
+
+  /** Where the autosave stands: the location (and its light) the title screen opens on. */
+  async titlePlace() {
+    const auto = this.saves.read('auto');
+    const stage = auto?.state?.stage;
+    const place = TITLE_PLACES[stage] || { id: 'bar' };
+    if (place.id !== 'bar') {
+      try {
+        await this.setLocation(place.id, { state: place.state });
+        this.story.stopAmbient?.();
+        for (const c of this.world.root.children) if (c.userData?.character) c.visible = false;
+      } catch (e) { console.warn('title place', e); await this.returnToBar(); return { id: 'bar' }; }
+    }
+    return place;
+  }
+
+  /** A slow drift along the location's camera path, a little higher and wider than in play. */
+  titleShot(t) {
+    const w = this.world, cam = w.camera || {};
+    const { minX = 0, maxX = 0 } = w.bounds.camera || {};
+    const span = Math.min(4.5, (maxX - minX) / 2);
+    const cx = this.titleView?.x ?? (minX + maxX) / 2;
+    const x = cx + Math.sin(t) * span;
+    const dist = (cam.distance ?? 8) * 1.15, h = (cam.height ?? 2.2) + 0.25;
+    return { x, y: h + Math.sin(t * 1.7) * 0.1, z: (cam.lookZ ?? -1) + dist, lookX: x + Math.sin(t) * 0.3, lookY: cam.lookHeight ?? 1.3, lookZ: cam.lookZ ?? -1, fov: (cam.fov ?? 32) + 2 };
+  }
 }
+
+// autosave stage → the location shown behind the main menu
+const TITLE_PLACES = {
+  morning: { id: 'bar' },
+  car: { id: 'car' },
+  station: { id: 'station' }, interrogation: { id: 'interrogation' },
+  medical: { id: 'hospital', state: 'day', x: 4 }, hospital_day: { id: 'hospital', state: 'day', x: 18 },
+  hospital_evening: { id: 'hospital', state: 'day', x: 18 }, hospital_night: { id: 'hospital', state: 'night', x: 18 },
+  hospital_return: { id: 'hospital', state: 'night', x: 18 }, recovery: { id: 'hospital', state: 'day', x: 18 },
+  street: { id: 'street' },
+  station_return: { id: 'station' }, forest: { id: 'forest', state: 'day' }, forest_night: { id: 'forest', state: 'night' },
+};
 
 const INTERACTIVE_STAGES = new Set(['explore', 'morning', 'car', 'station', 'interrogation', 'hospital_day', 'hospital_night', 'hospital_return']);
 

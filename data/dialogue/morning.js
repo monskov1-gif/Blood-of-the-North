@@ -35,8 +35,9 @@ export const DIALOGUES = {
   m_body_bar: {
     mode: 'bark',
     nodes: {
-      a: { speaker: 'thought', text: 'Мужчина у стойки. Кожа белая, как воск.' },
-      b: { speaker: 'thought', text: 'Крови нет. Ни капли — ни на нём, ни на полу.', set: { m_body_bar: true } },
+      a: { speaker: 'thought', text: 'Крис. Так и сидит на своём табурете, будто задремал над стаканом.' },
+      b: { speaker: 'thought', text: '«Есть разговор. Не здесь». Теперь уже никогда.' },
+      c: { speaker: 'thought', text: 'Кожа белая, как воск. Крови нет. Ни капли — ни на нём, ни на полу.', set: { m_body_bar: true, chris_dead: true } },
     },
   },
   m_body_window: {

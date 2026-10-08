@@ -33,6 +33,16 @@ def pixelize(rgba, scale):
     # drop isolated specks (single pixels with no opaque neighbours)
     n = nd.convolve(keep.astype(int), np.ones((3, 3), int), mode='constant') - keep
     keep &= n >= 2
+    # light matting fringe: an edge pixel much lighter than the figure just inside it goes
+    lum = rgb[..., 0] * 0.3 + rgb[..., 1] * 0.59 + rgb[..., 2] * 0.11
+    for _ in range(2):
+        inner = nd.binary_erosion(keep)
+        edge = keep & ~inner
+        k3 = np.ones((3, 3))
+        s_in = nd.convolve(np.where(inner, lum, 0), k3, mode='constant')
+        n_in = nd.convolve(inner.astype(float), k3, mode='constant')
+        mean_in = np.where(n_in > 0, s_in / np.maximum(n_in, 1), lum)
+        keep &= ~(edge & (lum > mean_in + 38))
     out = np.zeros((th, tw, 4), np.uint8)
     out[..., :3] = np.clip(rgb, 0, 255).astype(np.uint8); out[..., 3] = keep * 255
     return Image.fromarray(out, 'RGBA')

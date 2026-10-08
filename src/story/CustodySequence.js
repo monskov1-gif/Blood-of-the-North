@@ -93,7 +93,8 @@ const methods = {
     g.player.setGaze(null);
     g.player.impair = 0;
     g.hallucination.reset();
-    for (const k of ['morning', 'hangover', 'kayden', 'police', 'wake', 'thirst', 'blood', 'flash', 'interro']) g.renderer.clearLayer(k);
+    for (const k of ['morning', 'hangover', 'kayden', 'police', 'wake', 'thirst', 'blood', 'flash', 'interro', 'dying', 'wakeflash']) g.renderer.clearLayer(k);
+    g.letterbox?.set(false, 10); g.cameraSys.roll = 0;
     g.cameraSys.sway = 0;
     g.cameraSys.setShot(null, 1);
   },
@@ -774,42 +775,79 @@ const methods = {
     const mp = mon.halo.getWorldPosition(new THREE.Vector3());
     const wide = { x: 18.9, y: 1.6, z: -2.2, lookX: 18.3, lookY: 1.05, lookZ: -6.3, fov: 38 };
     // from the right of the bed: clear of the door post and of the drip stand
-    const close = { x: mp.x + 2.0, y: mp.y + 0.05, z: mp.z + 3.5, lookX: mp.x, lookY: mp.y - 0.02, lookZ: mp.z, fov: 22 };
-    const between = (k) => Object.fromEntries(Object.keys(wide).map((key) => [key, wide[key] + (close[key] - wide[key]) * k]));
+    const mid = { x: mp.x + 2.6, y: mp.y - 0.05, z: mp.z + 3.2, lookX: mp.x + 0.6, lookY: mp.y - 0.25, lookZ: mp.z - 0.2, fov: 30 };
+    const close = { x: mp.x + 1.1, y: mp.y + 0.02, z: mp.z + 1.9, lookX: mp.x, lookY: mp.y - 0.02, lookZ: mp.z, fov: 18 };
     g.cameraSys.setShot(wide, 1);
     g.cameraSys.snap();
     await g.card.show('Ночь', { en: 'Night', sub: '03:12', ms: 1900 });
     if (S !== this.session) return;
+    g.letterbox.set(true, 2400);
     await g.fader.to(false, 2000);
-    // the pulse slows… and stops
-    const steps = [40, 33, 26, 18, 11];
-    for (let i = 0; i < steps.length; i++) {
-      mon.bpm = steps[i];
-      g.cameraSys.setShot(between((i + 1) / (steps.length + 1)), 0.35);
-      await sleep(3.2);
-      if (S !== this.session) return;
+    // THE HEART STOPS — one long, unbroken push-in while the pulse runs down: the room loses its
+    // colour, sound goes under water, the frame tilts a little; every beat is a dull thump and
+    // a pulse of dark at the edges, each one weaker and later than the last
+    const dur = 17;
+    const push = g.cameraSys.dolly(wide, mid, dur);
+    let beatPulse = 0;
+    w.onBeat = (m) => {
+      if (m !== mon) return;
+      g.audio.play('sfx.beep', { volume: 0.5 });
+      g.audio.play('inner.heartbeat', { volume: 0.9 });
+      beatPulse = 1;
+    };
+    const t0 = g.cameraSys.time;   // game time: the push and the pulse stay in step
+    while (S === this.session) {
+      const k = Math.min(1, (g.cameraSys.time - t0) / dur);
+      mon.bpm = Math.max(9, Math.round(46 - 37 * Math.pow(k, 0.8)));
+      beatPulse *= 0.82;
+      g.renderer.setLayer('dying', { saturation: -0.75 * k, vignette: 0.08 + 0.28 * k + beatPulse * 0.18, exposure: -0.1 * k - beatPulse * 0.07, blur: 0.4 * k, tint: [0.02 * k, -0.04 * k, 0.03 * k] });
+      g.audio.setMuffle(0.15 + 0.6 * k, 0.3);
+      g.cameraSys.roll = -0.05 * k;
+      if (k >= 1) break;
+      await sleep(0.1);
     }
+    await push;
+    if (S !== this.session) return;
+    // flatline: one snap in to the screen, the line goes straight, the tone
+    w.onBeat = null;
     mon.bpm = 0;
     mon.flat = true;
     g.state.set('flatline', true);
     g.audio.music('none', 0.6); // only the flatline
+    g.audio.setMuffle(0, 0.05);
     const flat = g.audio.loop('sfx.flatline', { fade: 0.05 });
-    g.cameraSys.setShot(close, 0.6);
-    await sleep(3.5);
+    g.cameraSys.shake = 0.5;
+    g.renderer.setLayer('dying', { saturation: -0.85, vignette: 0.45, exposure: -0.05, blur: 0, tint: [-0.03, 0.04, 0.0] });
+    await g.cameraSys.dolly(mid, close, 1.1, (q) => 1 - Math.pow(1 - q, 3));
     if (S !== this.session) return;
-    g.fader.set(true);
-    flat?.stop(0.05);
-    g.audio.setMasterVolume(0, 0.05);
     await sleep(2.6);
     if (S !== this.session) return;
+    // everything goes: the picture sinks to black, the tone thins to a ringing, then nothing
+    const ring = g.audio.loop('inner.ring', { fade: 0.8, volume: 2.5 });
+    flat?.stop(2.2);
+    await g.fader.to(true, 2200);
+    if (S !== this.session) return;
+    g.audio.setMasterVolume(0, 0.4);
+    ring?.stop(0.5);
+    g.renderer.clearLayer('dying');
+    g.cameraSys.roll = 0;
+    await sleep(2.4);
+    if (S !== this.session) return;
+    g.letterbox.set(false, 300);
     // he wakes — the thirst
     g.audio.setMasterVolume(1, 0.05);
     g.audio.music('thirst', 1);
     g.audio.play('sfx.whoosh');
     g.audio.play('inner.heartbeat', { volume: 1 });
     g.renderer.setLayer('thirst', { redPulse: 0.35, vignette: 0.45, ca: 0.8, saturation: -0.35, blur: 0.25, wave: 0.3 });
-    g.cameraSys.shake = 1.2;
+    // the eyes snap open: a hard red flash that drains into the thirst
+    g.renderer.setLayer('wakeflash', { exposure: 0.9, redPulse: 1.2, tint: [0.35, -0.1, -0.1] });
+    g.cameraSys.setShot(close, 1);
+    g.cameraSys.snap();
+    g.cameraSys.setShot(null, 1.4);
+    g.cameraSys.shake = 1.6;
     g.fader.set(false);
+    (async () => { for (let i = 10; i >= 0; i--) { g.renderer.setLayer('wakeflash', { exposure: 0.09 * i, redPulse: 0.12 * i, tint: [0.035 * i, -0.01 * i, -0.01 * i] }); await sleep(0.06); } g.renderer.clearLayer('wakeflash'); })();
     // he is awake, and the line stays flat: the heart did not start again
     mon.flat = true; mon.bpm = 0;
     if (!(await this.lines(g.dialogue.dialogues.n_wake))) return;

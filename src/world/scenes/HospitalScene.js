@@ -607,6 +607,7 @@ export class HospitalScene extends LocationBase {
     this.anchors.wardADoor = new THREE.Vector3(16.9, 1.9, BACK + 0.15);
 
     this.buildExpansion(); // patient wing, old wing, operating area (HospitalExpansion.js)
+    for (const [pane, n] of this.wardViews || []) this.deepenView(pane, undefined, n);
 
     this.buildSignage();
     this.buildLights();
@@ -1389,7 +1390,7 @@ export class HospitalScene extends LocationBase {
     // back wall (with a real window opening), side walls
     if (window) {
       this.wall(x0, x1, H, zb + 0.05, wm, [{ x0: winX - winW / 2, x1: winX + winW / 2, y0: winY0, y1: winY1 }]);
-      this.box(w, H, 0.1, this.mat('hWardBackOuter', { color: 0x0a0c0e }), cx, H / 2, zb - 0.32);
+      this.box(w, H, 0.1, this.mat('hWardBackOuter', { color: 0x0a0c0e }), cx, H / 2, zb - 3.4);   // behind the (deepened) view
     } else this.bx(w, H, 0.1, wm, cx, H / 2, zb, { uv: [2, 2] });
     this.bx(0.1, H, depth, wm, x0, H / 2, BACK - depth / 2, { uv: [2, 2] });
     this.bx(0.1, H, depth, wm, x1, H / 2, BACK - depth / 2, { uv: [2, 2] });
@@ -1528,7 +1529,9 @@ export class HospitalScene extends LocationBase {
       outsideMat = new THREE.MeshBasicMaterial({ map: streetTexture('morning', view), color: 0xdde6ee });
       outsideMat.userData.view = view;
       this.outsideMats.push(outsideMat);
-      this.plane(winW + 0.2, winY1 - winY0 + 0.2, outsideMat, winX, (winY0 + winY1) / 2, zb - 0.26);
+      const pane = this.plane(winW + 0.2, winY1 - winY0 + 0.2, outsideMat, winX, (winY0 + winY1) / 2, zb - 0.26);
+      this.wardViews = this.wardViews || [];
+      this.wardViews.push([pane, +number]);
       const rev = this.mat('hReveal', { color: 0xd8dcd8, roughness: 0.7 });
       this.bx(winW, 0.04, 0.3, rev, winX, winY0 - 0.02, zb - 0.1);
       this.bx(winW, 0.04, 0.3, rev, winX, winY1 + 0.02, zb - 0.1);

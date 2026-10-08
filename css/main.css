@@ -57,6 +57,10 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .boot-note { font-style: italic; color: var(--ink-dim); font-size: 14px; }
 
 /* ------------------------------------------------------------------ fader */
+.letterbox { position: absolute; inset: 0; pointer-events: none; z-index: 55; }
+.letterbox > div { position: absolute; left: 0; right: 0; height: 0; background: #000; transition: height var(--lb, 0.9s) cubic-bezier(.6,0,.2,1); }
+.letterbox .lb-top { top: 0; } .letterbox .lb-bot { bottom: 0; }
+.letterbox.on > div { height: 11.5%; }
 .fader { position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none; transition: opacity var(--fade, 1s) ease; z-index: 60; }
 .fader.on { opacity: 1; }
 
@@ -121,10 +125,10 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .pt-left { left: max(calc(1 * var(--vw)), calc(50% - calc(30 * var(--vh)) - calc(22 * var(--vw)))); transform: translateX(-30px); }
 .pt-right { right: max(calc(1 * var(--vw)), calc(50% - calc(30 * var(--vh)) - calc(22 * var(--vw)))); transform: translateX(30px); }
 .pt-right .pt-img { transform: scaleX(-1); }
-.pt-right2 { right: max(calc(17 * var(--vw)), calc(50% - calc(30 * var(--vh)) - calc(4 * var(--vw)))); transform: translateX(30px) scale(0.92); transform-origin: bottom; z-index: -1; }
+.pt-right2 { right: max(calc(17 * var(--vw)), calc(50% - calc(30 * var(--vh)) - calc(4 * var(--vw)))); transform: translateX(30px); transform-origin: bottom; z-index: -1; }
 .pt-right2 .pt-img { transform: scaleX(-1); }
 .pt.show.pt-left, .pt.show.pt-right { transform: none; }
-.pt.show.pt-right2 { transform: scale(0.92); }
+.pt.show.pt-right2 { transform: none; }   /* same height as everywhere else (the waiter at the bar = at the station) */
 .pt.active.pt-left, .pt.active.pt-right { transform: translateY(-4px) scale(1.01); }
 
 .vn-fx { position: absolute; inset: 0; z-index: 3; pointer-events: none; opacity: 0; transition: opacity 1s;

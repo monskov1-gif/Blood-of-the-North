@@ -42,7 +42,7 @@ export class BarStory {
     this.owen = add('owen');
     this.bartender = add('bartender');
     this.waiter2 = add('waiter2');
-    this.patronB = add('patronB');
+    this.patronB = add('chris', 'patronB');   // Chris (Кристиан Кокс), the regular at the bar
     // the crowd (data/crowd.js)
     this.crowd = CROWD.map((c, i) => {
       const id = c.id || `crowd${i}`;
@@ -142,6 +142,7 @@ export class BarStory {
       { id: 'window', label: 'Окно', at: { x: -8.95, z: -2.0 }, radius: 1.2, anchor: A(-8.95, 2.9, -4.9), run: say('window') },
       { id: 'jukebox', label: 'Музыкальный автомат', at: { x: -7.95, z: -2.0 }, radius: 1.0, anchor: A(-7.95, 1.9, -4.4), run: say('jukebox') },
       { id: 'tv', label: 'Телевизор', at: { x: -5.4, z: -2.2 }, radius: 1.2, anchor: A(-5.55, 3.65, -4.1), run: say('tv') },
+      { id: 'chris', label: 'Крис', at: { x: -3.8, z: -2.2 }, radius: 0.6, anchor: A(-3.8, 2.15, -2.73), run: say('chris') },
       { id: 'bartender', label: 'Бармен', at: { x: -2.6, z: -2.25 }, radius: 1.1, anchor: A(-2.6, 2.3, -4.2), run: say('bartender') },
       { id: 'moose', label: 'Трофей', at: { x: 0.9, z: -2.25 }, radius: 1.0, anchor: A(1.0, 4.05, -4.6), run: say('moose') },
       { id: 'newspaper', label: 'Газета', at: { x: 4.45, z: -2.25 }, radius: 1.0, anchor: A(4.45, 1.5, -3.4), run: say('newspaper') },

@@ -85,6 +85,15 @@ export const DIALOGUES = {
       c: { speaker: 'bartender', text: 'Альварес уже второй заказывает. Сказал — за ваш счёт.', cmd: 'pose:bartender:idle' },
     },
   },
+  chris: {
+    mode: 'bark',
+    nodes: {
+      a: { speaker: 'chris', text: 'Рид! Живой. А говорили, тебя из участка уже не выпускают.', cmd: 'pose:patronB:talk' },
+      b: { speaker: 'julian', text: 'Крис. Опять до закрытия?' },
+      c: { speaker: 'chris', text: 'Суббота же. Слушай… если завтра увидишь меня трезвым — не удивляйся. Есть разговор. Не здесь.', cmd: 'pose:patronB:idle' },
+      d: { speaker: 'thought', text: 'Кристиан Кокс. Свой человек в «Северной розе» — знает всех, кто сюда ходит. Раньше он никогда не говорил «не здесь».', set: { met_chris: true } },
+    },
+  },
   serviceDoor: {
     mode: 'bark',
     nodes: {

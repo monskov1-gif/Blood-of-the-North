@@ -85,6 +85,22 @@ const TXX = {
     const r = rng(306);
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const v = (r() - 0.5) * 6 + ((x % 8 < 1 || y % 8 < 1) ? -10 : 0); px(c, `rgb(${(176 + v) | 0},${(204 + v) | 0},${(204 + v) | 0})`, x, y); }
   }),
+  /** Bare branches just outside a window (transparent): late-autumn twigs, a few last leaves, a line of snow. */
+  twigs: (seed) => T(`twigs-${seed}`, 96, 72, (c, w, h) => {
+    const r = rng(500 + seed);
+    const branch = (x, y, a, len, wid) => {
+      const ex = x + Math.cos(a) * len, ey = y + Math.sin(a) * len;
+      c.strokeStyle = '#2a2420'; c.lineWidth = wid; c.lineCap = 'round';
+      c.beginPath(); c.moveTo(x, y); c.lineTo(ex, ey); c.stroke();
+      if (wid > 1.2) { c.strokeStyle = 'rgba(232,236,240,0.85)'; c.lineWidth = 1; c.beginPath(); c.moveTo(x, y - wid / 2); c.lineTo(ex, ey - wid / 2); c.stroke(); }
+      if (len > 7) for (let k = 0; k < 2; k++) branch(ex, ey, a + (k ? 0.5 : -0.5) + (r() - 0.5) * 0.4, len * 0.62, Math.max(1, wid * 0.65));
+      else if (r() < 0.45) { c.fillStyle = ['#d8a020', '#c86a1c', '#b8401c', '#e0b830'][(r() * 4) | 0]; c.fillRect(ex - 1, ey - 1, 2 + (r() * 2 | 0), 2); }
+    };
+    // one or two limbs reaching in from the sides / the top
+    const from = r() < 0.5 ? [[0, h * (0.2 + r() * 0.5), -0.15 + r() * 0.3]] : [[w, h * (0.2 + r() * 0.4), Math.PI + (r() - 0.5) * 0.3]];
+    if (r() < 0.6) from.push([w * (0.3 + r() * 0.5), 0, Math.PI / 2 + (r() - 0.5) * 0.6]);
+    for (const [x, y, a] of from) branch(x, y, a, 26 + r() * 10, 3.5);
+  }),
   /** A seated person's shadow on a curtain (soft-edged silhouette). */
   silhouette: () => canvasTexture('hospx-sil', 64, 128, (c, w, h) => {
     c.fillStyle = 'rgba(10,14,18,0.9)';
@@ -189,6 +205,7 @@ const methods = {
       this.outsideMats.push(view);
       const pane = new THREE.Mesh(new THREE.PlaneGeometry(winW + 0.6, winY1 - winY0 + 0.6), view);
       pane.position.set(winX, (winY0 + winY1) / 2, zb - 0.25); root.add(pane);
+      this.deepenView(pane, undefined, +number);
       this.pl(winW, (winY1 - winY0) * 0.55, this.texMat('hBlindsW', tiled(TX.blinds(), 4, 4), { transparent: true }), winX, winY1 - (winY1 - winY0) * 0.275, zb + 0.06);
     } else this.bx(w, H, 0.1, wm, cx, H / 2, zb, { uv: [2, 2] });
     this.bx(0.1, H, depth, wm, x0, H / 2, BACK - depth / 2, { uv: [2, 2] });
@@ -262,6 +279,7 @@ const methods = {
     this.outsideMats.push(viewMat);
     const pane = new THREE.Mesh(new THREE.PlaneGeometry(w + 0.8, h + 0.8), viewMat);
     pane.position.set(cx, cy, z - 0.3); root.add(pane);
+    this.deepenView(pane, undefined, Math.round(cx));
     // the glare of the glass itself (washes the view out by day)
     const glareMat = new THREE.MeshBasicMaterial({ color: profile.color, transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false });
     const glare = new THREE.Mesh(new THREE.PlaneGeometry(w, h), glareMat);
@@ -667,6 +685,7 @@ const methods = {
     view.userData.view = 'ward109'; this.outsideMats.push(view);
     const pane = new THREE.Mesh(new THREE.PlaneGeometry(zB - zA + 1, y1 - y0 + 1), view);
     pane.rotation.y = -Math.PI / 2; pane.position.set(X_END + 0.35, (y0 + y1) / 2, (zA + zB) / 2); root.add(pane);
+    this.deepenView(pane, new THREE.Vector3(1, 0, 0), 57);
     const glareMat = new THREE.MeshBasicMaterial({ color: PROFILES.D.color, transparent: true, opacity: 0.45, blending: THREE.AdditiveBlending, depthWrite: false });
     const glare = new THREE.Mesh(new THREE.PlaneGeometry(zB - zA, y1 - y0), glareMat);
     glare.rotation.y = -Math.PI / 2; glare.position.set(X_END + 0.04, (y0 + y1) / 2, (zA + zB) / 2); glare.renderOrder = 2; root.add(glare);
@@ -692,6 +711,27 @@ const methods = {
 
   /** How much footsteps echo at x (0 in the new building, 1 in the old wing). */
   echoAt(x) { return Math.min(1, Math.max(0, (x - X_OLD + 0.5) / 2)); },
+
+  /**
+   * Depth behind a window: the painted view goes ~2.4 m further out (and grows so it still fills
+   * the opening) and a layer of bare branches hangs just outside the glass — the camera slides
+   * along the corridor, the layers part, the outside stops looking like a picture on the wall.
+   */
+  deepenView(pane, dir = new THREE.Vector3(0, 0, -1), seed = 1) {
+    const D = 2.4;
+    const base = pane.position.clone();
+    pane.position.addScaledVector(dir, D);
+    pane.scale.multiplyScalar(1 + D * 0.5);
+    const g = pane.geometry.parameters;
+    const twig = new THREE.MeshBasicMaterial({ map: TXX.twigs(seed), transparent: true, alphaTest: 0.4, color: 0xd8d4cc, depthWrite: false });
+    const t = new THREE.Mesh(new THREE.PlaneGeometry(g.width * 1.05, g.height * 1.05), twig);
+    t.position.copy(base).addScaledVector(dir, 0.55);
+    t.rotation.copy(pane.rotation);
+    t.renderOrder = 1;
+    this.root.add(t);
+    this.expNight.push((night) => twig.color.set(night ? 0x2a3040 : 0xd8d4cc));
+    return t;
+  },
 
   /** Floor shading for a corridor run: contact shadow at the wall, a worn walking line, dusk toward the camera. */
   floorShade(x0, x1) {

@@ -33,9 +33,15 @@ const methods = {
     g.hallucination.reset();
     g.renderer.clearLayer('kayden');
     // the room is empty: staff survived elsewhere, Owen is gone
-    for (const c of [this.waiter, this.waiter2, this.bartender, this.owen, this.patronB, this.windowGuest].filter(Boolean)) c.setLife(CharacterState.HIDDEN);
+    for (const c of [this.waiter, this.waiter2, this.bartender, this.owen, this.windowGuest].filter(Boolean)) c.setLife(CharacterState.HIDDEN);
     for (const c of this.crowd) {
       if (c.crowd.frame === 'npc_butler_side_v') c.setLife(CharacterState.HIDDEN);
+    }
+    // Chris never left his stool: slumped over the bar where he sat all evening
+    if (this.patronB) {
+      this.patronB.setVisible(true);
+      this.patronB.setPose('idle');
+      this.patronB.setLife(CharacterState.DEAD, { pose: 'slumped', dir: 1, tilt: 0.34 });
     }
     this.coupe.visible = false;
     // bodies: reuse the evening crowd (same faces, same clothes)
@@ -124,7 +130,7 @@ const methods = {
     return [
       { id: 'm_glass', label: 'Разбитый бокал', at: { x: 1.0, z: 1.55 }, radius: 0.9, anchor: A(1.15, 0.6, 1.0), run: () => this.glassMemory() },
       { id: 'm_chair', label: 'Опрокинутый стул', at: { x: -6.9, z: 1.15 }, radius: 1.0, anchor: A(-6.9, 0.8, 0.55), run: say('m_chair') },
-      { id: 'm_body_bar', label: 'Мужчина у стойки', at: { x: -3.5, z: -1.4 }, radius: 1.1, anchor: A(-3.6, 0.7, -2.0), run: say('m_body_bar') },
+      { id: 'm_body_bar', label: 'Крис', at: { x: -3.5, z: -1.4 }, radius: 1.1, anchor: A(-3.6, 0.7, -2.0), run: say('m_body_bar') },
       { id: 'm_body_window', label: 'Женщина у окна', at: { x: -8.4, z: 0.45 }, radius: 1.0, anchor: A(-8.5, 0.7, -0.3), run: say('m_body_window') },
       { id: 'm_body_door', label: 'У входа', at: { x: -11.4, z: 0.45 }, radius: 1.0, anchor: A(-12.4, 0.7, -0.55), run: say('m_body_door') },
       { id: 'm_body_far', label: 'В глубине зала', at: { x: 9.6, z: 0.2 }, radius: 1.1, anchor: A(9.9, 0.7, -0.85), run: say('m_body_far') },
@@ -414,9 +420,16 @@ const methods = {
     siren?.setVolume(0.6, 1);
     const offs = this.spawnOfficers();
     const J = this.julian;
-    const tx = J.position.x;
-    const walks = offs.map((o, i) => o.walkTo([{ x: -11.4, z: -1.2 + i * 0.6 }, { x: Math.max(-10.5, tx - 4.2 - i * 0.7), z: -0.6 + i * 0.9 }], { speed: 2.0 }));
-    g.cameraSys.setShot({ x: tx - 2.4, y: 1.9, z: 7.4, lookX: tx - 2.4, lookY: 1.2, lookZ: -0.2, fov: 36 }, 0.8);
+    const tx = J.position.x, tz = J.position.z;
+    // they close in to a couple of metres: two behind, Quinn in front (nearest the camera)
+    const clampZ = (z) => Math.max(-2.1, Math.min(1.55, z));
+    const stops = [
+      { x: Math.max(-10.5, tx - 2.4), z: clampZ(tz - 0.55) },
+      { x: Math.max(-10.5, tx - 3.3), z: clampZ(tz - 1.15) },
+      { x: Math.max(-10.5, tx - 1.75), z: clampZ(tz + 0.45) },
+    ];
+    const walks = offs.map((o, i) => o.walkTo([{ x: -11.4, z: -1.2 + i * 0.6 }, stops[i]], { speed: 2.2 }));
+    g.cameraSys.setShot({ x: tx - 1.6, y: 1.85, z: 6.6, lookX: tx - 1.6, lookY: 1.2, lookZ: -0.2, fov: 36 }, 0.8);
     await Promise.all(walks);
     if (S !== this.session) return;
     offs.forEach((o) => { o.face(1); o.setPose('aim'); });
@@ -429,6 +442,9 @@ const methods = {
     // Quinn recognises him
     const Q = offs[2];
     Q.setPose('idle');
+    // the camera finds her: Quinn lowers the gun, between him and the others
+    const q = Q.position;
+    g.cameraSys.setShot({ x: (q.x + tx) / 2, y: 1.7, z: q.z + 3.6, lookX: (q.x + tx) / 2, lookY: 1.35, lookZ: q.z - 0.6, fov: 34 }, 0.9);
     await g.view.flash('quinn', 'Джул?.. Господи. Джул, это ты?', 2200);
     await g.view.flash('officer2', 'Торрес, держи дистанцию. Он среди тел — значит, подозреваемый.', 2600);
     Q.setPose('aim');

@@ -40,7 +40,18 @@ export class CameraSystem {
   follow(target) { this.target = target; }
 
   /** Smoothly move to an explicit framing; pass null to return to follow mode. */
-  setShot(shot, speed = 1.5) { this.shot = shot; this.shotSpeed = speed; if (shot) this.lastShot = shot; }
+  setShot(shot, speed = 1.5) { this.dollyMove = null; this.shot = shot; this.shotSpeed = speed; if (shot) this.lastShot = shot; }
+
+  /**
+   * One continuous camera move from `from` to `to` over `seconds` (ease in-out), for cinematic
+   * push-ins: no stepping, no re-targeting. Resolves when it arrives.
+   */
+  dolly(from, to, seconds, ease = (k) => k * k * (3 - 2 * k)) {
+    return new Promise((resolve) => {
+      this.shot = { ...from }; this.lastShot = this.shot; this.shotBlend = 1; this.shotSpeed = 50;
+      this.dollyMove = { from, to, t: 0, dur: seconds, ease, resolve };
+    });
+  }
 
   resize(w, h) {
     this.width = w; this.height = h;
@@ -81,6 +92,14 @@ export class CameraSystem {
       x: this.x, y: this.baseHeight, z: this.baseDistance,
       lookX: this.x, lookY: this.lookHeight, lookZ: this.lookZ, fov: this.fov,
     };
+    if (this.dollyMove) {
+      const d = this.dollyMove;
+      d.t += dt;
+      const k = d.ease(Math.min(1, d.t / d.dur));
+      this.shot = Object.fromEntries(Object.keys(d.to).map((key) => [key, d.from[key] + (d.to[key] - d.from[key]) * k]));
+      this.lastShot = this.shot;
+      if (d.t >= d.dur) { this.dollyMove = null; d.resolve(); }
+    }
     this.shotBlend = THREE.MathUtils.damp(this.shotBlend, this.shot ? 1 : 0, this.shotSpeed || 1.5, dt);
     const s = this.shot || this.lastShot || follow;
     const k = this.shotBlend;
@@ -103,6 +122,7 @@ export class CameraSystem {
     }
     cam.lookAt(look);
     if (this.sway > 0) cam.rotation.z += Math.sin(t * 0.5) * 0.03 * this.sway;
+    if (this.roll) cam.rotation.z += this.roll;   // a slow dutch tilt for key moments
     cam.fov = lerp(follow.fov, sfov) + this.fovOffset + (this.sway > 0 ? Math.sin(t * 0.8) * 2.2 * this.sway : 0);
     cam.updateProjectionMatrix();
   }
