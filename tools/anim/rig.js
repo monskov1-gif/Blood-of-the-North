@@ -18,9 +18,9 @@ export const PARTS = {
   leg_near:   { rect: [234, 748, 321, 969], scale: 1.06, pin: [40, 0], at: [148, 590] },
   boot_near:  { rect: [920, 799, 1073, 971], scale: 0.8, pin: [50, 0], at: [150, 816] },
   torso_front:{ rect: [1007, 22, 1242, 398], scale: 0.93, pin: [118, 10], at: [165, 272] },
-  bag:        { rect: [570, 420, 722, 704], scale: 0.98, pin: [112, 4], at: [152, 290] },
-  arm_near:   { rect: [59, 427, 224, 705], scale: 1.0, pin: [40, 12], at: [140, 300] },
-  scarf:      { rect: [751, 22, 924, 375], scale: 0.86, pin: [80, 20], at: [190, 270] },
+  bag:        { rect: [570, 420, 722, 704], scale: 0.92, pin: [112, 4], at: [146, 302] },
+  arm_near:   { rect: [59, 427, 224, 705], scale: 1.0, pin: [40, 12], at: [122, 298] },
+  scarf:      { rect: [751, 22, 924, 375], scale: 0.9, pin: [80, 20], at: [196, 268] },
   head:       { rect: [4, 90, 214, 304], scale: 0.78, pin: [115, 190], at: [172, 268] },
   hair_front: { rect: [508, 25, 707, 362], scale: 0.8, pin: [100, 10], at: [168, 128] },
   earphones:  { rect: [1262, 473, 1345, 695], scale: 0.8, pin: [12, 4], at: [156, 214] }, // one bud: the other ear is out of view
@@ -33,7 +33,7 @@ export const JOINTS = {
   chest: ['pelvis', 160, 300],
   neck: ['chest', 172, 268],
   headTop: ['neck', 178, 140],
-  shoulderN: ['chest', 140, 300], elbowN: ['shoulderN', 148, 440], wristN: ['elbowN', 178, 540],
+  shoulderN: ['chest', 122, 298], elbowN: ['shoulderN', 130, 438], wristN: ['elbowN', 160, 538],
   shoulderF: ['chest', 166, 304], elbowF: ['shoulderF', 172, 436], wristF: ['elbowF', 208, 534],
   hipN: ['pelvis', 148, 530], kneeN: ['hipN', 151, 691], ankleN: ['kneeN', 150, 905], toeN: ['ankleN', 228, 950], heelN: ['ankleN', 112, 952],
   hipF: ['pelvis', 156, 530], kneeF: ['hipF', 159, 694], ankleF: ['kneeF', 192, 905], toeF: ['ankleF', 270, 950], heelF: ['ankleF', 154, 952],
@@ -41,24 +41,24 @@ export const JOINTS = {
 
 // sprite → bone (the bone that carries it); limbs are cut in two at the joint
 export const ATTACH = [
-  // [part, bone, seg]  seg: { joint, side: 'up'|'down', r } — limbs are cut at the joint with a round
-  // overlap (a disc of radius r around the joint belongs to both pieces), so a bent knee or elbow
-  // never shows the corner of a cut
+  // [part, bone]                       rigid part on one bone
+  // [part, { skin: [up, low, joint, band] }]  limb skinned to two bones: drawn as thin slices, each
+  //   slice blends the upper and lower bone transforms across ±band around the joint (no seams)
+  // [part, bone, { y0, y1 }]           rigid part limited to rows y0..y1 of the part (local px)
   ['hair_back', 'hairB'],
-  ['arm_far', 'elbowF', { joint: 'elbowF', side: 'down', r: 30 }], ['arm_far', 'shoulderF', { joint: 'elbowF', side: 'up', r: 30 }],
-  ['leg_far', 'kneeF', { joint: 'kneeF', side: 'down', r: 34 }], ['leg_far', 'hipF', { joint: 'kneeF', side: 'up', r: 34 }],
-  ['boot_far', 'kneeF', { joint: 'ankleF', side: 'up', r: 30 }], ['boot_far', 'ankleF', { joint: 'ankleF', side: 'down', r: 30 }],
-  ['torso_back', 'chest'],
+  ['arm_far', { skin: ['shoulderF', 'elbowF', 'elbowF', 34] }],
+  ['leg_far', { skin: ['hipF', 'kneeF', 'kneeF', 30] }],
+  ['boot_far', { skin: ['kneeF', 'ankleF', 'ankleF', 14] }],
   ['skirt', 'pelvis'],
-  ['leg_near', 'kneeN', { joint: 'kneeN', side: 'down', r: 34 }], ['leg_near', 'hipN', { joint: 'kneeN', side: 'up', r: 34 }],
-  ['boot_near', 'kneeN', { joint: 'ankleN', side: 'up', r: 30 }], ['boot_near', 'ankleN', { joint: 'ankleN', side: 'down', r: 30 }],
+  ['leg_near', { skin: ['hipN', 'kneeN', 'kneeN', 30] }],
+  ['boot_near', { skin: ['kneeN', 'ankleN', 'ankleN', 14] }],
   ['torso_front', 'chest'],
-  ['bag', 'bag'],
+  ['bag', 'bag', { y0: 120 }],
   ['hair_front', 'hairF'],
   ['scarf', 'scarf'],
-  ['arm_near', 'elbowN', { joint: 'elbowN', side: 'down', r: 32 }], ['arm_near', 'shoulderN', { joint: 'elbowN', side: 'up', r: 32 }],
+  ['arm_near', { skin: ['shoulderN', 'elbowN', 'elbowN', 36] }],
+  ['bag', 'bag', { y1: 126 }],          // the strap runs over the shoulder, on top of the sleeve
   ['head', 'neck'],
-  ['earphones', 'neck'],
 ];
 // spring-driven accessories hang from these joints (bind positions)
 const SPRINGS = { bag: [140, 300, 'chest'], scarf: [182, 278, 'chest'], hairB: [150, 175, 'neck'], hairF: [175, 175, 'neck'] };
@@ -70,9 +70,37 @@ const len = (ax, ay, bx, by) => Math.hypot(bx - ax, by - ay);
 const smooth = (t) => t * t * (3 - 2 * t);
 const lerp = (a, b, t) => a + (b - a) * t;
 
+/** Removes the light matting fringe: edge pixels much lighter than the pixel inside them. */
+function defringe(img) {
+  const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+  const g = c.getContext('2d'); g.drawImage(img, 0, 0);
+  const id = g.getImageData(0, 0, c.width, c.height), d = id.data, W = c.width, Hh = c.height;
+  const A = (x, y) => (x < 0 || y < 0 || x >= W || y >= Hh ? 0 : d[(y * W + x) * 4 + 3]);
+  const L = (i) => d[i] * 0.3 + d[i + 1] * 0.59 + d[i + 2] * 0.11;
+  const kill = [];
+  for (let pass = 0; pass < 2; pass++) {
+    kill.length = 0;
+    for (let y = 0; y < Hh; y++) for (let x = 0; x < W; x++) {
+      const i = (y * W + x) * 4;
+      if (d[i + 3] < 10) continue;
+      const nb = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+      if (!nb.some(([dx, dy]) => A(x + dx, y + dy) < 10)) continue;   // not an edge pixel
+      // the opaque neighbour on the other side
+      let inner = null;
+      for (const [dx, dy] of nb) if (A(x + dx, y + dy) >= 10 && A(x - dx, y - dy) < 10) { inner = ((y + dy) * W + x + dx) * 4; break; }
+      const lum = L(i);
+      if (lum > 150 || (inner != null && lum > L(inner) + 45) || d[i + 3] < 200) kill.push(i);
+    }
+    for (const i of kill) d[i + 3] = 0;
+  }
+  g.putImageData(id, 0, 0);
+  return c;
+}
+
 export class Rig {
   constructor(img) {
     this.img = img;
+    this.src = defringe(img);
     this.bind = {};
     for (const [k, [, x, y]] of Object.entries(JOINTS)) this.bind[k] = [x, y];
     for (const [k, [x, y]] of Object.entries(SPRINGS)) this.bind[k] = [x, y];
@@ -95,7 +123,7 @@ export class Rig {
     const b = this.bind;
     // gait timing: cadence ~108 steps/min at speed 1, stride grows with speed
     const cycleT = 1.12 / Math.pow(this.speed, 0.45);
-    const stride = 640 * Math.pow(this.speed, 0.6);           // px, two steps (≈ 1.3 m at 5 px/cm)
+    const stride = 470 * Math.pow(this.speed, 0.6);           // px, two steps (≈ 1.3 m at 5 px/cm)
     const vel = stride / cycleT;
     if (this.mode === 'walk') this.phase = ((this.phase || 0) + dt / cycleT) % 1;
     const ph = this.phase || 0;
@@ -111,13 +139,13 @@ export class Rig {
       if (p < ST) {
         const q = p / ST;
         fx = lerp(A, -B, q);
-        if (q < 0.12) footA = lerp(15, 0, smooth(q / 0.12));                 // heel strike, toe up
-        else if (q > 0.68) footA = -lerp(0, 35, smooth((q - 0.68) / 0.32));  // heel off, roll onto the toe
+        if (q < 0.12) footA = lerp(12, 0, smooth(q / 0.12));                 // heel strike, toe up
+        else if (q > 0.68) footA = -lerp(0, 22, smooth((q - 0.68) / 0.32));  // heel off, roll onto the toe
       } else {
         const q = (p - ST) / (1 - ST);
         fx = lerp(-B, A, smooth(q));
-        lift = Math.sin(Math.min(1, q * 1.3) * Math.PI) * 30 + Math.sin(q * Math.PI) * 8;
-        footA = q < 0.3 ? lerp(-35, 0, smooth(q / 0.3)) : lerp(0, 15, smooth((q - 0.3) / 0.7));
+        lift = Math.sin(Math.min(1, q * 1.3) * Math.PI) * 16 + Math.sin(q * Math.PI) * 5;
+        footA = q < 0.3 ? lerp(-22, 0, smooth(q / 0.3)) : lerp(0, 12, smooth((q - 0.3) / 0.7));
       }
       return { fx: fx * walkW, lift: lift * walkW, footA: footA * walkW, stance: p < ST };
     };
@@ -151,7 +179,7 @@ export class Rig {
     } else this.pelY = null;
     const pel = [b.pelvis[0] + idleSway, pelY];
     const bob = b.pelvis[1] - pelY;
-    const lean = (3.5 * walkW + 0.6 * breathe * (1 - walkW)) * D2R;   // torso pitch (forward = +)
+    const lean = (5 * walkW + 0.6 * breathe * (1 - walkW)) * D2R;   // torso pitch (forward = +)
     const twist = Math.sin(ph * 2 * Math.PI) * 1.2 * D2R * walkW;
     P.pelvis = { o: pel, a: Math.sin(ph * 4 * Math.PI) * 0.8 * D2R * walkW };
     const chestA = lean + twist;
@@ -171,8 +199,8 @@ export class Rig {
     const swing = (side) => {
       const p = side === 'N' ? ph : (ph + 0.5) % 1;
       const s = Math.sin((p - 0.04) * 2 * Math.PI);                 // + = arm back (near leg forward)
-      const sh = (-s * 17 * walkW + 1.2 * breathe * (1 - walkW)) * D2R;
-      const el = (-(6 + 10 * Math.max(0, -s)) * walkW - 2 * (1 - walkW)) * D2R;   // forearm forward
+      const sh = (-s * 24 * walkW + 1.2 * breathe * (1 - walkW)) * D2R;
+      const el = (-(8 + 16 * Math.max(0, -s)) * walkW - 2 * (1 - walkW)) * D2R;   // forearm forward
       fk(`shoulder${side}`, 'chest', 0);
       P[`shoulder${side}`].a = P.chest.a * 0.3 + sh;
       fk(`elbow${side}`, `shoulder${side}`, el);
@@ -229,26 +257,41 @@ export class Rig {
   // ---------------------------------------------------------------- draw
   draw(ctx, { skeleton = false } = {}) {
     const P = this.P, b = this.bind;
-    for (const [part, bone, seg] of ATTACH) {
+    const T = (bone, x, y) => {                  // bind point → world through a bone
+      const J = P[bone], jb = b[bone];
+      const [dx, dy] = rot(x - jb[0], y - jb[1], J.a);
+      return [J.o[0] + dx, J.o[1] + dy];
+    };
+    for (const [part, bone, lim] of ATTACH) {
       const pt = PARTS[part];
       const [x0, y0, x1, y1] = pt.rect;
       const w = x1 - x0, h = y1 - y0, s = pt.scale;
-      // bind placement of the part: local point `pin` at `at`
       const ox = pt.at[0] - pt.pin[0] * s, oy = pt.at[1] - pt.pin[1] * s;
+      if (typeof bone === 'object') {
+        const [up, low, joint, band] = bone.skin;
+        const [jx, jy] = b[joint];
+        const aU = P[up].a, aL = P[low].a;
+        const K = 2;                                 // slice height, part px
+        for (let r = 0; r < h; r += K) {
+          const hh = Math.min(K, h - r);
+          const yc = oy + (r + hh / 2) * s;
+          const t = smooth(Math.min(1, Math.max(0, (yc - (jy - band)) / (2 * band))));
+          const pu = T(up, jx, yc), pl = T(low, jx, yc);
+          ctx.save();
+          ctx.translate(lerp(pu[0], pl[0], t), lerp(pu[1], pl[1], t));
+          ctx.rotate(lerp(aU, aL, t));
+          ctx.drawImage(this.src, x0, y0 + r, w, hh, ox - jx, oy + r * s - yc, w * s, hh * s + 0.7);
+          ctx.restore();
+        }
+        continue;
+      }
       const J = P[bone], jb = b[bone];
       ctx.save();
       ctx.translate(J.o[0], J.o[1]);
       ctx.rotate(J.a);
       ctx.translate(-jb[0], -jb[1]);
-      if (seg) {
-        const [jx, jy] = b[seg.joint], r = seg.r;
-        ctx.beginPath();
-        if (seg.side === 'up') ctx.rect(ox - 50, oy - 50, w * s + 100, jy - oy + 50);
-        else ctx.rect(ox - 50, jy, w * s + 100, oy + h * s - jy + 50);
-        ctx.moveTo(jx + r, jy); ctx.arc(jx, jy, r, 0, Math.PI * 2);
-        ctx.clip();
-      }
-      ctx.drawImage(this.img, x0, y0, w, h, ox, oy, w * s, h * s);
+      const r0 = lim?.y0 ?? 0, r1 = lim?.y1 ?? h;
+      ctx.drawImage(this.src, x0, y0 + r0, w, r1 - r0, ox, oy + r0 * s, w * s, (r1 - r0) * s);
       ctx.restore();
     }
     if (skeleton) this.drawSkeleton(ctx);
