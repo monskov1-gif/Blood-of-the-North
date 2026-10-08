@@ -731,16 +731,11 @@ for g in ['jul', 'julg']:
 JUL_HEAD = frames['jul_idle'].copy()
 # the old 'think' frame is ~10 cm shorter than the repainted coat frames: same height now
 frames['julian_think'] = match_scale(frames['julian_think'], frames['jul_idle'])
-# gown: the client's reference is the ORIGINAL painted gown walk frame (its own
-# head, bowed a little, and its own neck). That frame stays as painted; its head
-# with the whole neck and the neckline around it is copied pixel for pixel onto
-# the other gown frames, lined up on the chest front (the neck sits forward)
-GOWN_SRC, GOWN_SRC_COLLAR = 'julg_idle_walk1', 28
-GOWN_COLLAR = {'julg_idle': 27, 'julg_talk': 27, 'julg_idle_walk2': 28}
-for n in ['jul_talk', 'jul_idle_walk1', 'jul_idle_walk2', 'julian_think', 'julian_seat']:
+# v0.10: the owner repainted every coat and gown frame with one consistent head
+# (tools/process_art4.py) — those frames stay exactly as painted. Only the older
+# frames without a repaint (think, seated) get the head of the new jul_idle.
+for n in ['julian_think', 'julian_seat']:
     frames[n] = graft_head(frames[n], JUL_HEAD)
-for n, collar in GOWN_COLLAR.items():
-    frames[n] = copy_neck_collar(frames[n], frames[GOWN_SRC], GOWN_SRC_COLLAR, collar)[0]
 for n in ['jul_idle', 'jul_talk', 'julg_idle', 'julg_talk']:
     ALIASES[f'{n}_sit'] = 'julian_seat'
 # v0.08: Wyatt and Quinn standing in profile (walk source), the old woman of 107 lying
