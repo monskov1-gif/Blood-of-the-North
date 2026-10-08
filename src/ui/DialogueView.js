@@ -2,6 +2,8 @@ import { CHARACTERS } from '../../data/characters.js';
 
 const SLOTS = ['left', 'right', 'right2'];
 const PORTRAIT_DOWN = ['sad', 'tired', 'concerned', 'dizzy', 'pain'];
+// portraits that have a 4th painted variant: smiling (<id>_3)
+const PORTRAIT_SMILE = new Set(['lizzy']);
 
 /** Preloads the painted portraits so the first swap has no flicker. */
 export function preloadPortraits(ids = ['julian', 'kayden', 'waiter']) {
@@ -206,7 +208,8 @@ export class DialogueView {
     const id = slot.id;
     const expr = this.expr[id] || 'neutral';
     const down = PORTRAIT_DOWN.includes(expr);
-    const idx = down ? 2 : (this.speaking === id ? 1 : 0);
+    const portraitId = CHARACTERS[id]?.portrait || id;
+    const idx = down ? 2 : (expr === 'smile' || expr === 'happy') && PORTRAIT_SMILE.has(portraitId) ? 3 : (this.speaking === id ? 1 : 0);
     const sig = `${id}|${idx}`;
     slot.wrap.classList.toggle('pale', expr === 'dizzy' || expr === 'pain');
     if (slot.sig === sig) return;

@@ -741,6 +741,14 @@ for n in ['jul_idle', 'jul_talk', 'julg_idle', 'julg_talk']:
 # v0.08: Wyatt and Quinn standing in profile (walk source), the old woman of 107 lying
 for n in ['wyatt_side', 'quinn_side', 'lie_granny']:
     frames[n] = load(n)
+# v0.12: Lizzy, Vikki, Olivia, Puriel (idle, talk, two painted walk frames) and four huge wolves
+# assembled from parts (tools/process_art5.py)
+for c in ['lizzy', 'vikki', 'olivia', 'puriel']:
+    for n in ['idle', 'talk', 'idle_walk1', 'idle_walk2']:
+        frames[f'{c}_{n}'] = load(f'{c}_{n}')
+for c in ['grey', 'white', 'red', 'dark']:
+    for n in ['', '_walk1', '_walk2', '_eat']:
+        frames[f'wolf_{c}{n}'] = load(f'wolf_{c}{n}')
 # the hospital beds are seen close up: the lying patients go on a 1.5× coarser grid
 # (1 px = 1.5 cm, stored small and drawn 1.5× larger — even pixels, no doubling)
 for n in ['lie_julian_gown', 'lie_granny']:

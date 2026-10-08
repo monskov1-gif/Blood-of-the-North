@@ -72,4 +72,17 @@ export const CHARACTERS = {
   patronA: { id: 'patronA', name: 'Посетитель', poses: { idle: 'patron_a' }, speed: 1.1, selfLight: 0x5a4c48 },
   patronB: { id: 'patronB', name: 'Посетитель', poses: { idle: 'patron_b', talk: 'patron_b_talk' }, selfLight: 0x5a4c48 },
   woman: { id: 'woman', name: 'Посетительница', poses: { idle: 'woman' }, selfLight: 0x5a4c48 },
+  // Christian Cox — a regular at the bar; he dies in the massacre (his story comes later)
+  chris: { id: 'chris', name: 'Крис', nameEn: 'CHRIS', poses: { idle: 'patron_b', talk: 'patron_b_talk' }, selfLight: 0x5a4c48, lie: 'lie_vest' },
+  // v0.12 — Lizzie Reed (Julian's sister, 17) and her friends; four huge wolves
+  lizzy: { id: 'lizzy', name: 'Лиззи Рид', nameEn: 'LIZZIE REED', portrait: 'lizzy', color: '#8a5a3a', poses: { idle: 'lizzy_idle', talk: 'lizzy_talk' }, speed: 1.35 },
+  vikki: { id: 'vikki', name: 'Викки', nameEn: 'VICKY', portrait: 'vikki', color: '#3a3a44', poses: { idle: 'vikki_idle', talk: 'vikki_talk' }, speed: 1.35 },
+  olivia: { id: 'olivia', name: 'Оливия', nameEn: 'OLIVIA', portrait: 'olivia', color: '#6a5a4a', poses: { idle: 'olivia_idle', talk: 'olivia_talk' }, speed: 1.35 },
+  puriel: { id: 'puriel', name: 'Пуриэль', nameEn: 'PURIEL', portrait: 'puriel', color: '#c8b89a', poses: { idle: 'puriel_idle', talk: 'puriel_talk' }, speed: 1.3 },
+  wolf: { id: 'wolf', name: 'Волк', nameEn: 'WOLF', poses: { idle: 'wolf_dark', eat: 'wolf_dark_eat' }, speed: 1.6 },
+  wolfGrey: { id: 'wolfGrey', name: 'Волк', nameEn: 'WOLF', poses: { idle: 'wolf_grey', eat: 'wolf_grey_eat' }, speed: 1.7 },
+  wolfWhite: { id: 'wolfWhite', name: 'Волк', nameEn: 'WOLF', poses: { idle: 'wolf_white', eat: 'wolf_white_eat' }, speed: 1.7 },
+  wolfRed: { id: 'wolfRed', name: 'Волк', nameEn: 'WOLF', poses: { idle: 'wolf_red', eat: 'wolf_red_eat' }, speed: 1.7 },
+  // the werewolf in human form (seen from far away in the forest)
+  stranger: { id: 'stranger', name: 'Человек', nameEn: 'MAN', poses: { idle: 'npc_bluecoat_side' }, speed: 1.2 },
 };
