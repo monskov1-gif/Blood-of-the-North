@@ -17,7 +17,25 @@ _src = open(os.path.join(_here, 'process_art.py')).read().split('# -------------
 H = types.ModuleType('pa')
 sys.argv = [sys.argv[0], os.path.dirname(SHEET), ROOT]
 exec(compile(_src, 'process_art.py', 'exec'), H.__dict__)
-pixelize, RAW = H.pixelize, H.RAW
+RAW = H.RAW
+
+
+def pixelize(rgba, scale):
+    """The sheet already has a clean alpha: premultiplied box downscale, hard alpha at 45%,
+    no edge erosion (it ate the white gown ties and the light neckline)."""
+    h, w = rgba.shape[:2]
+    tw, th = max(1, round(w * scale)), max(1, round(h * scale))
+    pm = rgba.copy(); pm[..., :3] *= pm[..., 3:4] / 255.0
+    d = np.asarray(Image.fromarray(np.clip(pm, 0, 255).astype(np.uint8), 'RGBA').resize((tw, th), Image.BOX)).astype(np.float32)
+    al = d[..., 3:4] / 255.0
+    rgb = np.where(al > 0, d[..., :3] / np.maximum(al, 1e-3), 0)
+    keep = d[..., 3] >= 115
+    # drop isolated specks (single pixels with no opaque neighbours)
+    n = nd.convolve(keep.astype(int), np.ones((3, 3), int), mode='constant') - keep
+    keep &= n >= 2
+    out = np.zeros((th, tw, 4), np.uint8)
+    out[..., :3] = np.clip(rgb, 0, 255).astype(np.uint8); out[..., 3] = keep * 255
+    return Image.fromarray(out, 'RGBA')
 
 a = np.asarray(Image.open(SHEET).convert('RGBA')).astype(np.float32)
 lab, n = nd.label(nd.binary_closing(a[..., 3] > 0, iterations=3))

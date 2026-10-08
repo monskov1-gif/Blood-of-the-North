@@ -9,7 +9,7 @@
 - Репозиторий: `monskov1-gif/Blood-of-the-North`
 - Рабочая ветка разработки задаётся сессией; сайт собирается с ветки `claude/admiring-turing-t5ns0m`
   (см. `release.md`).
-- Версия: `src/version.js` (на момент написания — 0.10).
+- Версия: `src/version.js` (на момент написания — 0.11).
 
 ## Сюжет и этапы (stage)
 
