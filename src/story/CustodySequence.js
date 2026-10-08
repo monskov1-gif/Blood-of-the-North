@@ -103,6 +103,7 @@ const methods = {
     this.stopAmbient();
     g.interactions.setItems([]);
     await g.setLocation(location, { state });
+    g.world.followTarget = () => this.julian;
     // a new place starts on its own framing, not halfway out of the previous shot
     g.cameraSys.setShot(null, 1);
     g.cameraSys.snap();

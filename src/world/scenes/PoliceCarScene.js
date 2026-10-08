@@ -433,38 +433,58 @@ export class PoliceCarScene extends LocationBase {
   buildBodySection() {
     const shape = new THREE.Shape(BODY_OUTER.map(([x, y]) => new THREE.Vector2(x, y)));
     shape.holes.push(new THREE.Path(CABIN.map(([x, y]) => new THREE.Vector2(x, y))));
-    const mat = new THREE.MeshBasicMaterial({ color: 0x131417 }); mat.userData.noLightingState = true;
+    // dark navy paint in the pixel register: a dithered gradient, lighter along the shoulder line
+    const paint = canvasTexture('car-paint', 160, 72, (ctx, w, h) => {
+      const r = rng(77);
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const t = 1 - y / h; // 0 bottom … 1 top
+        const shoulder = Math.exp(-((t - 0.62) ** 2) / 0.004) * 16 + Math.exp(-((t - 0.97) ** 2) / 0.002) * 12;
+        const v = 18 + t * 10 + shoulder + ((x + y) % 2 ? 2 : -2) + (r() - 0.5) * 3;
+        ctx.fillStyle = rgb(v * 0.92, v, v * 1.18); ctx.fillRect(x, y, 1, 1);
+      }
+      // livery: a thin yellow over blue band along the body side (RCMP-ish), dim in the dawn
+      for (let x = 0; x < w; x++) { ctx.fillStyle = 'rgb(92,78,30)'; ctx.fillRect(x, Math.round(h * 0.36), 1, 1); ctx.fillStyle = 'rgb(28,40,82)'; ctx.fillRect(x, Math.round(h * 0.36) + 1, 1, 2); }
+    }, { nearest: true, aniso: 1 });
+    const mat = new THREE.MeshBasicMaterial({ map: paint }); mat.userData.noLightingState = true;
     const sec = new THREE.Mesh(new THREE.ShapeGeometry(shape, 8), mat);
+    // ShapeGeometry UVs are world x/y: map the car's extent onto the texture
+    paint.repeat.set(1 / 4.9, 1 / 2.2); paint.offset.set(2.45 / 4.9, 0.4 / 2.2);
     sec.position.z = 0.36; sec.renderOrder = 2;
     this.root.add(sec);
     // the paint edge catches a little street light: a faint line on the roof and hood
     const rim = new THREE.Line(new THREE.BufferGeometry().setFromPoints(BODY_TOP.map(([x, y]) => new THREE.Vector3(x, y, 0.37))),
-      new THREE.LineBasicMaterial({ color: 0x3a4450 }));
+      new THREE.LineBasicMaterial({ color: 0x6a7c92 }));
     this.root.add(rim);
     // door seams, the B pillar line, handles: the section reads as a four-door sedan
     const seam = new THREE.LineBasicMaterial({ color: 0x24282e });
     for (const pts of [[[-0.29, 0.0], [-0.29, 0.36]], [[1.02, 0.36], [1.02, 0.02]], [[-1.4, 0.36], [-1.12, 0.12]], [[-1.05, 0.02], [1.05, 0.02]], [[-2.36, 0.86], [-1.6, 0.9]]]) {
       this.root.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts.map(([x, y]) => new THREE.Vector3(x, y, 0.37))), seam));
     }
-    // roof light bar: dark housing, the red and blue lenses (off, catching a little light)
-    const barM = new THREE.MeshBasicMaterial({ color: 0x1c1e22 });
-    const bar = new THREE.Mesh(new THREE.PlaneGeometry(0.86, 0.08), barM); bar.position.set(-0.24, 1.73, 0.37); this.root.add(bar);
-    for (const [x, c] of [[-0.5, 0x341010], [0.02, 0x101c38]]) {
-      const lens = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.05), new THREE.MeshBasicMaterial({ color: c }));
-      lens.position.set(x, 1.735, 0.371); this.root.add(lens);
+    // roof light bar: housing with its top face catching the sky, red and blue lenses (off), feet
+    const barM = new THREE.MeshBasicMaterial({ color: 0x1e2128 });
+    const bar = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.09), barM); bar.position.set(-0.24, 1.74, 0.37); this.root.add(bar);
+    const top = new THREE.Mesh(new THREE.PlaneGeometry(0.88, 0.015), new THREE.MeshBasicMaterial({ color: 0x5a6676 })); top.position.set(-0.24, 1.787, 0.372); this.root.add(top);
+    for (const [x, c, hi] of [[-0.48, 0x3a1212, 0x7a3030], [0.0, 0x10183a, 0x34509a]]) {
+      const lens = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.055), new THREE.MeshBasicMaterial({ color: c }));
+      lens.position.set(x, 1.742, 0.371); this.root.add(lens);
+      const h = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.012), new THREE.MeshBasicMaterial({ color: hi }));
+      h.position.set(x, 1.761, 0.372); this.root.add(h);
     }
     for (const x of [-0.6, 0.12]) { const ft = new THREE.Mesh(new THREE.PlaneGeometry(0.05, 0.03), barM); ft.position.set(x, 1.695, 0.37); this.root.add(ft); }
-    // wheels: tyre, steel rim, hub — turning with the road
-    const tyre = new THREE.MeshBasicMaterial({ color: 0x161719 }), rimM = new THREE.MeshBasicMaterial({ color: 0x272a2f }), hubM = new THREE.MeshBasicMaterial({ color: 0x3a3e44 });
+    // wheels: tyre with a sidewall ring, a steel hubcap with five lug nuts — turning with the road
+    const tyre = new THREE.MeshBasicMaterial({ color: 0x1a1b1e }), wall = new THREE.MeshBasicMaterial({ color: 0x26282c });
+    const capM = new THREE.MeshBasicMaterial({ color: 0x3a4047 }), capHi = new THREE.MeshBasicMaterial({ color: 0x565e68 }), lugM = new THREE.MeshBasicMaterial({ color: 0x24272c });
     for (const [x, y] of WHEELS) {
       const w = new THREE.Group();
-      w.add(new THREE.Mesh(new THREE.CircleGeometry(WHEEL_R, 24), tyre));
-      const ring = new THREE.Mesh(new THREE.RingGeometry(WHEEL_R * 0.5, WHEEL_R * 0.62, 24), rimM); ring.position.z = 0.001; w.add(ring);
+      w.add(new THREE.Mesh(new THREE.CircleGeometry(WHEEL_R, 28), tyre));
+      const sw = new THREE.Mesh(new THREE.RingGeometry(WHEEL_R * 0.62, WHEEL_R * 0.7, 28), wall); sw.position.z = 0.001; w.add(sw);
+      const cap = new THREE.Mesh(new THREE.CircleGeometry(WHEEL_R * 0.56, 24), capM); cap.position.z = 0.002; w.add(cap);
+      const hi = new THREE.Mesh(new THREE.RingGeometry(WHEEL_R * 0.48, WHEEL_R * 0.56, 24, 1, 0.4, 1.6), capHi); hi.position.z = 0.003; w.add(hi);
       for (let k = 0; k < 5; k++) {
-        const sp = new THREE.Mesh(new THREE.PlaneGeometry(0.012, WHEEL_R * 0.5), rimM);
-        sp.rotation.z = (k / 5) * Math.PI * 2; sp.position.set(Math.sin(-sp.rotation.z) * WHEEL_R * 0.25, Math.cos(sp.rotation.z) * WHEEL_R * 0.25, 0.002); w.add(sp);
+        const a = (k / 5) * Math.PI * 2;
+        const lug = new THREE.Mesh(new THREE.CircleGeometry(0.014, 6), lugM); lug.position.set(Math.cos(a) * WHEEL_R * 0.24, Math.sin(a) * WHEEL_R * 0.24, 0.004); w.add(lug);
       }
-      const hub = new THREE.Mesh(new THREE.CircleGeometry(0.035, 10), hubM); hub.position.z = 0.003; w.add(hub);
+      const hub = new THREE.Mesh(new THREE.CircleGeometry(0.03, 10), lugM); hub.position.z = 0.004; w.add(hub);
       w.position.set(x, y, 0.365); w.renderOrder = 2;
       this.root.add(w);
       this.wheels.push(w);

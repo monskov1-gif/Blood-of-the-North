@@ -290,7 +290,8 @@ const methods = {
     const patch = this.pool(profile.color, cx + 0.5, z + fall * 0.6, w + 0.8, 2.2, profile.patch);
     // at night the moon lays the window's panes on the floor (cold, faint)
     const panesTex = canvasTexture(`hospx-panes-${panes}`, 64, 64, (c, cw, ch) => {
-      c.fillStyle = '#fff'; c.fillRect(0, 0, cw, ch);
+      c.filter = 'blur(2px)';
+      c.fillStyle = '#fff'; c.fillRect(6, 4, cw - 12, ch - 8);
       c.fillStyle = '#000';
       for (let k = 1; k < panes; k++) c.fillRect((cw * k) / panes - 2, 0, 4, ch);
       c.fillRect(0, ch * 0.38 - 2, cw, 4);
@@ -409,8 +410,9 @@ const methods = {
     for (const nx of [27.9, 32.6]) {
       const nm = this.mat('hxNightLamp', { color: 0x201810, emissive: 0xffb060, emissiveIntensity: 0 });
       this.bx(0.22, 0.08, 0.04, nm, nx, 0.38, BACK + 0.05);
-      const np = this.pool(0xffa050, nx, BACK + 0.9, 1.6, 1.3, 0);
-      this.expNight.push((night) => { nm.emissiveIntensity = night ? 3 : 0; np.material.opacity = night ? 0.2 : 0; });
+      const np = this.pool(0xffa050, nx, BACK + 1.0, 2.8, 2.1, 0);
+      const nl = new THREE.PointLight(0xffa860, 0, 3.2, 1.6); nl.position.set(nx, 0.5, BACK + 0.5); this.root.add(nl);
+      this.expNight.push((night) => { nm.emissiveIntensity = night ? 3 : 0; np.material.opacity = night ? 0.28 : 0; nl.intensity = night ? 1.4 : 0; });
     }
     // directional sign at the end of the wing
     const s = this.textSign('СТАРОЕ КРЫЛО · ОПЕРБЛОК →', { w: 1.9, h: 0.22, bg: '#0e3a5a', fg: '#f4f8fa' });
@@ -704,6 +706,12 @@ const methods = {
 
   /** Per-frame life of the expansion: curtains in the draught, shadows behind curtains, a tired globe. */
   updateExpansion(dt) {
+    // at night a faint cool key follows Julian, so his silhouette always reads in the dark wings
+    if (!this.nightKey) { this.nightKey = new THREE.PointLight(0x8aa0d0, 0, 3.4, 1.5); this.root.add(this.nightKey); }
+    const J = this.followTarget?.();
+    const want = this.night && J && J.position.x > X_WING - 2 ? 1.6 : 0;
+    this.nightKey.intensity += (want - this.nightKey.intensity) * Math.min(1, dt * 2);
+    if (J) this.nightKey.position.set(J.position.x + 0.6, 1.7, J.position.z + 1.4);
     this.curtainTime.value += dt;
     const t = this.curtainTime.value;
     for (const s of this.shadowFigures) {
