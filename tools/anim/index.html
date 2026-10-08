@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Риг: просмотр анимации</title>
+<style>
+  :root { --bg: #15161a; --panel: #1e2026; --fg: #e8e6e0; --mute: #9a988f; --acc: #d9b46a; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.4 system-ui, sans-serif; display: flex; flex-direction: column; height: 100vh; }
+  header { padding: 10px 16px; display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; background: var(--panel); }
+  header h1 { font-size: 15px; margin: 0 8px 0 0; font-weight: 600; }
+  .grp { display: flex; gap: 6px; align-items: center; }
+  button { background: #2b2e36; color: var(--fg); border: 1px solid #3a3e48; border-radius: 6px; padding: 6px 10px; cursor: pointer; font: inherit; }
+  button.on { background: var(--acc); color: #1a1408; border-color: var(--acc); }
+  label { color: var(--mute); display: flex; align-items: center; gap: 6px; }
+  input[type=range] { width: 120px; }
+  #stage { flex: 1; position: relative; overflow: hidden; }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
+  #info { position: absolute; left: 12px; bottom: 10px; color: var(--mute); font-size: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Риг персонажа</h1>
+  <div class="grp"><button id="idle" class="on">Стойка</button><button id="walk">Ходьба</button></div>
+  <label>Скорость <input id="speed" type="range" min="0.5" max="1.6" step="0.05" value="1"><span id="sv">1.00</span></label>
+  <div class="grp">
+    <button id="pause">Пауза</button><button id="step">Кадр ›</button>
+  </div>
+  <div class="grp">
+    <button id="skel">Скелет</button><button id="move">Идёт по сцене</button><button id="px">Пиксели (масштаб игры)</button><button id="ref">Референс</button><button id="light">Светлый фон</button>
+  </div>
+</header>
+<div id="stage"><canvas id="c"></canvas><div id="info"></div></div>
+<script type="module">
+import { Rig, GROUND } from './rig.js';
+
+const img = new Image();
+img.src = '../art/girl/parts_sheet.png';
+const ref = new Image();
+ref.src = '../art/girl/reference.jpg';
+await new Promise((r) => { img.onload = r; });
+
+const rig = new Rig(img);
+const c = document.getElementById('c'), ctx = c.getContext('2d');
+const S = { paused: false, skel: false, move: false, px: false, ref: false, light: false, stepOnce: false };
+const $ = (id) => document.getElementById(id);
+const toggle = (id, key) => $(id).onclick = () => { S[key] = !S[key]; $(id).classList.toggle('on', S[key]); };
+toggle('skel', 'skel'); toggle('move', 'move'); toggle('px', 'px'); toggle('ref', 'ref'); toggle('light', 'light');
+$('idle').onclick = () => { rig.mode = 'idle'; $('idle').classList.add('on'); $('walk').classList.remove('on'); };
+$('walk').onclick = () => { rig.mode = 'walk'; $('walk').classList.add('on'); $('idle').classList.remove('on'); };
+$('speed').oninput = (e) => { rig.speed = +e.target.value; $('sv').textContent = rig.speed.toFixed(2); };
+$('pause').onclick = () => { S.paused = !S.paused; $('pause').classList.toggle('on', S.paused); };
+$('step').onclick = () => { S.paused = true; $('pause').classList.add('on'); S.stepOnce = true; };
+// test hooks (headless screenshots)
+window.__rig = rig; window.__S = S;
+
+// offscreen buffer for the pixel mode: the figure is drawn at full size, then reduced to the
+// game's grid (1 px ≈ 1 cm: the 830 px tall figure → ~165 px) and blown up without smoothing
+const off = document.createElement('canvas'), octx = off.getContext('2d');
+const small = document.createElement('canvas'), sctx = small.getContext('2d');
+
+let last = performance.now(), worldX = 0;
+function frame(now) {
+  requestAnimationFrame(frame);
+  let dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (S.paused && !S.stepOnce) dt = 0;
+  if (S.stepOnce) { dt = 1 / 24; S.stepOnce = false; }
+  if (window.__fixedDt != null) dt = window.__fixedDt;
+  rig.solve(dt);
+  worldX += rig.vel * dt;
+
+  const W = c.clientWidth * devicePixelRatio, H = c.clientHeight * devicePixelRatio;
+  if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
+  ctx.imageSmoothingEnabled = false;
+  ctx.fillStyle = S.light ? '#d8d4ca' : '#202227'; ctx.fillRect(0, 0, W, H);
+  // view: character space y 100..980 fits the height
+  const k = H / 920;
+  const camX = S.move ? 0 : worldX;           // "on the spot": the ground scrolls, the body stays
+  const bodyX = S.move ? ((worldX % 2400) - 400) : 0;
+  ctx.save();
+  ctx.translate(W / 2 - 160 * k, -90 * k);
+  ctx.scale(k, k);
+  // ground with ticks: the planted foot must stay on its tick (no sliding)
+  ctx.strokeStyle = S.light ? '#8a867c' : '#4a4d56'; ctx.lineWidth = 2 / k;
+  ctx.beginPath(); ctx.moveTo(-3000, GROUND + 1); ctx.lineTo(3000, GROUND + 1); ctx.stroke();
+  for (let x = -3000 - ((camX % 100) + 100) % 100; x < 3000; x += 100) {
+    ctx.beginPath(); ctx.moveTo(x, GROUND + 1); ctx.lineTo(x, GROUND + 14); ctx.stroke();
+  }
+  if (S.ref) { ctx.globalAlpha = 0.35; ctx.drawImage(ref, 0, 0); ctx.globalAlpha = 1; }
+  ctx.translate(bodyX, 0);
+  if (S.px) {
+    const fw = 600, fh = 900, sc = 165 / 830;
+    off.width = fw; off.height = fh; octx.clearRect(0, 0, fw, fh);
+    octx.save(); octx.translate(-30, -100); rig.draw(octx); octx.restore();
+    small.width = Math.round(fw * sc); small.height = Math.round(fh * sc);
+    sctx.imageSmoothingEnabled = true; sctx.imageSmoothingQuality = 'high';
+    sctx.clearRect(0, 0, small.width, small.height); sctx.drawImage(off, 0, 0, small.width, small.height);
+    // hard alpha like the game's sprites
+    const id = sctx.getImageData(0, 0, small.width, small.height), d = id.data;
+    for (let i = 3; i < d.length; i += 4) d[i] = d[i] > 110 ? 255 : 0;
+    sctx.putImageData(id, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(small, 30, 100, fw, fh);
+    if (S.skel) rig.drawSkeleton(ctx);
+  } else {
+    rig.draw(ctx, { skeleton: S.skel });
+  }
+  ctx.restore();
+  $('info').textContent = `${rig.mode === 'walk' ? 'ходьба' : 'стойка'} · фаза ${(rig.phase || 0).toFixed(2)} · скорость ${(rig.vel / 500).toFixed(2)} м/с`;
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
