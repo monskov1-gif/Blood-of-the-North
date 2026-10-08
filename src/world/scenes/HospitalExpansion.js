@@ -144,11 +144,11 @@ const methods = {
     const span = x1 - x0;
     const k = state === 'open' ? 0.16 : state === 'partial' ? 0.55 : 0.97;
     const w = Math.max(0.25, span * k);
-    const pleats = Math.round(w / 0.09);
+    const pleats = Math.max(3, Math.round(w / 0.15));
     const geo = new THREE.PlaneGeometry(w, drop, Math.max(6, pleats * 2), 3);
     const p = geo.attributes.position;
     // tighter, deeper folds when bunched
-    const depth = state === 'open' ? 0.07 : 0.045;
+    const depth = state === 'open' ? 0.09 : 0.075;
     for (let i = 0; i < p.count; i++) p.setZ(i, Math.sin((p.getX(i) / w) * pleats * Math.PI) * depth);
     geo.computeVertexNormals();
     const mat = this.mat(`hxCurtain-${state}`, { map: tiled(TXX.privacy(), w / 0.6, drop / 0.6), color: 0xffffff, roughness: 0.92, side: THREE.DoubleSide });
@@ -257,13 +257,13 @@ const methods = {
   brightWindow(x0, x1, y0, y1, profile, view = 'ward107', { blinds = false, z = BACK } = {}) {
     const root = this.root;
     const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, w = x1 - x0, h = y1 - y0;
-    const viewMat = new THREE.MeshBasicMaterial({ map: streetTexture('morning', view), color: 0xffffff });
+    const viewMat = new THREE.MeshBasicMaterial({ map: streetTexture('morning', view), color: 0xe4dccc }); // peaks near #F0E8D8, never pure white
     viewMat.userData.view = view;
     this.outsideMats.push(viewMat);
     const pane = new THREE.Mesh(new THREE.PlaneGeometry(w + 0.8, h + 0.8), viewMat);
     pane.position.set(cx, cy, z - 0.3); root.add(pane);
     // the glare of the glass itself (washes the view out by day)
-    const glareMat = new THREE.MeshBasicMaterial({ color: profile.color, transparent: true, opacity: 0.32, blending: THREE.AdditiveBlending, depthWrite: false });
+    const glareMat = new THREE.MeshBasicMaterial({ color: profile.color, transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false });
     const glare = new THREE.Mesh(new THREE.PlaneGeometry(w, h), glareMat);
     glare.position.set(cx, cy, z - 0.05); glare.renderOrder = 2; root.add(glare);
     // frame, mullions, sill
@@ -288,6 +288,20 @@ const methods = {
     geo.setIndex([0, 2, 1, 1, 2, 3]);
     const shaft = new THREE.Mesh(geo, shaftMat); shaft.renderOrder = 3; root.add(shaft);
     const patch = this.pool(profile.color, cx + 0.5, z + fall * 0.6, w + 0.8, 2.2, profile.patch);
+    // at night the moon lays the window's panes on the floor (cold, faint)
+    const panesTex = canvasTexture(`hospx-panes-${panes}`, 64, 64, (c, cw, ch) => {
+      c.fillStyle = '#fff'; c.fillRect(0, 0, cw, ch);
+      c.fillStyle = '#000';
+      for (let k = 1; k < panes; k++) c.fillRect((cw * k) / panes - 2, 0, 4, ch);
+      c.fillRect(0, ch * 0.38 - 2, cw, 4);
+      c.globalCompositeOperation = 'destination-in';
+      const g = c.createLinearGradient(0, 0, 0, ch); g.addColorStop(0, 'rgba(0,0,0,0.2)'); g.addColorStop(0.3, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0.6)');
+      c.fillStyle = g; c.fillRect(0, 0, cw, ch);
+    });
+    const moonM = new THREE.MeshBasicMaterial({ map: panesTex, color: 0x6a88c8, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
+    const moon = new THREE.Mesh(new THREE.PlaneGeometry(w * 1.05, 1.5), moonM);
+    moon.rotation.x = -Math.PI / 2; moon.position.set(cx + 0.35, 0.006, z + 1.25); moon.renderOrder = 2; root.add(moon);
+    this.expNight.push((night) => { moonM.opacity = night ? 0.25 : 0; });
     // its light zone for WindowLightSystem (exposure/bloom response + lens flare)
     const zone = {
       ...profile,
@@ -297,7 +311,7 @@ const methods = {
     };
     this.windowLights.push(zone);
     this.expNight.push((night) => {
-      glareMat.opacity = night ? 0.14 : 0.32;
+      glareMat.opacity = night ? 0.14 : 0.22;
       glareMat.color.set(night ? 0x5070b0 : profile.color);
       shaftMat.opacity = night ? profile.shaft * 0.45 : profile.shaft;
       shaftMat.color.set(night ? 0x5a78c0 : profile.color);
@@ -342,6 +356,8 @@ const methods = {
     this.pendants = [];
     this.curtainTime = this.curtainTime || { value: 0 };
     this.buildPatientWing();
+    this.floorShade(X_WING, X_OLD);
+    this.floorShade(X_OLD, X_END);
     this.doorFrameLarge(X_OLD);
     this.buildOldWing();
     this.buildOperating();
@@ -388,7 +404,7 @@ const methods = {
     // corridor ceiling: troffers, two of them dimmed
     for (let x = 24.5; x < X_OLD - 0.6; x += 3) this.troffer(x, -1.3, Math.abs(x - 30.5) < 0.1 ? 'B' : 'A');
     const l = new THREE.PointLight(0xe4eeff, 6, 11, 1.2); l.position.set(30, 2.75, -1.6); root.add(l);
-    this.expNight.push((night) => { l.color.set(night ? 0x5070b0 : 0xe4eeff); l.intensity = night ? 1.6 : 6; });
+    this.expNight.push((night) => { l.color.set(night ? 0x5070b0 : 0xe4eeff); l.intensity = night ? 2.4 : 6; });
     // night lamps low on the wall (like the ones in the old corridor): a dim amber pool each
     for (const nx of [27.9, 32.6]) {
       const nm = this.mat('hxNightLamp', { color: 0x201810, emissive: 0xffb060, emissiveIntensity: 0 });
@@ -469,8 +485,8 @@ const methods = {
     // the boarded side corridor: a sawhorse and a sign, the dark going on behind
     this.sideCorridorDark(55.5, 56.8);
     // pendant lights (old glass globes)
-    const globe = this.mat('hxGlobe', { color: 0xe8e4d8, emissive: 0xfff2d8, emissiveIntensity: 0.9, roughness: 0.3 });
-    const globeN = this.mat('hxGlobeN', { color: 0xe8e4d8, emissive: 0xffe8c8, emissiveIntensity: 0.9, roughness: 0.3 });
+    const globe = this.mat('hxGlobe', { color: 0xe8e4d8, emissive: 0xfff2d8, emissiveIntensity: 0.4, roughness: 0.3 });
+    const globeN = this.mat('hxGlobeN', { color: 0xe8e4d8, emissive: 0xffe8c8, emissiveIntensity: 0.4, roughness: 0.3 });
     const globeOff = this.mat('hxGlobeOff', { color: 0xc8c4b8, emissive: 0x000000, roughness: 0.3 });
     for (const [gx, on] of [[39.5, true], [43.5, true], [47.5, false], [51.5, true], [55.0, true]]) {
       this.cy(0.006, 0.006, 0.9, 4, iron, gx, H2 - 0.45, -1.3);
@@ -484,11 +500,11 @@ const methods = {
     const warm = new THREE.PointLight(0xffd8a0, 5, 9, 1.3); warm.position.set(41.5, 2.4, -1.8); root.add(warm);
     const cold = new THREE.PointLight(0xdce6f4, 5, 10, 1.3); cold.position.set(52.5, 2.6, -1.6); root.add(cold);
     this.expNight.push((night) => {
-      warm.color.set(night ? 0x4a5a98 : 0xffd8a0); warm.intensity = night ? 1.5 : 5;
-      cold.color.set(night ? 0x3a4a80 : 0xdce6f4); cold.intensity = night ? 1.8 : 5;
-      globe.emissiveIntensity = night ? 0.12 : 0.9;
+      warm.color.set(night ? 0x4a5a98 : 0xffd8a0); warm.intensity = night ? 2.0 : 5;
+      cold.color.set(night ? 0x3a4a80 : 0xdce6f4); cold.intensity = night ? 2.4 : 5;
+      globe.emissiveIntensity = night ? 0.12 : 0.4;
       nightGlobe.intensity = night ? 2.2 : 0;
-      globeN.emissiveIntensity = night ? 1.1 : 0.9;
+      globeN.emissiveIntensity = night ? 0.7 : 0.4;
     });
     // signs of the age: a 1970s visiting-hours board, "TИШИНА"
     const quiet = this.textSign('ТИШИНА', { w: 0.7, h: 0.2, bg: '#e8e2c8', fg: '#3a2a1a', font: 'bold 44px serif' });
@@ -499,8 +515,14 @@ const methods = {
     const fg = (x, z, name, build) => { const g = new THREE.Group(); g.name = name; build(g); g.position.set(x, 0, z); root.add(g); this.foregroundGroups.push(g); };
     fg(44.2, 3.1, 'fg-oldwheelchair', (g) => { const w = this.wheelchair(); w.rotation.y = 0.9; w.scale.setScalar(1.02); g.add(w); });
     fg(50.0, 2.9, 'fg-column', (g) => {
-      this.box(0.5, H2, 0.5, this.mat('hxOldWall'), 0, H2 / 2, 0, g);
+      // a plastered pier: dado, oak corner beads, a moulded cap under the ceiling
+      const colTex = TXX.oldPaint().clone(); colTex.needsUpdate = true; colTex.repeat.set(0.5, 2);
+      this.box(0.5, H2, 0.5, this.mat('hxColumn', { map: colTex, color: 0xe8ecdc, roughness: 0.85 }), 0, H2 / 2, 0, g);
       this.box(0.54, 1.25, 0.54, this.mat('hxOldDado'), 0, 0.625, 0, g);
+      this.box(0.58, 0.05, 0.58, this.mat('hxOldRail'), 0, 1.27, 0, g);
+      this.box(0.62, 0.14, 0.62, this.mat('hxCornice', { color: 0xd8d8cc, roughness: 0.7 }), 0, H2 - 0.07, 0, g);
+      this.box(0.58, 0.12, 0.58, this.mat('hSkirt'), 0, 0.06, 0, g);
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]) this.box(0.035, H2 - 1.4, 0.035, this.mat('hxOldRail'), sx * 0.25, 1.3 + (H2 - 1.4) / 2, sz * 0.25, g);
     });
   },
 
@@ -557,7 +579,7 @@ const methods = {
   buildOperating() {
     const root = this.root;
     const x0 = 48.0, x1 = 55.2, depth = 5.2, zb = BACK - depth, cx = (x0 + x1) / 2;
-    const tiles = this.mat('hxOrTiles', { map: tiled(TXX.orTiles(), (x1 - x0) / 0.5, 6), color: 0xffffff, roughness: 0.4 });
+    const tiles = this.mat('hxOrTiles', { map: tiled(TXX.orTiles(), (x1 - x0) / 0.5, 6), color: 0xa8b4ae, roughness: 0.4 });
     const band = this.mat('hxOrBand', { color: 0x4a7a6a, roughness: 0.4 });
     this.bx(x1 - x0, H2, 0.1, tiles, cx, H2 / 2, zb);
     this.bx(0.1, H2, depth, tiles, x0, H2 / 2, BACK - depth / 2);
@@ -607,9 +629,9 @@ const methods = {
     const redM = this.mat('hxInUse', { color: 0x200000, emissive: 0xff2020, emissiveIntensity: 0.3 });
     this.bx(0.4, 0.14, 0.05, redM, 49.0, 3.1, BACK + 0.04);
     // its own cold light by day; at night only the red lamp over the door
-    const l = new THREE.PointLight(0xe8f0ff, 4, 7, 1.4); l.position.set(tx, 2.8, tz + 0.6); root.add(l);
+    const l = new THREE.PointLight(0xe8f0ff, 2.2, 7, 1.4); l.position.set(tx, 2.8, tz + 0.6); root.add(l);
     this.expNight.push((night) => {
-      l.intensity = night ? 0.25 : 4;
+      l.intensity = night ? 0.25 : 2.2;
       lampM.emissiveIntensity = night ? 0.05 : 1.6;
       lampGlow.material.opacity = night ? 0 : 0.45;
       pool.material.opacity = night ? 0.03 : 0.3;
@@ -631,11 +653,11 @@ const methods = {
     const dado = new THREE.Mesh(new THREE.PlaneGeometry(9, 1.25), this.mat('hxOldDado'));
     dado.rotation.y = -Math.PI / 2; dado.position.set(X_END - 0.02, 0.625, 0.5); root.add(dado);
     // the window itself: outside view + glare, wooden frame
-    const view = new THREE.MeshBasicMaterial({ map: streetTexture('morning', 'ward109'), color: 0xffffff });
+    const view = new THREE.MeshBasicMaterial({ map: streetTexture('morning', 'ward109'), color: 0xe4dccc });
     view.userData.view = 'ward109'; this.outsideMats.push(view);
     const pane = new THREE.Mesh(new THREE.PlaneGeometry(zB - zA + 1, y1 - y0 + 1), view);
     pane.rotation.y = -Math.PI / 2; pane.position.set(X_END + 0.35, (y0 + y1) / 2, (zA + zB) / 2); root.add(pane);
-    const glareMat = new THREE.MeshBasicMaterial({ color: PROFILES.D.color, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false });
+    const glareMat = new THREE.MeshBasicMaterial({ color: PROFILES.D.color, transparent: true, opacity: 0.45, blending: THREE.AdditiveBlending, depthWrite: false });
     const glare = new THREE.Mesh(new THREE.PlaneGeometry(zB - zA, y1 - y0), glareMat);
     glare.rotation.y = -Math.PI / 2; glare.position.set(X_END + 0.04, (y0 + y1) / 2, (zA + zB) / 2); glare.renderOrder = 2; root.add(glare);
     const frame = this.mat('hxWoodFrame', { color: 0x4a301a, roughness: 0.5 });
@@ -652,7 +674,7 @@ const methods = {
     const patch = this.pool(PROFILES.D.color, X_END - 2.6, (zA + zB) / 2, 3.4, 2.6, PROFILES.D.patch);
     this.windowLights.push({ ...PROFILES.D, position: new THREE.Vector3(X_END, 2.4, (zA + zB) / 2), dir: new THREE.Vector3(-1, 0, 0), enabled: () => !this.night });
     this.expNight.push((night) => {
-      glareMat.opacity = night ? 0.16 : 0.85; glareMat.color.set(night ? 0x4a68b0 : PROFILES.D.color);
+      glareMat.opacity = night ? 0.16 : 0.45; glareMat.color.set(night ? 0x4a68b0 : PROFILES.D.color);
       shaftMat.opacity = night ? 0.12 : PROFILES.D.shaft; shaftMat.color.set(night ? 0x5a78c0 : PROFILES.D.color);
       patch.material.opacity = night ? 0.14 : PROFILES.D.patch; patch.material.color.set(night ? 0x5a78c0 : PROFILES.D.color);
     });
@@ -660,6 +682,25 @@ const methods = {
 
   /** How much footsteps echo at x (0 in the new building, 1 in the old wing). */
   echoAt(x) { return Math.min(1, Math.max(0, (x - X_OLD + 0.5) / 2)); },
+
+  /** Floor shading for a corridor run: contact shadow at the wall, a worn walking line, dusk toward the camera. */
+  floorShade(x0, x1) {
+    const w = x1 - x0, cx = (x0 + x1) / 2;
+    const grad = (key, stops) => canvasTexture(`hospx-${key}`, 4, 64, (c, cw, ch) => {
+      const g = c.createLinearGradient(0, 0, 0, ch);
+      for (const [o, a] of stops) g.addColorStop(o, `rgba(0,0,0,${a})`);
+      c.fillStyle = g; c.fillRect(0, 0, cw, ch);
+    });
+    const plane = (tex, z0, z1, opacity, y) => {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(w, z1 - z0), new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity, depthWrite: false }));
+      m.rotation.x = -Math.PI / 2; m.position.set(cx, y, (z0 + z1) / 2); m.renderOrder = 1;
+      this.root.add(m);
+      return m;
+    };
+    plane(grad('wallshade', [[0, 0.0], [0.75, 0.35], [1, 0.6]]), BACK, BACK + 0.7, 1, 0.004);   // contact shadow under the dado
+    plane(grad('near', [[0, 0.0], [0.5, 0.18], [1, 0.55]]), 2.0, 5.0, 1, 0.0045);             // the floor darkens toward the lens
+    plane(grad('path', [[0, 0], [0.5, 0.12], [1, 0]]), -1.7, -0.5, 1, 0.005);                  // the walking line, worn darker
+  },
 
   /** Per-frame life of the expansion: curtains in the draught, shadows behind curtains, a tired globe. */
   updateExpansion(dt) {
@@ -687,13 +728,13 @@ const methods = {
  * C through blinds, long streaks, weak; D the strong morning one, near blinding.
  */
 export const PROFILES = {
-  A: { id: 'A', color: 0xffd8a0, triggerDistance: 3.4, fadeDistance: 2.2, intensity: 1.0, exposure: 0.16, bloom: 0.22, shaft: 0.2, patch: 0.28,
+  A: { id: 'A', color: 0xffd8a0, triggerDistance: 3.4, fadeDistance: 2.2, intensity: 1.0, exposure: 0.13, bloom: 0.18, shaft: 0.18, patch: 0.28,
     flareSize: 1.0, starburstIntensity: 1.0, ghostIntensity: 0.8, ghostCount: 6, ghostSpacing: 0.42, ringIntensity: 0.5, colorTint: [1.0, 0.86, 0.6], ghostTints: [[0.5, 1.0, 0.6], [0.8, 1.0, 0.5], [1.0, 0.7, 0.3]], maxScreenOpacity: 0.85, old: true },
   B: { id: 'B', color: 0xdfe8ff, triggerDistance: 2.8, fadeDistance: 1.8, intensity: 0.7, exposure: 0.12, bloom: 0.2, shaft: 0.14, patch: 0.18,
     flareSize: 0.75, starburstIntensity: 0.45, ghostIntensity: 0.6, ghostCount: 5, ghostSpacing: 0.5, ringIntensity: 0.6, colorTint: [0.85, 0.92, 1.0], ghostTints: [[0.5, 0.6, 1.0], [0.8, 0.5, 1.0], [0.6, 0.9, 1.0]], maxScreenOpacity: 0.6 },
   C: { id: 'C', color: 0xe8ecf4, triggerDistance: 2.6, fadeDistance: 1.6, intensity: 0.55, exposure: 0.08, bloom: 0.25, shaft: 0.12, patch: 0.14,
     flareSize: 0.7, starburstIntensity: 0.3, ghostIntensity: 0.35, ghostCount: 3, ghostSpacing: 0.6, ringIntensity: 0.2, colorTint: [0.95, 0.97, 1.0], ghostTints: [[0.9, 0.95, 1.0]], streaks: true, maxScreenOpacity: 0.5, old: true },
-  D: { id: 'D', color: 0xfff0d4, triggerDistance: 4.5, fadeDistance: 4.0, intensity: 1.3, exposure: 0.42, bloom: 0.7, shaft: 0.3, patch: 0.4,
+  D: { id: 'D', color: 0xfff0d4, triggerDistance: 4.5, fadeDistance: 4.0, intensity: 1.2, exposure: 0.24, bloom: 0.4, shaft: 0.2, patch: 0.3,
     flareSize: 1.35, starburstIntensity: 1.4, ghostIntensity: 1.0, ghostCount: 8, ghostSpacing: 0.36, ringIntensity: 0.8, colorTint: [1.0, 0.94, 0.8], ghostTints: [[0.5, 1.0, 0.6], [0.4, 0.7, 1.0], [1.0, 0.4, 0.3], [1.0, 0.85, 0.4]], maxScreenOpacity: 0.95, old: true },
 };
 

@@ -215,9 +215,14 @@ const methods = {
       get: () => jpos.copy(this.julian.root.getWorldPosition(jpos)).add(V(0, 0.9, 0)),
       active: () => g.mode === 'play' && (g.keyScene || !g.player.enabled) && this.julian.root.parent === world.root });
     // free walk in the long hospital: a column or door post may cross Julian, but never hide him
-    if (world.id === 'hospital') zones.addZone({ id: 'julian (walk)', radius: 0.42, maxOcclusion: 0.55, priority: 1,
-      get: () => jpos.copy(this.julian.root.getWorldPosition(jpos)).add(V(0, 0.95, 0)),
-      active: () => g.mode === 'play' && g.player.enabled && !g.keyScene && this.julian.root.parent === world.root });
+    if (world.id === 'hospital') {
+      const walking = () => g.mode === 'play' && g.player.enabled && !g.keyScene && this.julian.root.parent === world.root;
+      const jp2 = new THREE.Vector3();
+      zones.addZone({ id: 'julian (walk)', radius: 0.42, maxOcclusion: 0.3, priority: 1, active: walking,
+        get: () => jpos.copy(this.julian.root.getWorldPosition(jpos)).add(V(0, 1.05, 0)) });
+      zones.addZone({ id: 'julian legs (walk)', radius: 0.3, maxOcclusion: 0.4, priority: 1, active: walking,
+        get: () => jp2.copy(this.julian.root.getWorldPosition(jp2)).add(V(0, 0.4, 0)) });
+    }
     zones.addZone({ id: 'focused interactable', radius: 0.32, maxOcclusion: 0.12, priority: 2,
       get: () => g.interactions.focused?.anchor || null, active: () => !!g.interactions.focused && g.world === world });
     const st = () => g.state.stage;

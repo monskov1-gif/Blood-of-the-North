@@ -357,13 +357,16 @@ export function autumnTree(ctx, r, x, y, s, night = false, kind = 'birch') {
   branch(x, y - s, Math.PI / 2 + (r() - 0.5) * 0.3, s * 0.18, 1);
   // what is left of the leaves: irregular golden clumps over the lower and inner
   // crown (birch and aspen go yellow here; a little orange), the top twigs bare
+  // every tree is at its own stage: some still half golden, some almost bare,
+  // and some (aspens) with a red-orange share
+  const bare = 0.3 + r() * 0.5, red = 0.08 + r() * 0.2, dense = 0.5 + r() * 0.8;
   for (const [tx, ty] of tips) {
     const high = ty < y - s * 0.95;
-    if (r() < (high ? 0.75 : 0.25)) continue;
+    if (r() < (high ? 0.6 + bare * 0.4 : bare)) continue;
     const cx = (tx + x) / 2 + (tx - x) * 0.25, cy = ty + s * 0.04;
-    for (let k = 0; k < 14 + r() * 10; k++) {
+    for (let k = 0; k < (8 + r() * 12) * dense; k++) {
       const pick = r();
-      ctx.fillStyle = pick < 0.82 ? leaves[pick < 0.4 ? 0 : pick < 0.62 ? 1 : 4] : leaves[2 + Math.floor(r() * 2)];
+      ctx.fillStyle = pick < red ? leaves[pick < red * 0.5 ? 3 : 5] : pick < red + 0.12 ? leaves[2] : leaves[r() < 0.45 ? 0 : r() < 0.6 ? 1 : 4];
       const ls = Math.max(1.5, s * (0.02 + r() * 0.02));
       ctx.fillRect(cx + (r() - 0.5) * s * 0.26, cy + (r() - 0.5) * s * 0.16, ls * (1 + r()), ls);
     }
@@ -378,6 +381,13 @@ export function pixelate(ctx, w, h, k = 3) {
   const small = document.createElement('canvas'); small.width = sw; small.height = sh;
   const sc = small.getContext('2d');
   sc.imageSmoothingEnabled = true; sc.drawImage(ctx.canvas, 0, 0, sw, sh);
+  // stepped tones with a 2×2 ordered dither: smooth glows and fog become pixel-art bands
+  const img = sc.getImageData(0, 0, sw, sh), d = img.data, step = 14, bayer = [-0.375, 0.125, 0.375, -0.125];
+  for (let y = 0; y < sh; y++) for (let x = 0; x < sw; x++) {
+    const i = (y * sw + x) * 4, o = bayer[(y & 1) * 2 + (x & 1)] * step;
+    for (let c = 0; c < 3; c++) d[i + c] = Math.max(0, Math.min(255, Math.round((d[i + c] + o) / step) * step));
+  }
+  sc.putImageData(img, 0, 0);
   ctx.save(); ctx.imageSmoothingEnabled = false; ctx.clearRect(0, 0, w, h); ctx.drawImage(small, 0, 0, w, h); ctx.restore();
 }
 

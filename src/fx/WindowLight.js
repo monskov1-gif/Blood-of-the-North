@@ -55,25 +55,25 @@ export class WindowLight {
     s.rot = R() * Math.PI;
     s.spin = (R() - 0.5) * 0.6;
     const all = [
-      { type: 'hex', t: j(0.5), r: j(0.115), tint: [1.0, 0.62, 0.35], a: 0.32 },
-      { type: 'hex', t: j(0.6), r: j(0.07), tint: tint(0), a: 0.42 },
-      { type: 'hex', t: j(0.36), r: j(0.045), tint: tint(1), a: 0.4 },
-      { type: 'hex', t: j(0.62), r: j(0.16), tint: [0.9, 0.55, 0.4], a: 0.12 },
-      { type: 'chroma', t: j(0.6), off: -j(0.2), r: j(0.045), a: 0.5 },
-      { type: 'dot', t: j(0.88, 0.05), r: 0.006, tint: [1, 0.8, 0.5], a: 0.7 },
-      { type: 'dot', t: j(0.98, 0.05), r: 0.005, tint: [1, 0.7, 0.4], a: 0.6 },
-      { type: 'hex', t: j(1.3), r: j(0.022), tint: tint(0), a: 0.55 },
-      { type: 'hex', t: j(1.6), r: j(0.024), tint: tint(2), a: 0.5 },
-      { type: 'spot', t: j(1.85, 0.06), off: -0.03, r: j(0.03), tint: [0.45, 0.4, 1.0], a: 0.75 },
+      { type: 'hex', t: j(0.5), r: j(0.15), tint: [0.85, 0.55, 0.32], a: 0.34 },
       { type: 'sparkle', t: j(2.0, 0.05), r: j(0.075), tint: [0.55, 1.0, 0.55], a: 0.9 },
-      { type: 'glow', t: j(2.15, 0.06), r: j(0.2), tint: [0.3, 0.9, 0.45], a: 0.32 },
-      { type: 'ring', t: j(2.15, 0.06), r: j(0.24, 0.08), a: 1 },
-      { type: 'sparkle', t: j(2.45, 0.05), off: 0.06, r: j(0.05), tint: [0.6, 1.0, 0.5], a: 0.55 },
+      { type: 'ring', t: 0, r: j(0.22, 0.08), a: 1 },
+      { type: 'glow', t: j(2.12, 0.06), r: j(0.2), tint: [0.3, 0.9, 0.45], a: 0.3 },
+      { type: 'hex', t: j(0.6), r: j(0.1), tint: [0.6, 0.66, 0.32], a: 0.4 },
+      { type: 'chroma', t: j(0.6), off: -j(0.2), r: j(0.045), a: 0.45 },
+      { type: 'spot', t: j(1.85, 0.06), off: -0.03, r: j(0.03), tint: [0.45, 0.4, 1.0], a: 0.7 },
+      { type: 'hex', t: j(0.4), r: j(0.07), tint: tint(1), a: 0.36 },
+      { type: 'gstreak', t: 0, r: j(0.14), tint: [0.7, 1.0, 0.4], a: 0.2 },
+      { type: 'hex', t: j(0.66), r: j(0.2), tint: [0.75, 0.5, 0.36], a: 0.16 },
+      { type: 'hex', t: j(1.3), r: j(0.022), tint: tint(0), a: 0.45 },
+      { type: 'hex', t: j(1.6), r: j(0.024), tint: tint(2), a: 0.4 },
+      ...[0.9, 1.05, 1.2, 1.42, 1.7].map((t, i) => ({ type: 'dot', t: j(t, 0.04), r: 0.004 + (i % 2) * 0.002, tint: [1, 0.78 - i * 0.04, 0.45], a: 0.55 })),
+      { type: 'sparkle', t: j(2.45, 0.05), off: 0.06, r: j(0.05), tint: [0.6, 1.0, 0.5], a: 0.5 },
     ];
     // fewer elements for the soft profiles / low quality: keep the strongest ones
-    const n = Math.max(3, Math.round(all.length * Math.min(1, z.ghostCount / 8) * (this.low ? 0.7 : 1)));
+    const n = Math.max(4, Math.round(all.length * Math.min(1, z.ghostCount / 8) * (this.low ? 0.75 : 1)));
     // priority: what makes it read as a lens flare goes first
-    const order = [0, 12, 10, 11, 1, 4, 9, 2, 7, 8, 3, 5, 13, 6];
+    const order = all.map((_, i) => i); // listed in priority order
     const pick = new Set(order.slice(0, n));
     s.ghosts = all.filter((g, i) => pick.has(i));
   }
@@ -150,6 +150,14 @@ export class WindowLight {
       jb = { x0: a.x - hw, x1: a.x + hw, y0: b.y, y1: a.y };
     }
     const overJ = (x, y, r) => jb && x + r > jb.x0 && x - r < jb.x1 && y + r > jb.y0 && y - r < jb.y1;
+    // ghosts thin out near Julian (within ~80 px of his box) and nearly vanish over him
+    const margin = 80 * sc;
+    const nearJ = (x, y, r) => {
+      if (!jb) return 1;
+      const dx = Math.max(jb.x0 - x, 0, x - jb.x1), dy = Math.max(jb.y0 - y, 0, y - jb.y1);
+      const d = Math.hypot(dx, dy) - r * 0.5;
+      return 0.2 + 0.8 * smooth(0, margin, d);
+    };
     const camPos = camera.position;
     // one lens, one dominant flare: the strongest window gets the full chain,
     // the others only a softer core (stacked flares wash the frame to white)
@@ -160,7 +168,7 @@ export class WindowLight {
       if (S.z > 1 || S.z < -1) continue;
       const facing = z.dir.x * (camPos.x - z.position.x) + z.dir.z * (camPos.z - z.position.z);
       if (facing <= 0) continue;
-      const edge = 1 - smooth(1.0, 1.45, Math.max(Math.abs(S.nx), Math.abs(S.ny)));
+      const edge = 1 - smooth(0.85, 1.05, Math.max(Math.abs(S.nx), Math.abs(S.ny))); // the window must be in the frame
       // Julian standing in front of the window shadows the source
       const occl = overJ(S.x, S.y, 0) ? 0.3 : 1;
       const A = Math.min(z.maxScreenOpacity, s.w * z.intensity * edge * occl * gain) * (minor ? 0.45 : 1);
@@ -174,7 +182,7 @@ export class WindowLight {
       };
       // --- source: halo + core + starburst
       const ct = z.colorTint;
-      put(this.halo(ct), S.x, S.y, U * 0.36 * z.flareSize, A * 0.5);
+      put(this.halo(ct), S.x, S.y, U * 0.26 * z.flareSize, A * 0.5);
       if (z.starburstIntensity > 0) put(this.burst(z.id, ct), S.x, S.y, U * 0.4 * z.flareSize, A * Math.min(1, 0.6 * z.starburstIntensity), s.rot + S.nx * s.spin);
       put(this.core(ct), S.x, S.y, U * 0.1 * z.flareSize, A * 0.8);
       if (minor) continue;
@@ -187,12 +195,15 @@ export class WindowLight {
       // --- the ghost chain along source → centre (and past it)
       const vx = W / 2 - S.x, vy = Hh / 2 - S.y;
       const len = Math.hypot(vx, vy) || 1, px = -vy / len, py = vx / len;
-      const gi = z.ghostIntensity * 1.6; // ghosts sit over a lit room, not over black
+      const gi = z.ghostIntensity * 1.1; // ghosts sit over a lit room, not over black
+      const sp = s.ghosts.find((q) => q.type === 'sparkle');
+      const spark = sp && { x: S.x + vx * sp.t + px * (sp.off || 0) * U, y: S.y + vy * sp.t + py * (sp.off || 0) * U };
+      // faint veiling glare over the whole frame
+      g.globalAlpha = 1; g.fillStyle = rgba(ct, 0.035 * A); g.fillRect(0, 0, W, Hh);
       for (const gh of s.ghosts) {
         const x = S.x + vx * gh.t + px * (gh.off || 0) * U, y = S.y + vy * gh.t + py * (gh.off || 0) * U;
         const r = U * gh.r * z.flareSize;
-        let a = A * gi * gh.a;
-        if (overJ(x, y, r)) a *= 0.3;
+        const a = A * gi * gh.a * nearJ(x, y, r);
         switch (gh.type) {
           case 'hex': put(this.hex(gh.tint), x, y, r, a * 0.8, s.rot * 0.2); break;
           case 'dot': put(this.core(gh.tint), x, y, Math.max(1.5, r), a); break;
@@ -200,7 +211,19 @@ export class WindowLight {
           case 'spot': put(this.halo(gh.tint), x, y, r, a); put(this.core(gh.tint), x, y, r * 0.35, a * 0.6); break;
           case 'sparkle': put(this.sparkle(gh.tint), x, y, r, a, s.rot * 0.5 + 0.4); break;
           case 'glow': put(this.halo(gh.tint), x, y, r, a); break;
-          case 'ring': if (z.ringIntensity > 0) put(this.ring(), x, y, r, a * z.ringIntensity * 0.75, Math.atan2(vy, vx)); break;
+          case 'ring': {
+            // thin arcs wrapped round the far side of the green sparkle
+            if (!(z.ringIntensity > 0) || !spark) break;
+            const ux = vx / len, uy = vy / len;
+            put(this.ring(), spark.x + ux * r * 0.35, spark.y + uy * r * 0.35, r, a * z.ringIntensity * 0.8, Math.atan2(vy, vx));
+            break;
+          }
+          case 'gstreak': {
+            // the long green streak off the source, up and to the side of the axis
+            const ang = Math.atan2(vy, vx) - 1.25;
+            put(this.gstreak(), S.x + Math.cos(ang) * r * 0.9, S.y + Math.sin(ang) * r * 0.9, r, a, ang);
+            break;
+          }
         }
       }
     }
@@ -244,14 +267,14 @@ export class WindowLight {
         g.closePath(); g.fill();
       };
       g.filter = 'blur(2px)';
-      const main = 12;
+      const main = 20;
       for (let i = 0; i < main; i++) {
-        const ang = (i / main) * Math.PI * 2 + (R() - 0.5) * 0.12;
-        const len = h * (0.45 + R() * 0.55);
-        const green = R() < 0.2;
-        ray(ang, len, 3 + R() * 2, (a) => (green ? rgba([0.75, 1.0, 0.45], a * 0.8) : rgba(t, a)));
+        const ang = (i / main) * Math.PI * 2 + (R() - 0.5) * 0.2;
+        const len = h * (i % 2 ? 0.3 + R() * 0.35 : 0.55 + R() * 0.45);
+        const green = R() < 0.15;
+        ray(ang, len, 1.6 + R() * 1.4, (a) => (green ? rgba([0.75, 1.0, 0.45], a * 0.8) : rgba(t, a)));
       }
-      for (let i = 0; i < 40; i++) ray(R() * Math.PI * 2, h * (0.15 + R() * 0.35), 0.8 + R() * 0.8, (a) => rgba(t, a * 0.45));
+      for (let i = 0; i < 60; i++) ray(R() * Math.PI * 2, h * (0.12 + R() * 0.4), 0.6 + R() * 0.6, (a) => rgba(t, a * 0.4));
       g.filter = 'none';
     });
   }
@@ -265,11 +288,11 @@ export class WindowLight {
         for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2 + Math.PI / 6; const x = h + Math.cos(a) * r, y = h + Math.sin(a) * r; if (i) g.lineTo(x, y); else g.moveTo(x, y); }
         g.closePath();
       };
-      g.filter = 'blur(2px)';
+      g.filter = 'blur(4px)';
       const gr = g.createRadialGradient(h, h, 0, h, h, r);
-      gr.addColorStop(0, rgba(t, 0.35)); gr.addColorStop(0.75, rgba(t, 0.5)); gr.addColorStop(1, rgba(t, 0.8));
+      gr.addColorStop(0, rgba(t, 0.3)); gr.addColorStop(0.8, rgba(t, 0.42)); gr.addColorStop(1, rgba(t, 0.6));
       g.fillStyle = gr; path(); g.fill();
-      g.strokeStyle = rgba(t, 0.5); g.lineWidth = 2.5; path(); g.stroke();
+      g.strokeStyle = rgba(t, 0.3); g.lineWidth = 3; path(); g.stroke();
       g.filter = 'none';
     });
   }
@@ -303,27 +326,37 @@ export class WindowLight {
     });
   }
 
-  /** Rainbow arc (part of a ring), brightest on the side away from the source. */
+  /** Rainbow arcs (parts of rings): thin, soft, a little desaturated; brightest away from the source. */
   ring() {
-    return this.sprite('ring', 512, (g, n) => {
+    return this.sprite('ring2', 512, (g, n) => {
       const h = n / 2;
-      g.filter = 'blur(7px)';
-      const bands = [[255, 60, 40], [255, 160, 40], [200, 255, 80], [60, 255, 140], [60, 180, 255], [120, 80, 255]];
-      bands.forEach((c, i) => {
-        g.strokeStyle = `rgba(${c[0]},${c[1]},${c[2]},0.42)`;
-        g.lineWidth = 11;
-        g.beginPath(); g.arc(h, h, h * 0.86 - i * 8, -1.25, 1.35); g.stroke();
-      });
-      // a second, fainter inner arc
-      g.strokeStyle = 'rgba(80,255,160,0.3)'; g.lineWidth = 16;
-      g.beginPath(); g.arc(h - 18, h + 10, h * 0.62, -0.6, 1.9); g.stroke();
+      g.filter = 'blur(3px)';
+      const bands = [[245, 90, 70], [235, 190, 80], [120, 235, 120], [80, 180, 240], [150, 110, 240]];
+      for (const [R0, off, a0, a1] of [[0.86, 0, -1.2, 1.3], [0.74, 3, -0.9, 1.6], [0.62, 6, -0.5, 1.1]]) {
+        bands.forEach((c, i) => {
+          g.strokeStyle = `rgba(${c[0]},${c[1]},${c[2]},${R0 === 0.86 ? 0.5 : 0.3})`;
+          g.lineWidth = 3;
+          g.beginPath(); g.arc(h - off, h + off, h * R0 - i * 3.5, a0, a1); g.stroke();
+        });
+      }
       g.filter = 'none';
-      // fade the arc ends
       g.globalCompositeOperation = 'destination-in';
       const cg = g.createConicGradient(0, h, h);
       cg.addColorStop(0, 'rgba(0,0,0,1)'); cg.addColorStop(0.2, 'rgba(0,0,0,0.6)'); cg.addColorStop(0.32, 'rgba(0,0,0,0)');
       cg.addColorStop(0.68, 'rgba(0,0,0,0)'); cg.addColorStop(0.8, 'rgba(0,0,0,0.6)'); cg.addColorStop(1, 'rgba(0,0,0,1)');
       g.fillStyle = cg; g.fillRect(0, 0, n, n);
+    });
+  }
+
+  /** Elongated soft green streak. */
+  gstreak() {
+    return this.sprite('gstreak', 256, (g, n) => {
+      const h = n / 2;
+      g.filter = 'blur(4px)';
+      const gr = g.createLinearGradient(0, h, n, h);
+      gr.addColorStop(0, 'rgba(150,255,90,0)'); gr.addColorStop(0.5, 'rgba(170,255,110,0.7)'); gr.addColorStop(1, 'rgba(150,255,90,0)');
+      g.fillStyle = gr; g.beginPath(); g.ellipse(h, h, h * 0.9, h * 0.07, 0, 0, Math.PI * 2); g.fill();
+      g.filter = 'none';
     });
   }
 
