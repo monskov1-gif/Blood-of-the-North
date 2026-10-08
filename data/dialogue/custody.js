@@ -323,7 +323,7 @@ export const DIALOGUES = {
   h_wardB_day: {
     mode: 'bark',
     nodes: {
-      a: { speaker: 'thought', text: 'Палата 107. Пожилая женщина. Кома, судя по аппаратам.' },
+      a: { speaker: 'thought', text: 'Палата 113. Пожилая женщина. Кома, судя по аппаратам.' },
       b: { speaker: 'thought', text: 'Над кроватью висит пакет с кровью. Тёмный. Я почему-то не могу отвести взгляд.', set: { blood_bag_seen: true } },
     },
   },
@@ -403,6 +403,10 @@ export const DIALOGUES = {
     ['julian', 'Что я сделал?'],
     ['thought', 'Что со мной?'],
   ],
+  n_ward_hint: [
+    ['thought', 'Голос… дальше по коридору. Женский. Палата 113 — под дверью свет.'],
+  ],
+  n_ward_listen: { mode: 'bark', nodes: { a: { speaker: 'thought', text: 'За дверью кто-то есть. Я… прислушаюсь.' } } },
   n_return_hint: { mode: 'bark', nodes: { a: { speaker: 'thought', text: 'Назад. В палату. Пока никто не увидел.', set: { objective: 'back' } } } },
   n_nurse_vn: {
     mode: 'vn',

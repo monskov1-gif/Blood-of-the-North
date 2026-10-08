@@ -179,7 +179,7 @@ const methods = {
   /** A closed ward behind a glass front (not enterable): bed, curtain, its own light. */
   closedWard(x0, x1, number, { curtain = 'closed', light = 'dark', occupant = false, window = true } = {}) {
     const root = this.root;
-    const w = x1 - x0, cx = (x0 + x1) / 2, depth = 3.4, zb = BACK - depth;
+    const w = x1 - x0, cx = (x0 + x1) / 2, depth = 3.6, zb = BACK - depth;   // every ward: 3.6 m deep
     const wm = this.mat(`hxWard-${number}`, { map: TX.block(), color: light === 'warm' ? 0xeee0cc : 0xd8e4dc, roughness: 0.8 });
     const winX = cx + 0.5, winW = 1.3, winY0 = 1.05, winY1 = 2.3;
     if (window) {
@@ -372,17 +372,25 @@ const methods = {
     const ceilMat = this.mat('hxCeilA', { map: tiled(TX.ceiling(), (X_OLD - X_WING) / 1.2, 15 / 1.2), roughness: 0.9, emissive: 0xffffff, emissiveMap: tiled(TX.ceiling(), (X_OLD - X_WING) / 1.2, 15 / 1.2), emissiveIntensity: 0.03, color: 0xb8bcb8 });
     this.slab(X_WING, X_OLD, floorMat, H, ceilMat);
     const holes = [
-      { x0: 23.6, x1: 27.2, y0: 0, y1: 2.6 },  // ward 111
+      { x0: 23.3, x1: 27.3, y0: 0, y1: 2.6 },  // ward 111
       { x0: 27.55, x1: 28.45, y0: 0, y1: 2.2 }, // linen
-      { x0: 28.8, x1: 32.4, y0: 0, y1: 2.6 },  // ward 113
-      { x0: 33.0, x1: 34.6, y0: 1.25, y1: 2.55 }, // window B over the waiting chairs
+      { x0: 28.8, x1: 32.8, y0: 0, y1: 2.6 },  // ward 113 — the old woman
+      { x0: 33.2, x1: 34.8, y0: 1.25, y1: 2.55 }, // window B over the waiting chairs
       { x0: 35.0, x1: 35.9, y0: 0, y1: 2.2 },  // ward 115
     ];
     this.wallRun(X_WING, X_OLD - 0.35, H, holes, { mat: this.wallMat, dado: this.mat('hWains') });
     this.bx(X_OLD - X_WING, 0.06, 0.012, this.mat('hWallStripe', { color: 0x2a6ab0, roughness: 0.5 }), (X_WING + X_OLD) / 2, 1.32, BACK + 0.006);
     // wards: 111 half-drawn (someone asleep), 113 drawn shut (a shadow behind it, the lamp on)
-    this.closedWard(23.6, 27.2, '111', { curtain: 'partial', light: 'cold', occupant: true });
-    this.closedWard(28.8, 32.4, '113', { curtain: 'closed', light: 'warm', occupant: true });
+    this.closedWard(23.3, 27.3, '111', { curtain: 'partial', light: 'cold', occupant: true });
+    // 113: the old woman's ward (story ward B: the blood bag, the nurse) — far from Julian's 109
+    this.wardB = this.buildWard(28.8, 32.8, '113', { patient: true, window: true });
+    this.anchors.wardBDoor = new THREE.Vector3(this.wardB.doorSpot.x, 1.9, BACK + 0.15);
+    // a strip of warm light under her door at night: the ward is lived in
+    const s113 = this.mat('hxStrip-113', { color: 0x000000, emissive: 0xffc078, emissiveIntensity: 0 });
+    this.bx(0.95, 0.015, 0.02, s113, this.wardB.doorSpot.x, 0.012, BACK + 0.05);
+    this.expNight.push((night) => { s113.emissiveIntensity = night ? 2.4 : 0; });
+    // 107 (by the station) stands empty now: dark, curtain open
+    this.closedWard(9.0, 13.0, '107', { curtain: 'open', light: 'dark', occupant: false });
     this.hDoor(28.0, BACK + 0.02, { sign: 'БЕЛЬЁ · LINEN', w: 0.9, color: 0x7a8490, push: true });
     const d115 = this.hDoor(35.45, BACK + 0.02, { sign: 'ПАЛАТА 115', w: 0.9 });
     void d115;
@@ -392,16 +400,16 @@ const methods = {
     // waiting nook under window B: chairs, a low table, magazines, a plant
     const seat = this.mat('plasticChairH', { color: 0x3a7a86, roughness: 0.55 });
     for (let i = 0; i < 3; i++) {
-      const x = 33.2 + i * 0.56;
+      const x = 33.4 + i * 0.56;
       this.bx(0.5, 0.07, 0.46, seat, x, 0.46, BACK + 0.4);
       this.bx(0.5, 0.45, 0.05, seat, x, 0.72, BACK + 0.17, { rx: -0.1 });
       this.bx(0.04, 0.42, 0.04, this.mat('steel'), x - 0.22, 0.21, BACK + 0.4);
       this.bx(0.04, 0.42, 0.04, this.mat('steel'), x + 0.22, 0.21, BACK + 0.4);
     }
-    this.bx(0.7, 0.04, 0.42, this.mat('hLaminate', { map: TX.laminate(), color: 0xffffff, roughness: 0.6 }), 34.0, 0.42, BACK + 1.0);
-    for (let i = 0; i < 3; i++) this.bx(0.22, 0.012, 0.3, this.matV('hMagazine', { color: 0xffffff, roughness: 0.7 }), 33.85 + i * 0.09, 0.45 + i * 0.012, BACK + 1.0, { ry: i * 0.5, color: [0xc04040, 0x3a7ab0, 0xe0c060][i] });
-    this.plant(32.75, BACK + 0.4, root, 1.4, 12);
-    this.brightWindow(33.0, 34.6, 1.25, 2.55, PROFILES.B, 'ward109');
+    this.bx(0.7, 0.04, 0.42, this.mat('hLaminate', { map: TX.laminate(), color: 0xffffff, roughness: 0.6 }), 34.2, 0.42, BACK + 1.0);
+    for (let i = 0; i < 3; i++) this.bx(0.22, 0.012, 0.3, this.matV('hMagazine', { color: 0xffffff, roughness: 0.7 }), 34.05 + i * 0.09, 0.45 + i * 0.012, BACK + 1.0, { ry: i * 0.5, color: [0xc04040, 0x3a7ab0, 0xe0c060][i] });
+    this.plant(33.0, BACK + 0.35, root, 1.3, 12);
+    this.brightWindow(33.2, 34.8, 1.25, 2.55, PROFILES.B, 'ward109');
     // corridor ceiling: troffers, two of them dimmed
     for (let x = 24.5; x < X_OLD - 0.6; x += 3) this.troffer(x, -1.3, Math.abs(x - 30.5) < 0.1 ? 'B' : 'A');
     const l = new THREE.PointLight(0xe4eeff, 6, 11, 1.2); l.position.set(30, 2.75, -1.6); root.add(l);
@@ -419,9 +427,9 @@ const methods = {
     s.position.set(33.4, 2.72, -2.3); root.add(s);
     const sb = s.clone(); sb.rotation.y = Math.PI; sb.position.z -= 0.01; root.add(sb);
     // a fire extinguisher, hand rub, a notice board
-    this.cy(0.075, 0.075, 0.45, 10, this.mat('hFireRed'), 32.65, 0.85, BACK + 0.1);
+    this.cy(0.075, 0.075, 0.45, 10, this.mat('hFireRed'), 36.25, 0.85, BACK + 0.1);
     this.sanitizer(27.4, 1.25);
-    this.framed(TX.poster('hands'), 0.32, 0.44, 32.6, 1.75);
+    this.framed(TX.poster('hands'), 0.32, 0.44, 20.75, 1.75);
     // foreground: a meds cart and an IV pole near the camera
     const fg = (x, z, name, build) => { const g = new THREE.Group(); g.name = name; build(g); g.position.set(x, 0, z); root.add(g); this.foregroundGroups.push(g); };
     fg(25.6, 3.0, 'fg-crashcart-w', (g) => {

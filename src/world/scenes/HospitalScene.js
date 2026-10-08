@@ -11,7 +11,7 @@ import { installExpansion, X_END } from './HospitalExpansion.js';
  *   x -14 …  -3  corridor A: elevator, stairs, water cooler, vending, procedure room
  *   x  -1 …   1  side corridor going back (surgery / service)
  *   x   3 …   7  nurse station
- *   x   9 …  13  ward 107 — the old woman (glass front)
+ *   x   9 …  13  ward 107 — empty, dark (the old woman is in 113, patient wing)
  *   x  14 …  15  staff door
  *   x  16 …  21  ward 109 — Julian (glass front)
  *
@@ -499,10 +499,11 @@ export class HospitalScene extends LocationBase {
       { minX: -21.5, maxX: X_END - 0.6, minZ: -2.6, maxZ: 1.8 },     // main corridor + patient wing + old wing
       { minX: -0.9, maxX: 0.9, minZ: -9.0, maxZ: -2.5 },            // side corridor
       { minX: -5.6, maxX: -3.4, minZ: -6.4, maxZ: -2.5 },           // procedure room
-      { minX: 16.3, maxX: 20.8, minZ: -7.4, maxZ: -4.4 },           // ward 109 (Julian)
+      { minX: 16.3, maxX: 19.9, minZ: -7.4, maxZ: -4.4 },           // ward 109 (Julian)
       { minX: 16.55, maxX: 17.45, minZ: -4.6, maxZ: -2.5 },         // ward 109 door
-      { minX: 9.2, maxX: 12.8, minZ: -7.4, maxZ: -4.4, enabled: () => this.wardBOpen },
-      { minX: 9.55, maxX: 10.45, minZ: -4.6, maxZ: -2.5, enabled: () => this.wardBOpen },
+      // ward 113 (the old woman) in the patient wing — same size as 109 (4.0 × 3.6 m)
+      { minX: 29.0, maxX: 32.6, minZ: -7.4, maxZ: -4.4, enabled: () => this.wardBOpen },
+      { minX: 29.3, maxX: 30.15, minZ: -4.6, maxZ: -2.5, enabled: () => this.wardBOpen },
     ];
     this.bounds = { walk: { areas }, camera: { minX: -17.5, maxX: X_END - 4.5 } };
     this._batches = new Map();
@@ -599,10 +600,10 @@ export class HospitalScene extends LocationBase {
     this.buildStretch(); // between station and ward 107, staff door, end of corridor
 
     // ---------------------------------------------------------------- wards
-    this.wardB = this.buildWard(9.0, 13.0, '107', { patient: true, window: true });
-    this.wardA = this.buildWard(16.1, 21.0, '109', { window: true });
+    // every ward is 4.0 m wide and 3.6 m deep; the old woman's ward (113) is built with the
+    // patient wing (HospitalExpansion), 107 is an empty dark room now
+    this.wardA = this.buildWard(16.1, 20.1, '109', { window: true });
     this.wardA.hinge.rotation.y = 1.35; // Julian's door stands open
-    this.anchors.wardBDoor = new THREE.Vector3(10.0, 1.9, BACK + 0.15);
     this.anchors.wardADoor = new THREE.Vector3(16.9, 1.9, BACK + 0.15);
 
     this.buildExpansion(); // patient wing, old wing, operating area (HospitalExpansion.js)
@@ -653,7 +654,7 @@ export class HospitalScene extends LocationBase {
       { x0: -5.8, x1: -3.2, y0: 0, y1: 2.4 },     // procedure room
       { x0: -1.0, x1: 1.0, y0: 0, y1: 2.6 },      // side corridor
       { x0: 9.0, x1: 13.0, y0: 0, y1: 2.6 },      // ward 107 front
-      { x0: 16.1, x1: 21.0, y0: 0, y1: 2.6 },     // ward 109 front
+      { x0: 16.1, x1: 20.1, y0: 0, y1: 2.6 },     // ward 109 front
       { x0: -9.85, x1: -8.75, y0: 0, y1: 2.2 },   // stairs door
       { x0: 14.0, x1: 15.0, y0: 0, y1: 2.2 },     // staff-only door
     ];
@@ -1643,10 +1644,11 @@ export class HospitalScene extends LocationBase {
     this.wardB.warm.intensity = open ? 9 : 0;
     this.wardB.readM.emissiveIntensity = open ? 2.5 : 0;
     if (open && !this.spill) {
-      this.spill = this.pool(0xffb070, 10.0, -1.8, 2.6, 3.4, 0.0);
+      const dx = this.wardB.x0 - 9.0;   // the light geometry was laid out for a ward at x 9…13
+      this.spill = this.pool(0xffb070, 10.0 + dx, -1.8, 2.6, 3.4, 0.0);
       // a wedge of light fanning out of the doorway across the floor
       const geo = new THREE.BufferGeometry();
-      const v = [9.42, 0.014, -4.0, 10.45, 0.014, -4.0, 7.2, 0.014, -0.4, 10.6, 0.014, -0.4];
+      const v = [9.42 + dx, 0.014, -4.0, 10.45 + dx, 0.014, -4.0, 7.2 + dx, 0.014, -0.4, 10.6 + dx, 0.014, -0.4];
       geo.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
       geo.setAttribute('uv', new THREE.Float32BufferAttribute([0, 1, 1, 1, 0, 0, 1, 0], 2));
       geo.setIndex([0, 2, 1, 1, 2, 3]);

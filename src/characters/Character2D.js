@@ -214,8 +214,21 @@ export class Character2D {
   stand() { this.seated = false; this.shadow.visible = true; }
 
   /** Walk in a straight line (or through waypoints). Resolves on arrival. */
-  walkTo(points, { speed } = {}) {
-    const pts = Array.isArray(points) ? points : [points];
+  walkTo(points, { speed, direct = false } = {}) {
+    let pts = Array.isArray(points) ? points : [points];
+    // round furniture: every leg of the route goes through the scene's navigation (A*), unless
+    // the script asks for a straight line (direct) or the character isn't in the active scene
+    const nav = Character2D.nav;
+    if (nav && !direct && this.root.parent && this.root.parent === Character2D.navRoot) {
+      const out = [];
+      let from = { x: this.position.x, z: this.position.z };
+      for (const p of pts) {
+        const leg = nav.findPath(from, p);
+        out.push(...(leg || [p]));
+        from = p;
+      }
+      pts = out;
+    }
     this.stand();
     return new Promise((resolve) => {
       this.path = { pts: pts.map((p) => new THREE.Vector2(p.x, p.z)), i: 0, speed: speed ?? this.speed, resolve };

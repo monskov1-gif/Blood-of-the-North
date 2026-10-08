@@ -9,6 +9,7 @@ import { Renderer } from '../render/Renderer.js';
 import { CameraSystem } from '../camera/CameraSystem.js';
 import { SpriteAtlas } from '../characters/SpriteAtlas.js';
 import { PlayerController } from '../characters/PlayerController.js';
+import { Character2D } from '../characters/Character2D.js';
 import { Navigation } from '../world/Navigation.js';
 import { SafeZones } from '../world/SafeZones.js';
 import { InteractionSystem } from '../interaction/InteractionSystem.js';
@@ -69,6 +70,7 @@ export class Game {
     this.renderer.setup(this.scene3d, this.cameraSys.camera);
     this.cameraSys.setBounds(this.world.bounds.camera);
     this.nav = new Navigation(this.world.bounds.walk, this.world.colliders);
+    Character2D.nav = this.nav; Character2D.navRoot = this.world.root;   // NPC routes avoid furniture
     this.locations = new Map([['bar', this.world]]);
     this.locationId = 'bar';
     this.barWorld = this.world;
@@ -237,6 +239,7 @@ export class Game {
     this.cameraSys.configure(w.camera);
     this.cameraSys.setBounds(w.bounds.camera);
     this.nav.set(w.bounds.walk, w.colliders);
+    Character2D.navRoot = w.root;
     this.hallucination.scene = w;
     if (this.debugSafeZones) w.safeZones?.setDebug(true, w.root, w.bounds.walk);
     this.bus.emit('location', { id, state });

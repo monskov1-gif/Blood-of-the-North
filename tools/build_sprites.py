@@ -725,9 +725,9 @@ def coarser(a, k=2, keep_size=True):
     return np.asarray(Image.fromarray(small.astype(np.uint8), 'RGBA').resize((w, h), Image.NEAREST)).astype(float)
 
 
-for g in ['jul', 'julg']:
-    for n in ['idle_walk1', 'idle_walk2']:
-        frames[f'{g}_{n}'] = match_scale(frames[f'{g}_{n}'], frames[f'{g}_idle'])
+# v0.12: the owner's walk frames keep their painted size (a stride is naturally a little lower);
+# stretching them to the idle height with nearest-neighbour doubled single rows — one of them
+# landed on the neck and read as the head being torn off the scarf
 JUL_HEAD = frames['jul_idle'].copy()
 # the old 'think' frame is ~10 cm shorter than the repainted coat frames: same height now
 frames['julian_think'] = match_scale(frames['julian_think'], frames['jul_idle'])
