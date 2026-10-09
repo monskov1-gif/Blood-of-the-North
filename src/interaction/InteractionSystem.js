@@ -23,6 +23,10 @@ export class InteractionSystem {
 
   setItems(items) {
     this.items = items;
+    // a new set of interactables means the story moved on: an item whose run is still pending
+    // (a talk that goes on into a whole sequence, a door) must not keep the new ones locked
+    this.running = false;
+    this.runToken = (this.runToken || 0) + 1;
     // emit the change so the HUD drops the old marker (otherwise a label from
     // the previous location lingers on screen)
     this.setFocus(null);
@@ -61,8 +65,9 @@ export class InteractionSystem {
     this.setFocus(null);
     this.state.markInteracted(item.id);
     this.bus.emit('interact', item);
+    const token = this.runToken = (this.runToken || 0) + 1;
     try { await item.run?.(item); } catch (e) { console.error(e); }
-    this.running = false;
+    if (this.runToken === token) this.running = false;
   }
 
   /** Projects an anchor to screen (for the HUD marker). */
