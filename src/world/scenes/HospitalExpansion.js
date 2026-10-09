@@ -234,14 +234,16 @@ const methods = {
     // bed, locker, IV, a dim monitor
     const bedX = cx + 0.45, bedZ = BACK - 2.0;
     this.bed(bedX, bedZ);
-    this.bx(0.44, 0.7, 0.42, this.mat('hCabinetW'), bedX - 1.4, 0.36, BACK - 2.3);
+    this.locker(bedX - 1.4, BACK - 2.3, 0.44, 0.7, 0.42);
     this.ivStand(bedX - 1.15, BACK - 1.4);
     const scr = this.mat(`hxMon-${light}`, { color: 0x081008, emissive: 0x30c070, emissiveIntensity: light === 'dark' ? 0.2 : 0.7 });
-    this.bx(0.4, 0.28, 0.12, this.mat('monitorBody'), bedX - 1.4, 1.45, BACK - 2.8);
+    this.rb(0.42, 0.3, 0.12, 0.03, this.mat('monitorBody'), bedX - 1.4, 1.45, BACK - 2.8);
+    this.rb(0.36, 0.24, 0.01, 0.006, this.mat('hBlack'), bedX - 1.4, 1.45, BACK - 2.742);
+    this.rod([bedX - 1.4, 1.42, BACK - 2.86], [bedX - 1.4, 1.42, zb + 0.05], 0.02, this.mat('steelDark'));
     this.pl(0.34, 0.22, scr, bedX - 1.4, 1.45, BACK - 2.735);
     if (occupant) {
       // someone in the bed: a mound under the blanket
-      const mound = new THREE.Mesh(new THREE.CapsuleGeometry(0.2, 1.2, 4, 8), this.mat('blanket'));
+      const mound = new THREE.Mesh(new THREE.CapsuleGeometry(0.2, 1.2, 8, 20), this.mat('blanket'));
       mound.rotation.z = Math.PI / 2; mound.scale.set(1, 1, 0.7); mound.position.set(bedX + 0.1, 0.78, bedZ); root.add(mound);
     }
     // the room's own light: emissive panel + a pool (no extra point light)
@@ -416,15 +418,10 @@ const methods = {
     this.bx(0.8, 0.015, 0.02, s115, 35.45, 0.012, BACK + 0.05);
     this.expNight.push((night) => { s115.emissiveIntensity = night ? 2.6 : 0; });
     // waiting nook under window B: chairs, a low table, magazines, a plant
-    const seat = this.mat('plasticChairH', { color: 0x3a7a86, roughness: 0.55 });
-    for (let i = 0; i < 3; i++) {
-      const x = 33.4 + i * 0.56;
-      this.bx(0.5, 0.07, 0.46, seat, x, 0.46, BACK + 0.4);
-      this.bx(0.5, 0.45, 0.05, seat, x, 0.72, BACK + 0.17, { rx: -0.1 });
-      this.bx(0.04, 0.42, 0.04, this.mat('steel'), x - 0.22, 0.21, BACK + 0.4);
-      this.bx(0.04, 0.42, 0.04, this.mat('steel'), x + 0.22, 0.21, BACK + 0.4);
-    }
-    this.bx(0.7, 0.04, 0.42, this.mat('hLaminate', { map: TX.laminate(), color: 0xffffff, roughness: 0.6 }), 34.2, 0.42, BACK + 1.0);
+    this.chairRow(33.4, 3, BACK + 0.42, 1);
+    this.rb(0.72, 0.035, 0.44, 0.015, this.mat('hLaminate', { map: TX.laminate(), color: 0xffffff, roughness: 0.6 }), 34.2, 0.42, BACK + 1.0);
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) this.rod([34.2 + sx * 0.3, 0.4, BACK + 1.0 + sz * 0.17], [34.2 + sx * 0.3, 0.0, BACK + 1.0 + sz * 0.17], 0.014, this.mat('steel'));
+    this.rb(0.62, 0.012, 0.36, 0.005, this.mat('steel'), 34.2, 0.14, BACK + 1.0);
     for (let i = 0; i < 3; i++) this.bx(0.22, 0.012, 0.3, this.matV('hMagazine', { color: 0xffffff, roughness: 0.7 }), 34.05 + i * 0.09, 0.45 + i * 0.012, BACK + 1.0, { ry: i * 0.5, color: [0xc04040, 0x3a7ab0, 0xe0c060][i] });
     this.plant(33.0, BACK + 0.35, root, 1.3, 12);
     this.brightWindow(33.2, 34.8, 1.25, 2.55, PROFILES.B, 'ward109');
@@ -445,17 +442,12 @@ const methods = {
     s.position.set(33.4, 2.72, -2.3); root.add(s);
     const sb = s.clone(); sb.rotation.y = Math.PI; sb.position.z -= 0.01; root.add(sb);
     // a fire extinguisher, hand rub, a notice board
-    this.cy(0.075, 0.075, 0.45, 10, this.mat('hFireRed'), 36.25, 0.85, BACK + 0.1);
+    this.extinguisher(36.25, BACK + 0.1);
     this.sanitizer(27.4, 1.25);
     this.framed(TX.poster('hands'), 0.32, 0.44, 20.75, 1.75);
     // foreground: a meds cart and an IV pole near the camera
     const fg = (x, z, name, build) => { const g = new THREE.Group(); g.name = name; build(g); g.position.set(x, 0, z); root.add(g); this.foregroundGroups.push(g); };
-    fg(25.6, 3.0, 'fg-crashcart-w', (g) => {
-      const red = this.mat('hFireRed');
-      this.box(0.7, 0.95, 0.5, red, 0, 0.55, 0, g);
-      for (let i = 0; i < 4; i++) this.box(0.66, 0.02, 0.01, this.mat('hBlack'), 0, 0.25 + i * 0.2, 0.255, g);
-      this.box(0.74, 0.04, 0.54, this.mat('hPlasticG'), 0, 1.04, 0, g);
-    });
+    fg(25.6, 3.0, 'fg-crashcart-w', (g) => this.inGroup(g, () => this.crashCart(0, 0, true)));
     fg(30.8, 3.3, 'fg-wheelchair-w', (g) => { const w = this.wheelchair(); w.rotation.y = -0.6; g.add(w); });
   },
 
