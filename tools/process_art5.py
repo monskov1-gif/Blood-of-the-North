@@ -120,7 +120,23 @@ H2, W2 = W.shape[0] // 2, W.shape[1] // 2
 BOX = {'head': (10, 20, 222, 265), 'body': (218, 20, 580, 280), 'tail': (545, 35, 724, 312),
        'legA': (35, 268, 142, 530), 'legB': (142, 262, 254, 530), 'ruff': (254, 290, 432, 540),
        'legC': (428, 262, 558, 530), 'legD': (555, 262, 712, 530)}
-ORDER = ['legB', 'legD', 'tail', 'body', 'ruff', 'legA', 'legC', 'head']
+# Layering by the owner's reference assembly (top → bottom): head, chest ruff, front-left leg,
+# hind-left leg, torso, tail, front-right leg, hind-right leg (= a copy of the hind-left one).
+# Drawn bottom-up:
+ORDER = ['hindR', 'frontR', 'tail', 'body', 'hindL', 'frontL', 'ruff', 'head']
+SRC = {'frontL': 'legA', 'frontR': 'legB', 'hindL': 'legC', 'hindR': 'legC'}
+# Measured on the owner's assembled grey wolf (template matching, /tmp/s/wolf/scripts): every part
+# relative to the torso box — centre x (cx) and centre y (cy) or the paw line (bot) in torso
+# widths / heights, and the part height in torso heights (the legs were enlarged ×1.2–1.36).
+LAYOUT = {
+    'head':   dict(cx=-0.080, cy=0.013, h=0.821),
+    'ruff':   dict(cx=0.123, cy=0.347, h=1.041),
+    'frontL': dict(cx=0.223, bot=1.608, h=1.468),
+    'hindL':  dict(cx=0.854, bot=1.576, h=1.403),
+    'tail':   dict(cx=1.126, cy=0.704, h=1.010),
+    'frontR': dict(cx=0.155, bot=1.571, h=1.474),
+    'hindR':  dict(cx=0.689, bot=1.524, h=1.295),
+}
 
 
 _PARTS = {}
@@ -152,53 +168,63 @@ def parts_of(q):
 
 
 def part(q, key):
-    a = parts_of(q)[key]
-    im = Image.fromarray(np.clip(a, 0, 255).astype(np.uint8), 'RGBA')
-    if key in ('legB', 'legD'):
-        im = ImageEnhance.Brightness(im).enhance(0.72)   # far legs a step darker
-    return im
+    a = parts_of(q)[SRC.get(key, key)]
+    return Image.fromarray(np.clip(a, 0, 255).astype(np.uint8), 'RGBA')
+
+
+def placed(q):
+    """Every layer scaled and positioned on the torso, as in the owner's reference."""
+    P = parts_of(q)
+    bh, bw = P['body'].shape[:2]
+    bx, by = 300, 200
+    out = {'body': (part(q, 'body'), bx, by)}
+    for key, L in LAYOUT.items():
+        im = part(q, key)
+        k = L['h'] * bh / im.size[1]
+        im = im.resize((max(1, round(im.size[0] * k)), max(1, round(im.size[1] * k))), Image.LANCZOS)
+        w, h = im.size
+        x = bx + L['cx'] * bw - w / 2
+        y = by + (L['cy'] * bh - h / 2 if 'cy' in L else L['bot'] * bh - h)
+        out[key] = (im, round(x), round(y))
+    return out
+
+
+def rot(canvas, im, x, y, angle, cx, cy):
+    """Paste `im` at (x, y) rotated by `angle` about its own point (cx, cy)."""
+    w, h = im.size
+    big = Image.new('RGBA', (w * 3, h * 3)); big.alpha_composite(im, (w, h))
+    big = big.rotate(angle, resample=Image.BICUBIC, center=(w + cx, h + cy))
+    canvas.alpha_composite(big, (x - w, y - h))
 
 
 def compose(q, pose):
-    canvas = Image.new('RGBA', (900, 620), (0, 0, 0, 0))
-    P = parts_of(q)
-    bh, bw = P['body'].shape[:2]
-    bx, by = 240, 60
-    # placement relative to the body (head over the chest front, ruff under the neck, legs under
-    # the shoulder and the hip, tail at the rump); the same proportions for every wolf
-    def at(key, fx, fy, ax=0.0, ay=0.0):
-        h, w = P[key].shape[:2]
-        return (int(bx + bw * fx - w * ax), int(by + bh * fy - h * ay))
-    POS = {'body': (bx, by), 'head': at('head', 0.1, 0.62, 1.0, 0.75), 'tail': at('tail', 0.96, 0.12, 0.08, 0.06),
-           'ruff': at('ruff', 0.06, 0.45, 0.25, 0.0), 'legA': at('legA', 0.2, 0.78, 0.5, 0.0),
-           'legB': at('legB', 0.31, 0.76, 0.5, 0.0), 'legC': at('legC', 0.78, 0.72, 0.5, 0.0),
-           'legD': at('legD', 0.89, 0.72, 0.5, 0.0)}
-    swing = {'stand': {}, 'walk1': {'legA': -14, 'legB': 12, 'legC': 12, 'legD': -12},
-             'walk2': {'legA': 12, 'legB': -12, 'legC': -12, 'legD': 12}, 'eat': {}}[pose]
+    canvas = Image.new('RGBA', (1400, 1100), (0, 0, 0, 0))
+    lay = placed(q)
+    # legs swing about the shoulder / hip (top centre); near and far legs in opposite phase
+    swing = {'stand': {}, 'walk1': {'frontL': -13, 'hindL': 11, 'frontR': 11, 'hindR': -10},
+             'walk2': {'frontL': 11, 'hindL': -11, 'frontR': -11, 'hindR': 10}, 'eat': {}}[pose]
     for key in ORDER:
-        im = part(q, key)
-        x, y = POS[key]
-        if key.startswith('leg') and key in swing:
-            a = swing[key]
-            # rotate about the top centre of the leg (shoulder / hip)
-            w, h = im.size
-            big = Image.new('RGBA', (w * 3, h * 3)); big.alpha_composite(im, (w, h))
-            big = big.rotate(a, resample=Image.BICUBIC, center=(w * 1.5, h))
-            canvas.alpha_composite(big, (x - w, y - h - (4 if abs(a) > 0 and a * (1 if key in 'legAlegB' else -1) > 0 else 0)))
-            continue
-        if key == 'head' and pose == 'eat':
-            w, h = im.size
-            big = Image.new('RGBA', (w * 3, h * 3)); big.alpha_composite(im, (w, h))
-            big = big.rotate(32, resample=Image.BICUBIC, center=(w * 1.95, h * 1.55))   # head down to the ground
-            canvas.alpha_composite(big, (x - w + 18, y - h + 120))
-            continue
-        if key == 'tail' and pose != 'stand':
-            w, h = im.size
-            big = Image.new('RGBA', (w * 3, h * 3)); big.alpha_composite(im, (w, h))
-            big = big.rotate({'walk1': -6, 'walk2': 5, 'eat': -10}[pose], resample=Image.BICUBIC, center=(w * 1.1, h * 1.08))
-            canvas.alpha_composite(big, (x - w, y - h))
-            continue
-        canvas.alpha_composite(im, (x, y))
+        im, x, y = lay[key]
+        w, h = im.size
+        if key in swing:
+            rot(canvas, im, x, y, swing[key], w / 2, h * 0.08)
+        elif key == 'head' and pose == 'eat':
+            # head down to the ground, pivoting at the neck (back of the head)
+            rot(canvas, im, x + round(w * 0.06), y + round(h * 0.42), 34, w * 0.92, h * 0.72)
+        elif key in ('ruff', 'body') and pose == 'eat':
+            # with the head lowered, the chest's top lobe and the shoulder fur (normally under the head)
+            # would read as a second head: cut away what the standing head covered, except the neck base
+            hm, hx, hy = lay['head']
+            cut = Image.new('L', im.size, 0)
+            cut.paste(hm.getchannel('A'), (hx - x, hy - y))
+            keep = np.zeros(im.size[::-1], bool); keep[int(hy - y + hm.size[1] * 0.72):, :] = True
+            a = np.asarray(im).copy()
+            a[..., 3] = np.where((np.asarray(cut) > 20) & ~keep, 0, a[..., 3])
+            canvas.alpha_composite(Image.fromarray(a, 'RGBA'), (x, y))
+        elif key == 'tail' and pose != 'stand':
+            rot(canvas, im, x, y, {'walk1': -6, 'walk2': 5, 'eat': -10}[pose], w * 0.12, h * 0.1)
+        else:
+            canvas.alpha_composite(im, (x, y))
     a = np.asarray(canvas).astype(np.float32)
     ys, xs = np.where(a[..., 3] > 20)
     return a[ys.min(): ys.max() + 1, xs.min(): xs.max() + 1]
@@ -207,6 +233,9 @@ def compose(q, pose):
 WOLVES = {'grey': (0, 0), 'white': (W2, 0), 'red': (0, H2), 'dark': (W2, H2)}
 for colour, q in WOLVES.items():
     stand = compose(q, 'stand')
+    if os.environ.get('WOLF_PREVIEW'):     # full-resolution check against the owner's reference
+        for pose in ['stand', 'walk1', 'eat']:
+            Image.fromarray(np.clip(compose(q, pose), 0, 255).astype(np.uint8), 'RGBA').save(os.path.join(os.environ['WOLF_PREVIEW'], f'{colour}_{pose}.png'))
     S = 150 / stand.shape[0]            # a huge wolf: ~150 cm to the ear tips
     for pose in ['stand', 'walk1', 'walk2', 'eat']:
         f = stand if pose == 'stand' else compose(q, pose)

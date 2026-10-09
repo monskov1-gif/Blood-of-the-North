@@ -114,10 +114,10 @@ const tapeTex = () => PX('tape', 128, 8, (ctx, w, h) => {
 });
 
 /** Yellow evidence tent with a black number. */
-const markerTex = (n) => PX(`marker${n}`, 16, 12, (ctx, w, h) => {
+const markerTex = (n) => PX(`marker${n}`, 24, 16, (ctx, w, h) => {
   ctx.fillStyle = '#e4b81c'; ctx.fillRect(0, 0, w, h);
   ctx.fillStyle = '#b08a10'; ctx.fillRect(0, h - 2, w, 2);
-  ctx.fillStyle = '#141210'; ctx.font = 'bold 9px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#141210'; ctx.font = 'bold 12px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText(String(n), w / 2, h / 2);
 });
 
@@ -388,7 +388,7 @@ export class ForestScene extends LocationBase {
     // a ribcage, half under snow
     for (let k = 0; k < 6; k++) { const rib = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.02, 4, 10, Math.PI), bone); rib.position.set(5.2 + k * 0.1, 0.02, -4.2); rib.rotation.set(0, Math.PI / 2, 0); root.add(rib); }
     // the clawed aspen: thicker, right by the tape
-    this.bare(7.4, -3.0, 1.55, 1);
+    this.bare(7.4, -3.0, 1.12, 1);
     const claws = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.62), this.mat('claws', { map: clawTex(), transparent: true, alphaTest: 0.5, color: 0xffffff, roughness: 0.9 }));
     claws.position.set(7.4, 2.15, -2.8); root.add(claws);
     this.anchors.claws = new THREE.Vector3(7.4, 2.2, -2.8);
