@@ -5,6 +5,7 @@ import { StationScene } from './StationScene.js';
 import { InterrogationScene } from './InterrogationScene.js';
 import { HospitalScene } from './HospitalScene.js';
 import { StreetScene } from './StreetScene.js';
+import { ForestScene } from './ForestScene.js';
 
 /**
  * Scene registry: each entry pairs a 3D world builder with its story script.
@@ -21,4 +22,5 @@ export const LOCATIONS = {
   interrogation: InterrogationScene,
   hospital: HospitalScene,
   street: StreetScene,
+  forest: ForestScene,
 };

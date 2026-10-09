@@ -11,6 +11,7 @@ const STAGE_MUSIC = {
   car: 'car', station: 'station', interrogation: 'interrogation', medical: 'clinic',
   hospital_day: 'hospital_day', hospital_evening: 'hospital_evening', hospital_night: 'hospital_night',
   hospital_return: 'hospital_night', recovery: 'recovery', street: 'street',
+  station_return: 'station', forest: 'street', forest_night: 'hospital_night',
 };
 import { glow } from '../world/props.js';
 import { sleep } from './Director.js';
@@ -217,7 +218,7 @@ const methods = {
       get: () => jpos.copy(this.julian.root.getWorldPosition(jpos)).add(V(0, 0.9, 0)),
       active: () => g.mode === 'play' && (g.keyScene || !g.player.enabled) && this.julian.root.parent === world.root });
     // free walk in the long hospital: a column or door post may cross Julian, but never hide him
-    if (world.id === 'hospital') {
+    if (world.id === 'hospital' || world.id === 'forest') {
       const walking = () => g.mode === 'play' && g.player.enabled && !g.keyScene && this.julian.root.parent === world.root;
       const jp2 = new THREE.Vector3();
       zones.addZone({ id: 'julian (walk)', radius: 0.42, maxOcclusion: 0.3, priority: 1, active: walking,
@@ -1130,11 +1131,10 @@ const methods = {
     await sleep(2.0);
     if (S !== this.session) return;
     await g.fader.to(true, 2600);
-    g.state.set('demo_completed', true);
-    g.state.setStage('ended');
-    g.saves.clear('auto');
     g.keyScene = false;
-    g.showEnding();
+    if (S !== this.session) return;
+    // a week later: back at the station
+    await this.startStationReturn();
   },
 
   // ------------------------------------------------------------------ per frame + loading

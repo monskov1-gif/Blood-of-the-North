@@ -19,6 +19,9 @@ const STAGE_LABEL = {
   hospital_return: 'Больница. Ночь',
   recovery: 'Выздоровление',
   street: 'Выписка',
+  station_return: 'Участок. Неделю спустя',
+  forest: 'Долина Такхини',
+  forest_night: 'Долина. Сумерки',
   ended: 'Конец демо',
 };
 

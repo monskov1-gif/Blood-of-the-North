@@ -23,6 +23,7 @@ import { TouchControls } from '../ui/TouchControls.js';
 import { MainMenu, Panels } from '../ui/Menus.js';
 import { Fader, PhoneView, Insert, EndingScreen, PortraitFlash, Card, Letterbox } from '../ui/Overlays.js';
 import { el } from '../ui/dom.js';
+import { CaseFiles } from '../ui/CaseFiles.js';
 import { SCENES, LOCATIONS } from '../world/scenes/index.js';
 import { DIALOGUES } from '../../data/dialogue/index.js';
 
@@ -94,6 +95,7 @@ export class Game {
     this.card = new Card(root);
     this.phone = new PhoneView({ root, bus: this.bus, audio: this.audio, state: this.state });
     this.ending = new EndingScreen({ root, bus: this.bus, audio: this.audio });
+    this.cases = new CaseFiles({ root, bus: this.bus, audio: this.audio, state: this.state, atlas: this.atlas });
 
     // systems
     this.dialogue = new DialogueSystem({
@@ -111,6 +113,7 @@ export class Game {
     this.cameraSys.follow(this.story.julian.root);
     this.director.registerAll(this.story.commands());
     this.director.registerAll(this.story.custodyCommands());
+    this.director.registerAll(this.story.investigationCommands?.() || {});
     this.interactions.setItems(this.story.interactables());
     this.view.bgProvider = (key) => this.story.paintBackground(key);
     this.windowLight = new WindowLight({ renderer: this.renderer, settings: this.settings, canvas: this.renderer.canvas });
@@ -170,8 +173,12 @@ export class Game {
     bus.on('menu', (act) => this.onMenu(act));
     bus.on('ui-open', (what) => {
       if (this.mode !== 'play') return;
-      if (what === 'pause' && !this.panels.open && !this.phone.isOpen) this.panels.pause();
+      if (what === 'pause' && !this.panels.open && !this.phone.isOpen && !this.cases.isOpen) this.panels.pause();
       if (what === 'log') this.panels.log();
+      if (what === 'case' && this.hud.visible && !this.dialogue.busy && !this.panels.open && !this.phone.isOpen && !this.cases.isOpen && this.state.get('case_route')) {
+        this.hud.notifyCase(false);
+        this.cases.open(this.state.get('case_route'));
+      }
       if (what === 'phone' && this.hud.visible && !this.dialogue.busy && !this.panels.open) {
         this.hud.notifyPhone(false);
         this.phone.open();
@@ -179,7 +186,7 @@ export class Game {
     });
     bus.on('action', ({ action, down }) => {
       if (!down) return;
-      if (action === 'menu' && this.mode === 'play' && !this.panels.open && !this.phone.isOpen) this.panels.pause();
+      if (action === 'menu' && this.mode === 'play' && !this.panels.open && !this.phone.isOpen && !this.cases.isOpen) this.panels.pause();
       if (action === 'log' && this.mode === 'play' && !this.panels.open) this.panels.log();
     });
     bus.on('panel', (open) => {
@@ -379,6 +386,7 @@ export class Game {
     this.hallucination.reset();
     await this.returnToBar();
     this.titleView = null;
+    this.cases.close(true);
     this.mode = 'play';
     this.story.julian.setVisible(true);
   }
@@ -386,6 +394,7 @@ export class Game {
   async newGame() {
     await this.beginPlay();
     this.state.reset();
+    this.hud.setCase(null);
     this.dialogue.history = [];
     this.dialogue.checkpoint = null;
     this.saves.clear('auto');
@@ -408,6 +417,7 @@ export class Game {
     this.story.startAmbient();
     this.updateControl();
     this.hud.setObjective(this.state.get('objective'));
+    this.hud.setCase(this.state.get('case_route'));
     await this.story.load(data.story);
   }
 
@@ -497,6 +507,6 @@ const TITLE_PLACES = {
   station_return: { id: 'station' }, forest: { id: 'forest', state: 'day' }, forest_night: { id: 'forest', state: 'night' },
 };
 
-const INTERACTIVE_STAGES = new Set(['explore', 'morning', 'car', 'station', 'interrogation', 'hospital_day', 'hospital_night', 'hospital_return']);
+const INTERACTIVE_STAGES = new Set(['explore', 'morning', 'car', 'station', 'interrogation', 'hospital_day', 'hospital_night', 'hospital_return', 'station_return', 'forest', 'forest_night']);
 
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));

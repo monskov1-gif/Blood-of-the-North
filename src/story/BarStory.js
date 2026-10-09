@@ -7,6 +7,7 @@ import { paintCocktail } from '../ui/Overlays.js';
 import { sleep } from './Director.js';
 import { installMorning } from './MorningSequence.js';
 import { installCustody, CUSTODY_STAGES } from './CustodySequence.js';
+import { installInvestigation, INVESTIGATION_STAGES } from './InvestigationSequence.js';
 
 /**
  * Scene logic for the prologue in the "Northern Rose" bar:
@@ -520,6 +521,7 @@ export class BarStory {
     const g = this.g;
     this.updateMorning(dt);
     this.updateCustody(dt);
+    this.updateInvestigation(dt);
     const J = this.julian;
     // Kayden calls out when Julian gets close the first time
     if (g.state.stage === 'explore' && !g.state.get('kayden_called') && J.position.x > -3.5) {
@@ -557,6 +559,10 @@ export class BarStory {
     const a = this.scene.anchors;
     if (CUSTODY_STAGES.includes(st)) {
       await this.loadCustody(st);
+      return;
+    }
+    if (INVESTIGATION_STAGES.includes(st)) {
+      await this.loadInvestigation(st);
       return;
     }
     if (st === 'morning' || st === 'police' || st === 'ended') {
@@ -606,3 +612,4 @@ export class BarStory {
 
 installMorning(BarStory);
 installCustody(BarStory);
+installInvestigation(BarStory);

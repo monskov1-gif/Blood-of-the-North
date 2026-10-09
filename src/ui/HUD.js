@@ -15,6 +15,13 @@ const OBJECTIVES = {
   bed: { ru: 'Вернуться в палату 109', en: 'BACK TO ROOM 109' },
   night: { ru: 'Жажда', en: 'THIRST' },
   back: { ru: 'Вернуться в палату 109', en: 'BACK TO ROOM 109' },
+  victims: { ru: 'Список погибших — на доске объявлений', en: 'THE LIST OF THE DEAD' },
+  kowalski: { ru: 'Ковальски ждёт у кабинетов', en: 'SEE KOWALSKI' },
+  valley: { ru: 'Долина у реки. Где пропала Лиззи', en: 'THE RIVER VALLEY' },
+  forest: { ru: 'Осмотреть оцепленное место', en: 'SEARCH THE CORDONED SITE' },
+  watch: { ru: 'Не спугнуть. Смотреть', en: 'STAY DOWN. WATCH' },
+  follow: { ru: 'Проследить за ним', en: 'FOLLOW HIM' },
+  cave: { ru: 'Пещера', en: 'THE CAVE' },
 };
 
 /** Exploration overlay: objective, interaction marker, phone & menu buttons, toasts. */
@@ -28,6 +35,11 @@ export class HUD {
     this.marker = el('div', 'marker', h, '<div class="lbl"></div><div class="gem"></div>');
     this.toastEl = el('div', 'toast', h);
     const btns = el('div', 'hud-btns', h);
+    // the investigation folder (after a case is taken at the station)
+    this.caseBtn = el('button', 'hud-btn case', btns, `${ICONS.folder}<span class="badge"></span>`);
+    this.caseBtn.title = 'Папка расследования (J)';
+    this.caseBtn.addEventListener('click', () => bus.emit('ui-open', 'case'));
+    window.addEventListener('keydown', (e) => { if (e.code === 'KeyJ' && this.visible) bus.emit('ui-open', 'case'); });
     this.phoneBtn = el('button', 'hud-btn', btns, `${ICONS.phone}<span class="badge"></span>`);
     this.phoneBtn.title = 'Телефон (Q)';
     this.phoneBtn.addEventListener('click', () => bus.emit('ui-open', 'phone'));
@@ -37,7 +49,10 @@ export class HUD {
     window.addEventListener('keydown', (e) => { if (e.code === 'KeyQ' && this.visible) bus.emit('ui-open', 'phone'); });
 
     bus.on('focus', (item) => { this.focus = item; this.renderMarker(); });
-    bus.on('flag', ({ flag, value }) => { if (flag === 'objective') this.setObjective(value); });
+    bus.on('flag', ({ flag, value }) => {
+      if (flag === 'objective') this.setObjective(value);
+      if (flag === 'case_route') this.setCase(value);
+    });
   }
 
   show(v) { this.visible = v; this.el.classList.toggle('off', !v); }
@@ -48,6 +63,10 @@ export class HUD {
     this.obj.querySelector('.txt').innerHTML = `${o.ru}<small>${o.en}</small>`;
     this.obj.classList.add('show');
   }
+
+  setCase(route) { this.caseBtn.classList.toggle('on', !!route); }
+
+  notifyCase(on) { this.caseBtn.classList.toggle('notify', on); }
 
   notifyPhone(on) { this.phoneBtn.classList.toggle('notify', on); }
 

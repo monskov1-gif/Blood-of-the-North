@@ -41,6 +41,7 @@ const STAGE_CLOCK = {
   hospital_day: DAY + 13 * 60 + 27, hospital_evening: DAY + 19 * 60 + 38,
   hospital_night: 2 * DAY + 3 * 60 + 12, hospital_return: 2 * DAY + 3 * 60 + 31,
   recovery: 6 * DAY + 10 * 60 + 5, street: 6 * DAY + 11 * 60 + 4, ended: 6 * DAY + 11 * 60 + 10,
+  station_return: 7 * DAY + 10 * 60 + 20, forest: 7 * DAY + 14 * 60 + 5, forest_night: 9 * DAY + 16 * 60 + 40,
 };
 const WEEKDAYS = ['суббота', 'воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница'];
 const TEMPS = [-34, -31, -36, -29, -27, -30, -26];
