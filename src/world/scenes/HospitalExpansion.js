@@ -492,34 +492,27 @@ const methods = {
     // old furniture: wooden benches, a standing scale, a gurney under a sheet, a glass cabinet
     const wood = this.mat('hxBenchWood', { color: 0x6a4a2c, roughness: 0.5 });
     const iron = this.mat('hxIron', { color: 0x2a2a2a, metalness: 0.5, roughness: 0.5 });
-    for (const bx of [51.2, 53.4]) {
-      this.bx(1.7, 0.06, 0.42, wood, bx, 0.46, BACK + 0.45);
-      this.bx(1.7, 0.4, 0.05, wood, bx, 0.78, BACK + 0.22, { rx: -0.12 });
-      for (const dx of [-0.75, 0.75]) this.bx(0.05, 0.46, 0.4, iron, bx + dx, 0.23, BACK + 0.45);
-    }
+    for (const bx of [51.2, 53.4]) this.oldBench(bx, BACK + 0.42, 1.7, wood, iron);
     this.clock(52.3, 2.75, BACK + 0.02, 'oldwing');
-    // standing scale
-    this.bx(0.4, 0.06, 0.34, iron, 42.4, 0.04, BACK + 0.4);
-    this.bx(0.05, 1.4, 0.05, iron, 42.4, 0.72, BACK + 0.25);
-    this.bx(0.3, 0.05, 0.05, iron, 42.4, 1.42, BACK + 0.28);
-    // gurney with a sheet by window C
-    this.bx(1.9, 0.06, 0.62, this.mat('steel'), 45.3, 0.72, BACK + 0.55);
-    this.bx(1.85, 0.12, 0.6, this.mat('sheet'), 45.3, 0.8, BACK + 0.55);
-    for (const dx of [-0.85, 0.85]) this.bx(0.04, 0.7, 0.04, this.mat('steel'), 45.3 + dx, 0.35, BACK + 0.55);
-    // glass-fronted medicine cabinet between window C and the OR doors
-    this.bx(0.7, 1.8, 0.35, this.mat('hxCabinetCream', { color: 0xe4e0d0, roughness: 0.5 }), 47.85 + 0.0, 0.95, BACK + 0.2);
-    this.bx(0.6, 1.3, 0.02, this.mat('hGlass'), 47.85, 1.2, BACK + 0.38);
-    for (let i = 0; i < 9; i++) this.cy(0.025, 0.025, 0.12, 6, this.matV('hxVial', { color: 0xffffff, roughness: 0.3 }), 47.62 + (i % 3) * 0.2, 0.7 + Math.floor(i / 3) * 0.42, BACK + 0.25, { color: [0x8a5a20, 0xc8d8c0, 0x5a3a20][i % 3] });
+    this.beamScale(42.4, BACK + 0.36);
+    this.oldGurney(45.3, BACK + 0.6);
+    this.medCabinet(47.85, BACK + 0.2);
     // the boarded side corridor: a sawhorse and a sign, the dark going on behind
     this.sideCorridorDark(55.5, 56.8);
     // pendant lights (old glass globes)
     const globe = this.mat('hxGlobe', { color: 0xe8e4d8, emissive: 0xfff2d8, emissiveIntensity: 0.4, roughness: 0.3 });
     const globeN = this.mat('hxGlobeN', { color: 0xe8e4d8, emissive: 0xffe8c8, emissiveIntensity: 0.4, roughness: 0.3 });
     const globeOff = this.mat('hxGlobeOff', { color: 0xc8c4b8, emissive: 0x000000, roughness: 0.3 });
+    // schoolhouse pendants: ceiling rose, stem, a cast fitter, an opal-glass shade
+    const shadeGeo = new THREE.LatheGeometry([[0.062, 0], [0.07, -0.02], [0.11, -0.06], [0.15, -0.12], [0.168, -0.18], [0.17, -0.21], [0.16, -0.26], [0.13, -0.3], [0.08, -0.33], [0.03, -0.342], [0, -0.344]].reverse().map(([r, y]) => new THREE.Vector2(r, y)), 32);
+    const brassP = this.mat('hxFitter', { color: 0x8a7a5a, metalness: 0.6, roughness: 0.4 });
     for (const [gx, on] of [[39.5, true], [43.5, true], [47.5, false], [51.5, true], [55.0, true]]) {
-      this.cy(0.006, 0.006, 0.9, 4, iron, gx, H2 - 0.45, -1.3);
-      const g = new THREE.Mesh(new THREE.SphereGeometry(0.17, 14, 10), gx === 51.5 ? globeN : on ? globe : globeOff);
-      g.position.set(gx, H2 - 1.0, -1.3); root.add(g);
+      const top = H2 - 0.83;
+      this.lathe([[0, 0], [0.09, 0], [0.09, -0.012], [0.07, -0.03], [0.02, -0.04], [0, -0.04]], this.mat('hxCornice'), gx, H2, -1.3);
+      this.rod([gx, H2 - 0.03, -1.3], [gx, top + 0.06, -1.3], 0.009, iron);
+      this.lathe([[0, 0.12], [0.012, 0.12], [0.02, 0.095], [0.022, 0.07], [0.04, 0.05], [0.07, 0.02], [0.072, 0.0], [0.065, -0.01], [0, -0.01]], brassP, gx, top - 0.01, -1.3);
+      const g = new THREE.Mesh(shadeGeo, gx === 51.5 ? globeN : on ? globe : globeOff);
+      g.position.set(gx, top - 0.01, -1.3); root.add(g);
       this.pendants.push(g);
     }
     // light: warm from window A, cold from C/D, the globes
@@ -554,22 +547,161 @@ const methods = {
     });
   },
 
+  /** 1950s physician's beam scale: enamel platform with a ribbed mat, tapered column, beam head with two poised bars, height rod. */
+  beamScale(x, z) {
+    const enamel = this.mat('hxEnamel', { color: 0xe6e2d4, roughness: 0.32 });
+    const iron = this.mat('hxIron', { color: 0x2a2a2a, metalness: 0.5, roughness: 0.5 });
+    const chrome = this.mat('hChrome', { color: 0xdfe4e8, metalness: 0.75, roughness: 0.22 });
+    const rubber = this.mat('hxMat', { color: 0x1e2022, roughness: 0.9 });
+    this.rb(0.46, 0.025, 0.42, 0.01, iron, x, 0.0125, z);
+    this.rb(0.44, 0.07, 0.4, 0.03, enamel, x, 0.06, z);
+    this.rb(0.36, 0.014, 0.3, 0.006, rubber, x, 0.098, z + 0.03);
+    for (let i = 0; i < 6; i++) this.rb(0.34, 0.006, 0.012, 0.003, rubber, x, 0.107, z - 0.08 + i * 0.044);
+    const cz = z - 0.16;
+    this.lathe([[0.055, 0], [0.055, 0.02], [0.04, 0.05], [0.03, 0.07], [0, 0.07]], enamel, x, 0.09, cz);
+    this.rod([x, 0.14, cz], [x, 1.3, cz], 0.026, enamel, { r2: 0.017, seg: 20 });
+    this.lathe([[0, 0], [0.024, 0], [0.03, 0.02], [0.03, 0.03], [0, 0.03]], enamel, x, 1.28, cz);
+    this.rb(0.11, 0.17, 0.1, 0.03, enamel, x, 1.38, cz);
+    for (const [yy, p] of [[1.43, 0.32], [1.385, 0.12]]) {
+      this.rb(0.52, 0.026, 0.014, 0.006, chrome, x + 0.29, yy, cz + 0.03);
+      for (let t = 0; t < 10; t++) this.rb(0.003, 0.012, 0.003, 0.001, iron, x + 0.07 + t * 0.045, yy + 0.008, cz + 0.038);
+      this.rb(0.04, 0.05, 0.04, 0.01, iron, x + p, yy, cz + 0.03);
+    }
+    this.rb(0.035, 0.13, 0.06, 0.012, enamel, x + 0.56, 1.405, cz + 0.03);
+    this.rb(0.005, 0.05, 0.005, 0.002, this.mat('hFireRed'), x + 0.56, 1.44, cz + 0.062);
+    this.rod([x - 0.05, 1.4, cz + 0.03], [x - 0.11, 1.4, cz + 0.03], 0.007, chrome);
+    this.lathe([[0, -0.04], [0.02, -0.035], [0.024, -0.01], [0.015, 0.0], [0, 0.003]], iron, x - 0.12, 1.39, cz + 0.03);
+    // height rod and its fold-out head piece
+    this.rod([x, 1.46, cz - 0.04], [x, 1.96, cz - 0.04], 0.008, chrome);
+    this.rb(0.03, 0.035, 0.035, 0.008, iron, x, 1.9, cz - 0.04);
+    this.rod([x, 1.9, cz - 0.02], [x, 1.9, cz + 0.2], 0.006, chrome);
+    this.rb(0.06, 0.012, 0.02, 0.004, iron, x, 1.9, cz + 0.2);
+  },
+
+  /** Old tubular-steel gurney with a thin mattress and a sheet thrown over it. */
+  oldGurney(x, z) {
+    const steel = this.mat('steel');
+    const L = 1.9, W = 0.6, top = 0.7;
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+      const lx = x + sx * (L / 2 - 0.1), lz = z + sz * (W / 2 - 0.05);
+      this.rod([lx, 0.12, lz], [lx, top, lz], 0.016, steel);
+      this.lathe([[0, 0], [0.022, 0], [0.022, 0.03], [0.016, 0.04], [0, 0.04]], steel, lx, 0.1, lz);
+      this.caster(lx, 0.11, lz, 0.045, 0);
+    }
+    for (const yy of [top, 0.26]) {
+      for (const sz of [-1, 1]) this.rod([x - L / 2 + 0.06, yy, z + sz * (W / 2 - 0.05)], [x + L / 2 - 0.06, yy, z + sz * (W / 2 - 0.05)], 0.015, steel);
+      for (const sx of [-1, 1]) this.rod([x + sx * (L / 2 - 0.1), yy, z - W / 2 + 0.05], [x + sx * (L / 2 - 0.1), yy, z + W / 2 - 0.05], 0.013, steel);
+    }
+    this.rb(L - 0.3, 0.015, W - 0.12, 0.006, this.mat('hxShelf', { color: 0xb8bec4, metalness: 0.4, roughness: 0.4 }), x, 0.27, z);
+    // push bar at the head end
+    this.tube([[x - L / 2 + 0.06, top, z - 0.25], [x - L / 2 - 0.06, top + 0.12, z - 0.22], [x - L / 2 - 0.08, top + 0.14, z], [x - L / 2 - 0.06, top + 0.12, z + 0.22], [x - L / 2 + 0.06, top, z + 0.25]], 0.014, steel, { seg: 48, tension: 0.3 });
+    this.rb(L - 0.08, 0.07, W - 0.06, 0.03, this.mat('hxOrPad', { color: 0x2a4a4a, roughness: 0.6 }), x, top + 0.05, z);
+    const sheet = this.mat('sheetDS', { map: TX.sheet(), color: 0xffffff, roughness: 0.95, side: THREE.DoubleSide });
+    this._add(this.drapeGeo(L - 0.06, W - 0.04, 0.14, 0.2, 0.04, 11), sheet, x, top + 0.088, z);
+    // a folded grey blanket on the shelf
+    const fold = this.pillowGeo(0.5, 0.36, 0.1, 0.035, 0.3); fold.rotateX(-Math.PI / 2);
+    this._add(fold, this.mat('hxBlanketGrey', { color: 0x7a8088, roughness: 0.95 }), x + 0.4, 0.33, z);
+  },
+
+  /** Enamelled medicine cabinet: turned feet, drawers, a glazed upper case with shelves of bottles, cornice. */
+  medCabinet(x, z) {
+    const cream = this.mat('hxCabinetCream', { color: 0xe4e0d0, roughness: 0.5 });
+    const inside = this.mat('hxCabInside', { color: 0xb4bcb6, roughness: 0.6 });
+    const brass = this.mat('hBrass');
+    const W = 0.72, D = 0.36, y0 = 0.12, Hc = 1.72;
+    const zf = z + D / 2;
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) this.lathe([[0.02, 0], [0.026, 0.01], [0.02, 0.06], [0.026, 0.1], [0.03, 0.12], [0, 0.12]], cream, x + sx * (W / 2 - 0.05), 0, z + sz * (D / 2 - 0.05));
+    this.rb(W, 0.04, D, 0.012, cream, x, y0 + 0.02, z);
+    for (const sx of [-1, 1]) this.rb(0.03, Hc, D, 0.012, cream, x + sx * (W / 2 - 0.015), y0 + Hc / 2, z);
+    this.rb(W - 0.04, Hc, 0.02, 0.006, inside, x, y0 + Hc / 2, z - D / 2 + 0.012);
+    this.rb(W + 0.03, 0.03, D + 0.03, 0.01, cream, x, y0 + Hc, z + 0.005);
+    this.rb(W + 0.07, 0.06, D + 0.06, 0.022, cream, x, y0 + Hc + 0.045, z + 0.01);
+    // two drawers with brass cup pulls, a counter ledge
+    for (let i = 0; i < 2; i++) {
+      const yy = y0 + 0.13 + i * 0.19;
+      this.rb(W - 0.07, 0.17, 0.022, 0.008, cream, x, yy, zf - 0.004);
+      this.rb(0.1, 0.03, 0.014, 0.008, brass, x, yy + 0.02, zf + 0.012);
+      this.rb(0.03, 0.03, 0.006, 0.004, this.mat('hBlack'), x, yy - 0.04, zf + 0.009);
+    }
+    const ledge = y0 + 0.44;
+    this.rb(W + 0.02, 0.03, D + 0.02, 0.01, cream, x, ledge, z + 0.01);
+    // glazed doors: rounded frames, glass, little brass knobs
+    const top = y0 + Hc - 0.02, dh = top - ledge - 0.02, dy = (top + ledge) / 2, dw = (W - 0.06) / 2;
+    for (const s of [-1, 1]) {
+      const dx = x + s * (dw / 2 + 0.002);
+      this.rb(0.04, dh, 0.026, 0.01, cream, dx - s * (dw / 2 - 0.02), dy, zf);
+      this.rb(0.04, dh, 0.026, 0.01, cream, dx + s * (dw / 2 - 0.02), dy, zf);
+      for (const yy of [dy - dh / 2 + 0.025, dy + dh / 2 - 0.025, dy - dh * 0.12]) this.rb(dw, 0.05, 0.026, 0.01, cream, dx, yy, zf);
+      this.bx(dw - 0.07, dh - 0.08, 0.004, this.mat('hGlass'), dx, dy, zf);
+      this.lathe([[0, 0], [0.012, 0.0], [0.016, 0.012], [0.01, 0.02], [0, 0.022]], brass, x + s * 0.03, dy - dh * 0.12, zf + 0.012, { rx: Math.PI / 2 });
+    }
+    // shelves and bottles behind the glass
+    const vial = this.matV('hxVial', { color: 0xffffff, roughness: 0.25 });
+    const r = rng(77);
+    for (let k = 0; k < 3; k++) {
+      const sy = ledge + 0.04 + k * 0.36;
+      this.rb(W - 0.07, 0.014, D - 0.08, 0.005, this.mat('hxShelfGlass', { color: 0xc8d4d0, roughness: 0.2, metalness: 0.2 }), x, sy, z - 0.01);
+      let bx = x - W / 2 + 0.07;
+      while (bx < x + W / 2 - 0.08) {
+        const br = 0.022 + r() * 0.018, bh = 0.09 + r() * 0.11;
+        this.lathe([[0, 0], [br, 0], [br, bh * 0.66], [br * 0.6, bh * 0.8], [br * 0.38, bh * 0.84], [br * 0.38, bh], [br * 0.42, bh], [br * 0.42, bh * 1.06], [0, bh * 1.06]], vial, bx + br, sy + 0.007, z - 0.03 + (r() - 0.5) * 0.08, { seg: 16, color: [0x8a5a20, 0xc8d8c0, 0x5a3a20, 0x3a5a8a, 0xe8e8e0][(r() * 5) | 0] });
+        bx += br * 2 + 0.015 + r() * 0.03;
+      }
+    }
+  },
+
+  /** Slatted wooden waiting bench on cast-iron ends (facing +z). */
+  oldBench(x, z, len, wood, iron) {
+    for (let i = 0; i < 3; i++) this.rb(len, 0.035, 0.12, 0.012, wood, x, 0.46, z - 0.13 + i * 0.135);
+    for (const [yy, dz] of [[0.66, -0.215], [0.84, -0.238]]) this.rb(len, 0.1, 0.03, 0.012, wood, x, yy, z + dz, { rx: -0.12 });
+    for (const ex of [x - len / 2 + 0.12, x + len / 2 - 0.12]) {
+      this.tube([[ex, 0.0, z + 0.2], [ex, 0.2, z + 0.19], [ex, 0.44, z + 0.17]], 0.018, iron, { seg: 24 });
+      this.tube([[ex, 0.0, z - 0.18], [ex, 0.25, z - 0.19], [ex, 0.44, z - 0.2], [ex, 0.92, z - 0.26]], 0.018, iron, { seg: 32 });
+      this.rod([ex, 0.43, z + 0.18], [ex, 0.43, z - 0.2], 0.015, iron);
+      this.tube([[ex, 0.43, z + 0.17], [ex, 0.62, z + 0.12], [ex, 0.64, z - 0.05], [ex, 0.62, z - 0.22]], 0.014, iron, { seg: 32 });
+      for (const fz of [z + 0.2, z - 0.18]) this.lathe([[0.03, 0], [0.03, 0.015], [0.018, 0.03], [0, 0.03]], iron, ex, 0, fz);
+    }
+  },
+
   /** Old wooden door (single or double), optionally with frosted glass lit from behind. */
   oldDoor(x, w, h, { sign, frosted = false, double = false, lit = null } = {}) {
     const root = this.root;
     const wood = this.mat('hxDoorWood', { color: 0x5a3a20, roughness: 0.5 });
     const frame = this.mat('hxWoodFrame', { color: 0x4a301a, roughness: 0.5 });
-    this.bx(w + 0.24, 0.14, 0.16, frame, x, h + 0.07, BACK + 0.02);
-    for (const s of [-1, 1]) this.bx(0.12, h, 0.16, frame, x + s * (w / 2 + 0.06), h / 2, BACK + 0.02);
+    // moulded architrave: posts and head with a cornice cap, plinth blocks at the floor
+    this.rb(w + 0.28, 0.16, 0.16, 0.03, frame, x, h + 0.08, BACK + 0.02);
+    this.rb(w + 0.36, 0.05, 0.2, 0.02, frame, x, h + 0.185, BACK + 0.03);
+    for (const s of [-1, 1]) {
+      this.rb(0.12, h, 0.16, 0.025, frame, x + s * (w / 2 + 0.06), h / 2, BACK + 0.02);
+      this.rb(0.04, h - 0.2, 0.17, 0.012, wood, x + s * (w / 2 + 0.06), h / 2 + 0.1, BACK + 0.025);
+      this.rb(0.14, 0.2, 0.18, 0.015, frame, x + s * (w / 2 + 0.06), 0.1, BACK + 0.03);
+    }
     const leaves = double ? 2 : 1, lw = w / leaves;
     const glassM = frosted ? this.mat(`hxFrosted-${lit}`, { map: TXX.frosted(), color: 0xffffff, emissive: 0xfff4dc, emissiveMap: TXX.frosted(), emissiveIntensity: lit === 'day' ? 0.5 : 0, roughness: 0.3 }) : null;
+    const brass = this.mat('hBrass');
     for (let k = 0; k < leaves; k++) {
       const lx = x - w / 2 + lw * (k + 0.5);
-      this.bx(lw - 0.02, h, 0.05, wood, lx, h / 2, BACK);
-      for (const py of [0.35, 1.0]) this.bx(lw - 0.2, 0.36, 0.06, frame, lx, py, BACK + 0.005);
-      if (glassM) this.bx(lw - 0.24, h * 0.36, 0.06, glassM, lx, h * 0.72, BACK + 0.008);
-      else this.bx(lw - 0.2, 0.5, 0.06, frame, lx, h * 0.72, BACK + 0.005);
-      this.bx(0.04, 0.12, 0.05, this.mat('hBrass'), lx + (k ? -1 : 1) * (lw / 2 - 0.1), 1.02, BACK + 0.05);
+      const hs = k ? -1 : 1; // the handle side
+      this.rb(lw - 0.02, h, 0.05, 0.012, wood, lx, h / 2, BACK);
+      // fielded panels: a dark bolection frame round a raised field
+      const panel = (py, ph) => {
+        this.rb(lw - 0.2, ph, 0.03, 0.012, frame, lx, py, BACK + 0.022);
+        this.rb(lw - 0.3, ph - 0.1, 0.03, 0.03, wood, lx, py, BACK + 0.032, { seg: 3 });
+      };
+      panel(0.36, 0.4);
+      panel(0.98, 0.5);
+      if (glassM) {
+        this.rb(lw - 0.2, h * 0.36 + 0.06, 0.03, 0.012, frame, lx, h * 0.72, BACK + 0.022);
+        this.bx(lw - 0.26, h * 0.36, 0.01, glassM, lx, h * 0.72, BACK + 0.036);
+        for (let q = 1; q < 3; q++) this.rb(0.02, h * 0.36, 0.014, 0.006, frame, lx - (lw - 0.26) / 2 + (lw - 0.26) * q / 3, h * 0.72, BACK + 0.042);
+      } else panel(h * 0.72, 0.62);
+      // brass: lever on a round rose, a keyhole escutcheon, a kick plate
+      const hx = lx + hs * (lw / 2 - 0.1);
+      this.lathe([[0, 0], [0.03, 0], [0.032, 0.008], [0.02, 0.016], [0, 0.018]], brass, hx, 1.02, BACK + 0.026, { rx: Math.PI / 2 });
+      this.rod([hx, 1.02, BACK + 0.04], [hx, 1.02, BACK + 0.065], 0.008, brass);
+      this.tube([[hx, 1.02, BACK + 0.065], [hx - hs * 0.06, 1.02, BACK + 0.07], [hx - hs * 0.11, 1.012, BACK + 0.068]], 0.008, brass, { seg: 16 });
+      this.rb(0.025, 0.07, 0.006, 0.006, brass, hx, 0.92, BACK + 0.028);
+      this.rb(lw - 0.08, 0.18, 0.006, 0.004, this.mat('hxKick', { color: 0x8a7444, metalness: 0.6, roughness: 0.45 }), lx, 0.1, BACK + 0.028);
     }
     if (glassM) this.expNight.push((night) => { glassM.emissiveIntensity = night ? 0.0 : (lit === 'day' ? 0.5 : 0); });
     if (sign) {

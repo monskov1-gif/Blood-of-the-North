@@ -421,6 +421,47 @@ function worldUV(geo, ox, oy, oz, su, sv) {
   }
 }
 
+/**
+ * A box with truly rounded edges and corners (a proper fillet, not a chamfer):
+ * `seg` rings sweep each rounding, normals follow the curvature. Cached, cloned on use.
+ */
+const softCache = new Map();
+function softBoxGeo(w, h, d, r, seg = 3) {
+  r = Math.max(0.001, Math.min(r, w / 2 - 1e-4, h / 2 - 1e-4, d / 2 - 1e-4));
+  const key = `${w.toFixed(3)}|${h.toFixed(3)}|${d.toFixed(3)}|${r.toFixed(4)}|${seg}`;
+  let geo = softCache.get(key);
+  if (!geo) {
+    const n = seg * 2 + 1;
+    geo = new THREE.BoxGeometry(1, 1, 1, n, n, n);
+    const p = geo.attributes.position, nr = geo.attributes.normal;
+    const inner = [w / 2 - r, h / 2 - r, d / 2 - r];
+    const c = [0, 0, 0], e = [0, 0, 0];
+    for (let i = 0; i < p.count; i++) {
+      for (let k = 0; k < 3; k++) {
+        const g = Math.round((p.getComponent(i, k) + 0.5) * n);
+        if (g <= seg) { e[k] = -Math.tan(((seg - g) / seg) * Math.PI / 4); c[k] = -inner[k]; } else { e[k] = Math.tan(((g - seg - 1) / seg) * Math.PI / 4); c[k] = inner[k]; }
+      }
+      const l = Math.hypot(e[0], e[1], e[2]) || 1;
+      p.setXYZ(i, c[0] + (r * e[0]) / l, c[1] + (r * e[1]) / l, c[2] + (r * e[2]) / l);
+      nr.setXYZ(i, e[0] / l, e[1] / l, e[2] / l);
+    }
+    softCache.set(key, geo);
+  }
+  return geo.clone();
+}
+
+/** Cylinder between two points (radius r, open or capped). */
+function rodGeo(a, b, r, seg = 16, r2 = r) {
+  const A = new THREE.Vector3(...a), B = new THREE.Vector3(...b);
+  const len = A.distanceTo(B);
+  const geo = new THREE.CylinderGeometry(r2, r, len, seg, 1);
+  const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), B.clone().sub(A).normalize());
+  geo.applyQuaternion(q);
+  const m = A.add(B).multiplyScalar(0.5);
+  geo.translate(m.x, m.y, m.z);
+  return geo;
+}
+
 function mergeGeometries(geos) {
   let nv = 0, ni = 0;
   for (const g of geos) { nv += g.attributes.position.count; ni += g.index ? g.index.count : g.attributes.position.count; }
@@ -526,7 +567,24 @@ export class HospitalScene extends LocationBase {
   }
   bx(w, h, d, mat, x, y, z, o) { return this._add(bevelBox(w, h, d), mat, x, y, z, o); }
   pl(w, h, mat, x, y, z, o) { return this._add(new THREE.PlaneGeometry(w, h), mat, x, y, z, o); }
-  cy(rt, rb, h, seg, mat, x, y, z, o) { return this._add(new THREE.CylinderGeometry(rt, rb, h, seg), mat, x, y, z, o); }
+  cy(rt, rb, h, seg, mat, x, y, z, o) { return this._add(new THREE.CylinderGeometry(rt, rb, h, Math.max(16, seg)), mat, x, y, z, o); }
+  /** Rounded box with a real fillet radius r (batched). */
+  rb(w, h, d, r, mat, x, y, z, o) { return this._add(softBoxGeo(w, h, d, r, o?.seg || 3), mat, x, y, z, o); }
+  /** Lathe profile [[radius, y], …] around the y axis (batched). */
+  lathe(pts, mat, x, y, z, o = {}) {
+    // the profile runs bottom → top so the normals face out
+    const p = pts[0][1] > pts[pts.length - 1][1] ? [...pts].reverse() : pts;
+    return this._add(new THREE.LatheGeometry(p.map(([r, py]) => new THREE.Vector2(Math.max(0.0005, r), py)), o.seg || 24), mat, x, y, z, o);
+  }
+  /** Round bar from a to b in world space (batched). */
+  rod(a, b, r, mat, o = {}) { return this._add(rodGeo(a, b, r, o.seg || 16, o.r2 ?? r), mat, 0, 0, 0, o); }
+  /** Bent tube through points (batched); `tension` keeps the bends tight. */
+  tube(pts, r, mat, o = {}) {
+    const curve = new THREE.CatmullRomCurve3(pts.map((p) => new THREE.Vector3(...p)), !!o.closed, 'catmullrom', o.tension ?? 0.2);
+    return this._add(new THREE.TubeGeometry(curve, o.seg || Math.max(16, pts.length * 8), r, o.rs || 12, !!o.closed), mat, 0, 0, 0, o);
+  }
+  /** Torus (batched), axis along z unless rotated. */
+  torus(R, r, mat, x, y, z, o = {}) { return this._add(new THREE.TorusGeometry(R, r, o.rs || 12, o.ts || 32, o.arc || Math.PI * 2), mat, x, y, z, o); }
   flushBatches() {
     for (const [mat, list] of this._batches) {
       const mesh = new THREE.Mesh(mergeGeometries(list), mat);
@@ -1210,6 +1268,306 @@ export class HospitalScene extends LocationBase {
 
   // ---------------------------------------------------------------- reusable props
 
+  /** Build detail with the batch helpers (bx/rb/rod/…) in a group's local space, merged per material. */
+  inGroup(group, fn) {
+    const saved = this._batches;
+    this._batches = new Map();
+    try { fn(); } finally {
+      for (const [mat, list] of this._batches) {
+        const mesh = new THREE.Mesh(mergeGeometries(list), mat);
+        if (mat.transparent) mesh.renderOrder = 1;
+        group.add(mesh);
+      }
+      this._batches = saved;
+    }
+    return group;
+  }
+
+  /** Small rubber caster: swivel stem, fork, wheel (axis along `ax`, `az`). */
+  caster(x, y, z, r = 0.035, ang = 0) {
+    const fork = this.mat('hCasterFork', { color: 0x8a9096, metalness: 0.5, roughness: 0.35 });
+    const tyre = this.mat('hTyre', { color: 0x141618, roughness: 0.7 });
+    const ax = Math.sin(ang), az = Math.cos(ang);
+    this.rod([x, y, z], [x, y - 0.03, z], 0.007, fork);
+    this.rb(0.03, 0.035, r * 1.2, 0.008, fork, x - Math.cos(ang) * 0.012, y - 0.045, z + Math.sin(ang) * 0.012, { ry: ang });
+    const cx = x - Math.cos(ang) * 0.02, cz = z + Math.sin(ang) * 0.02, cyy = y - 0.03 - r * 0.9;
+    this.rod([cx - ax * r * 0.4, cyy, cz - az * r * 0.4], [cx + ax * r * 0.4, cyy, cz + az * r * 0.4], r, tyre, { seg: 20 });
+    this.rod([cx - ax * r * 0.5, cyy, cz - az * r * 0.5], [cx + ax * r * 0.5, cyy, cz + az * r * 0.5], r * 0.35, fork);
+  }
+
+  /** Soft pillow / bag: a rounded box whose faces bulge out toward the middle. */
+  pillowGeo(w, h, d, r = 0.03, bulge = 0.5) {
+    const geo = softBoxGeo(w, h, d, r, 4);
+    const p = geo.attributes.position;
+    for (let i = 0; i < p.count; i++) {
+      const u = Math.min(1, Math.abs(p.getX(i)) / (w / 2)), v = Math.min(1, Math.abs(p.getY(i)) / (h / 2));
+      const k = (1 - u * u) * (1 - v * v * v) * bulge + (1 - bulge);
+      p.setZ(i, p.getZ(i) * k);
+    }
+    geo.computeVertexNormals();
+    return geo;
+  }
+
+  /**
+   * Cloth draped over a block (a sheet, a blanket): flat on top, rounded over the edges,
+   * hanging `hangX` / `hangZ` down the sides, with a soft hem wave.
+   */
+  drapeGeo(lx, lz, hangX, hangZ, r = 0.05, seed = 1) {
+    const prof = (half, hang) => {
+      // arc length along the profile → [horizontal offset, drop]
+      const flat = half - r, arc = (Math.PI / 2) * r, total = flat + arc + hang;
+      return { total, at: (s) => {
+        const a = Math.abs(s), sg = Math.sign(s) || 1;
+        if (a <= flat) return [s, 0];
+        if (a <= flat + arc) { const t = (a - flat) / r; return [sg * (flat + Math.sin(t) * r), r - Math.cos(t) * r]; }
+        return [sg * half, r + (a - flat - arc)];
+      } };
+    };
+    const PX = prof(lx / 2, hangX), PZ = prof(lz / 2, hangZ);
+    const geo = new THREE.PlaneGeometry(PX.total * 2, PZ.total * 2, 40, 22);
+    geo.rotateX(-Math.PI / 2);
+    const p = geo.attributes.position;
+    for (let i = 0; i < p.count; i++) {
+      const [x, dx] = PX.at(p.getX(i)), [z, dz] = PZ.at(p.getZ(i));
+      const drop = dx + dz;
+      const wave = drop > r ? Math.sin(x * 23 + seed) * 0.012 * Math.min(1, (drop - r) / 0.15) : 0;
+      const out = drop > r ? 1 + wave * 2 : 1;
+      p.setXYZ(i, x * (Math.abs(x) >= lx / 2 - 1e-3 ? out : 1) + (Math.abs(z) >= lz / 2 - 1e-3 ? wave : 0), -drop, z * (Math.abs(z) >= lz / 2 - 1e-3 ? out : 1) + (Math.abs(x) >= lx / 2 - 1e-3 ? wave : 0));
+    }
+    geo.computeVertexNormals();
+    return geo;
+  }
+
+  /** IV pole: five-legged castor base, two-stage pole with a clamp knob, ram's-horn hooks, a pump; a pillow-shaped bag. */
+  ivStand(x, z, bagColor = 0xdde8f0) {
+    const g = new THREE.Group();
+    const steel = this.mat('steel');
+    const chrome = this.mat('hChrome', { color: 0xdfe4e8, metalness: 0.75, roughness: 0.22 });
+    const plastic = this.mat('hIvBase', { color: 0x9ea6ac, roughness: 0.45, metalness: 0.2 });
+    const pumpM = this.mat('hPump', { color: 0xe6e8e4, roughness: 0.45 });
+    const pumpDark = this.mat('hPumpDark', { color: 0x2c3034, roughness: 0.5 });
+    const lcd = this.mat('hPumpLcd', { color: 0x000000, emissive: 0x7ad08a, emissiveIntensity: 0.9 });
+    this.inGroup(g, () => {
+      this.lathe([[0, 0.055], [0.05, 0.055], [0.056, 0.07], [0.05, 0.095], [0.022, 0.11], [0.016, 0.13], [0, 0.13]], plastic, 0, 0, 0, { seg: 24 });
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * Math.PI * 2 + 0.3, c = Math.cos(a), s = -Math.sin(a);
+        this.tube([[c * 0.03, 0.085, s * 0.03], [c * 0.15, 0.082, s * 0.15], [c * 0.27, 0.07, s * 0.27]], 0.011, plastic, { rs: 10 });
+        this.lathe([[0, 0.055], [0.016, 0.055], [0.018, 0.07], [0.012, 0.08], [0, 0.08]], plastic, c * 0.28, 0, s * 0.28, { seg: 16 });
+        this.caster(c * 0.28, 0.058, s * 0.28, 0.026, a + Math.PI / 2);
+      }
+      this.rod([0, 0.12, 0], [0, 1.24, 0], 0.0145, chrome, { seg: 20 });
+      this.lathe([[0, 1.22], [0.022, 1.22], [0.024, 1.235], [0.024, 1.27], [0.016, 1.285], [0, 1.285]], plastic, 0, 0, 0);
+      this.rod([0.02, 1.252, 0], [0.055, 1.252, 0], 0.005, steel);
+      this.lathe([[0, -0.015], [0.012, -0.012], [0.016, 0], [0.012, 0.012], [0, 0.015]], plastic, 0.066, 1.252, 0, { seg: 16, rz: Math.PI / 2 });
+      this.rod([0, 1.28, 0], [0, 1.93, 0], 0.0105, chrome, { seg: 20 });
+      this.lathe([[0, 1.92], [0.016, 1.92], [0.018, 1.935], [0.01, 1.95], [0, 1.952]], plastic, 0, 0, 0);
+      // four ram's-horn hooks
+      for (let k = 0; k < 4; k++) {
+        const a = (k / 4) * Math.PI * 2, c = Math.cos(a), s = -Math.sin(a);
+        const R = k % 2 ? 0.15 : 0.2;
+        this.tube([[0, 1.928, 0], [c * R * 0.45, 1.935, s * R * 0.45], [c * R * 0.85, 1.915, s * R * 0.85], [c * R, 1.865, s * R], [c * (R + 0.022), 1.875, s * (R + 0.022)], [c * (R + 0.02), 1.9, s * (R + 0.02)]], 0.0045, chrome, { rs: 8, seg: 40 });
+      }
+      // infusion pump clamped on the pole
+      this.rb(0.13, 0.17, 0.11, 0.018, pumpM, 0.075, 1.02, 0.0);
+      this.rb(0.08, 0.04, 0.008, 0.003, lcd, 0.075, 1.07, 0.056);
+      for (let i = 0; i < 3; i++) this.rb(0.022, 0.016, 0.01, 0.004, pumpDark, 0.045 + i * 0.03, 1.025, 0.056);
+      this.rb(0.1, 0.035, 0.012, 0.005, pumpDark, 0.075, 0.975, 0.056);
+      this.rb(0.045, 0.05, 0.04, 0.01, plastic, 0.0, 1.02, 0.0);
+      this.rod([-0.03, 1.02, 0], [-0.055, 1.02, 0], 0.005, steel);
+    });
+    // the bag: a soft pillow with a hanger tab and two ports, printed graduations
+    const bagTex = T('ivbag', 16, 24, (c, w, h) => {
+      rect(c, '#f4f6f8', 0, 0, w, h);
+      rect(c, '#c4d4e4', 2, 5, 9, 7); rect(c, '#5a7aa0', 3, 6, 7, 1); rect(c, '#7a8a9a', 3, 8, 6, 1); rect(c, '#7a8a9a', 3, 10, 5, 1);
+      for (let i = 0; i < 6; i++) rect(c, '#8a96a2', 12, 4 + i * 3, i % 2 ? 2 : 3, 1);
+      rect(c, '#d8dee4', 0, 0, w, 2); rect(c, '#d8dee4', 0, h - 2, w, 2);
+    });
+    const bagMat = new THREE.MeshStandardMaterial({ map: bagTex, color: bagColor, roughness: 0.18, transparent: true, opacity: 0.85, emissive: bagColor === 0xdde8f0 ? 0x000000 : 0x300004 });
+    const parts = [this.pillowGeo(0.15, 0.24, 0.05, 0.03, 0.75)];
+    const tab = softBoxGeo(0.05, 0.05, 0.008, 0.012, 2); tab.translate(0, 0.135, 0); parts.push(tab);
+    for (const dx of [-0.025, 0.02]) { const pg = new THREE.CylinderGeometry(0.007, 0.008, 0.045, 16); pg.translate(dx, -0.14, 0); parts.push(pg); }
+    const bag = new THREE.Mesh(mergeGeometries(parts), bagMat);
+    bag.position.set(0.2, 1.69, 0);
+    g.add(bag);
+    const tubeMat = new THREE.MeshStandardMaterial({ color: bagColor === 0xdde8f0 ? 0xe8eef2 : 0x7a0010, transparent: true, opacity: 0.8, roughness: 0.2 });
+    const tubeGeo = (x, y, z) => {
+      // from the drip chamber under the bag, sagging, into the arm at (x, y, z)
+      const sx = 0.2, sy = 1.5;
+      const mx = sx + (x - sx) * 0.45, my = Math.min(y, sy) - 0.18 - Math.abs(x - sx) * 0.12;
+      return new THREE.TubeGeometry(new THREE.CatmullRomCurve3([
+        new THREE.Vector3(sx, sy, 0), new THREE.Vector3(sx + (x - sx) * 0.08, sy - 0.4, z * 0.4),
+        new THREE.Vector3(mx, my, z * 0.8), new THREE.Vector3(x, y, z)]), 28, 0.0045, 8);
+    };
+    const tube = new THREE.Mesh(tubeGeo(0.7, 0.8, 0.05), tubeMat);
+    // drip chamber + spike (travel with the line: hidden when it is torn off)
+    const chamber = new THREE.Mesh(new THREE.LatheGeometry([[0.004, 1.5], [0.011, 1.51], [0.012, 1.56], [0.009, 1.575], [0.005, 1.585], [0.004, 1.6]].map(([r, y]) => new THREE.Vector2(r, y)), 16),
+      this.mat('hDripChamber', { color: 0xe4eef4, transparent: true, opacity: 0.6, roughness: 0.1 }));
+    chamber.geometry.translate(0.2, 0, 0);
+    tube.add(chamber);
+    g.add(tube);
+    g.userData.bag = bag;
+    g.userData.tube = tube;
+    /** Re-route the tube to end at a point given in the stand's local space (null = back to the bed). */
+    g.userData.aimTube = (x, y, z) => {
+      const key = x == null ? 'home' : `${x.toFixed(2)},${y.toFixed(2)},${z.toFixed(2)}`;
+      if (tube.userData.key === key) return;
+      tube.userData.key = key;
+      tube.geometry.dispose();
+      tube.geometry = x == null ? tubeGeo(0.7, 0.8, 0.05) : tubeGeo(x, y, z);
+    };
+    g.position.set(x, 0, z);
+    this.root.add(g);
+    return g;
+  }
+
+  /** Hospital bed (head towards -x): castor chassis, lift columns, deck, mattress, head/foot boards, split rails, draped blanket. */
+  bed(x, z, { flip = false } = {}) {
+    const g = new THREE.Group();
+    const steel = this.mat('steel');
+    const grey = this.mat('hBedPlastic', { color: 0x8e979e, roughness: 0.5, metalness: 0.15 });
+    const board = this.mat('hBedBoard', { color: 0xe6e2d6, roughness: 0.45 });
+    const inset = this.mat('hLaminate', { map: TX.laminate(), color: 0xffffff, roughness: 0.6 });
+    const sheet = this.mat('sheet');
+    this.inGroup(g, () => {
+      // chassis on castors, two lift columns with bellows, the deck frame
+      this.rb(1.7, 0.07, 0.62, 0.03, grey, 0, 0.16, 0);
+      for (const sx of [-0.82, 0.82]) for (const sz of [-0.27, 0.27]) {
+        this.rb(0.09, 0.05, 0.09, 0.02, grey, sx, 0.13, sz);
+        this.caster(sx, 0.11, sz, 0.045, 0);
+      }
+      for (const sx of [-0.5, 0.5]) {
+        this.rb(0.18, 0.08, 0.24, 0.03, grey, sx, 0.22, 0);
+        for (let k = 0; k < 5; k++) this.rb(0.15 - (k % 2) * 0.012, 0.035, 0.2 - (k % 2) * 0.012, 0.014, grey, sx, 0.27 + k * 0.035, 0);
+        this.rb(0.2, 0.05, 0.26, 0.02, grey, sx, 0.45, 0);
+      }
+      this.rb(2.0, 0.07, 0.88, 0.03, steel, 0, 0.49, 0);
+      for (const sz of [-0.43, 0.43]) this.rod([-0.98, 0.5, sz], [0.98, 0.5, sz], 0.016, steel);
+      // mattress: thick, soft rounded edges, a piping seam
+      this.rb(1.96, 0.15, 0.86, 0.06, sheet, 0, 0.6, 0, { seg: 4 });
+      this.rb(1.97, 0.012, 0.87, 0.006, this.mat('hPiping', { color: 0xc8ccd0, roughness: 0.8 }), 0, 0.585, 0);
+      // head and foot boards: a rounded frame with a laminate inset and a grab tube on top
+      for (const [sx, hh] of [[-1.03, 0.62], [1.03, 0.5]]) {
+        const yc = 0.48 + hh / 2;
+        this.rb(0.06, hh, 0.92, 0.028, board, sx, yc, 0, { seg: 3 });
+        this.rb(0.065, hh - 0.14, 0.72, 0.02, inset, sx, yc - 0.02, 0, { uv: [1, 1] });
+        this.rod([sx, 0.48 + hh + 0.01, -0.42], [sx, 0.48 + hh + 0.01, 0.42], 0.018, grey, { seg: 18 });
+        for (const sz of [-0.42, 0.42]) this.lathe([[0, 0], [0.022, 0], [0.022, 0.02], [0.015, 0.035], [0, 0.035]], grey, sx, 0.48 + hh - 0.02, sz);
+      }
+      // split side rails: the far one along the head, the near one at the foot (keeps the face clear)
+      for (const [x0, x1, sz] of [[-0.9, 0.05, -0.47], [0.15, 0.85, 0.47]]) {
+        for (const y of [0.74, 0.86]) this.rod([x0, y, sz], [x1, y, sz], 0.012, steel);
+        for (const xx of [x0, (x0 + x1) / 2, x1]) this.rod([xx, 0.52, sz], [xx, 0.87, sz], 0.009, steel);
+        this.rb(0.06, 0.035, 0.018, 0.008, grey, x1 - 0.06, 0.8, sz + Math.sign(sz) * 0.01);
+      }
+      // pillow
+      const pil = this.pillowGeo(0.44, 0.6, 0.13, 0.05, 0.6);
+      pil.rotateX(-Math.PI / 2); pil.rotateZ(0.12);
+      this._add(pil, sheet, -0.74, 0.74, 0);
+    });
+    // the blanket: draped over the mattress down both sides
+    const cover = new THREE.Mesh(this.drapeGeo(1.25, 0.88, 0.0, 0.17, 0.05, x), this.mat('blanketDS', { map: TX.blanket(), color: 0xffffff, roughness: 0.95, side: THREE.DoubleSide }));
+    cover.position.set(0.32, 0.705, 0);
+    g.add(cover);
+    g.userData.cover = cover;
+    if (flip) g.rotation.y = Math.PI;
+    g.position.set(x, 0, z);
+    this.root.add(g);
+    return g;
+  }
+
+  /** Folding wheelchair: tyres, rims and push rims, spokes, tubular frame, slung seat, armrests, castors, footplates. */
+  wheelchair() {
+    const g = new THREE.Group();
+    const steel = this.mat('hChrome', { color: 0xdfe4e8, metalness: 0.75, roughness: 0.22 });
+    const black = this.mat('hTyre', { color: 0x141618, roughness: 0.7 });
+    const seat = this.mat('wcSeat', { color: 0x1a2a3a, roughness: 0.8 });
+    const grip = this.mat('hGrip', { color: 0x202224, roughness: 0.8 });
+    this.inGroup(g, () => {
+      for (const s of [-1, 1]) {
+        const zw = s * 0.29;
+        this.torus(0.3, 0.022, black, 0, 0.32, zw, { rs: 12, ts: 48 });
+        this.torus(0.275, 0.009, steel, 0, 0.32, zw, { rs: 8, ts: 48 });
+        this.torus(0.27, 0.007, steel, 0, 0.32, zw + s * 0.035, { rs: 8, ts: 48 });
+        for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2 + 0.4; this.rod([Math.cos(a) * 0.27, 0.32 + Math.sin(a) * 0.27, zw], [Math.cos(a) * 0.27, 0.32 + Math.sin(a) * 0.27, zw + s * 0.035], 0.004, steel, { seg: 8 }); }
+        for (let k = 0; k < 16; k++) { const a = (k / 16) * Math.PI * 2; this.rod([Math.cos(a) * 0.02, 0.32 + Math.sin(a) * 0.02, zw - s * (k % 2 ? 0.02 : -0.02)], [Math.cos(a + 0.3) * 0.268, 0.32 + Math.sin(a + 0.3) * 0.268, zw], 0.0018, steel, { seg: 6 }); }
+        this.rod([0, 0.32, zw - s * 0.03], [0, 0.32, zw + s * 0.03], 0.028, steel);
+        // side frame: back post bending into the push handle, seat rail, front down-tube to the footrest
+        const zf = s * 0.23;
+        this.tube([[-0.2, 0.26, zf], [-0.2, 0.55, zf], [-0.21, 0.9, zf], [-0.24, 1.0, zf], [-0.34, 1.03, zf]], 0.012, steel, { seg: 40 });
+        this.rod([-0.34, 1.03, zf], [-0.44, 1.03, zf], 0.016, grip);
+        this.tube([[-0.2, 0.5, zf], [0.18, 0.5, zf], [0.27, 0.46, zf], [0.33, 0.25, zf], [0.38, 0.15, zf]], 0.012, steel, { seg: 40 });
+        this.rod([-0.2, 0.3, zf], [0.3, 0.3, zf], 0.011, steel);
+        this.rod([0.3, 0.3, zf], [0.33, 0.12, zf], 0.011, steel);
+        // armrest on two posts
+        this.rod([-0.14, 0.5, zf], [-0.14, 0.72, zf], 0.01, steel);
+        this.rod([0.14, 0.5, zf], [0.14, 0.72, zf], 0.01, steel);
+        this.rb(0.36, 0.04, 0.06, 0.018, grip, 0.0, 0.74, zf);
+        // castor + footplate
+        this.rod([0.33, 0.14, zf], [0.33, 0.1, zf], 0.012, steel);
+        this.rb(0.025, 0.06, 0.04, 0.008, steel, 0.35, 0.08, zf);
+        this.rod([0.36, 0.065, zf - 0.016], [0.36, 0.065, zf + 0.016], 0.062, black, { seg: 20 });
+        this.rod([0.36, 0.065, zf - 0.02], [0.36, 0.065, zf + 0.02], 0.02, steel);
+        this.rb(0.16, 0.014, 0.15, 0.006, this.mat('hBlack', { color: 0x141414, roughness: 0.6 }), 0.42, 0.13, s * 0.11, { rz: 0.1 });
+      }
+      // folding cross-brace, slung seat and back
+      this.rod([0.0, 0.3, -0.23], [0.0, 0.5, 0.23], 0.01, steel);
+      this.rod([0.0, 0.3, 0.23], [0.0, 0.5, -0.23], 0.01, steel);
+      for (const [a, b] of [[-0.2, 0.5], [0.18, 0.5]]) this.rod([a, b, -0.23], [a, b, 0.23], 0.012, steel);
+      const sling = softBoxGeo(0.42, 0.035, 0.46, 0.015, 2);
+      { const p = sling.attributes.position; for (let i = 0; i < p.count; i++) p.setY(i, p.getY(i) - 0.03 * (1 - (2 * p.getZ(i) / 0.46) ** 2)); sling.computeVertexNormals(); }
+      this._add(sling, seat, -0.005, 0.52, 0);
+      const back = softBoxGeo(0.03, 0.38, 0.46, 0.012, 2);
+      { const p = back.attributes.position; for (let i = 0; i < p.count; i++) p.setX(i, p.getX(i) - 0.035 * (1 - (2 * p.getZ(i) / 0.46) ** 2)); back.computeVertexNormals(); }
+      this._add(back, seat, -0.21, 0.76, 0, { rz: -0.06 });
+    });
+    return g;
+  }
+
+  /** Bar handle on two stand-offs, horizontal (dir 'x') or vertical ('y'), on a face looking +z (or rotated by ry). */
+  barHandle(x, y, z, len, dir = 'x', mat = this.mat('steel'), ry = 0) {
+    const c = Math.cos(ry), s = Math.sin(ry);
+    const P = (dx, dy, dz) => [x + dx * c + dz * s, y + dy, z - dx * s + dz * c];
+    const a = dir === 'x' ? [-len / 2, 0] : [0, -len / 2], b = dir === 'x' ? [len / 2, 0] : [0, len / 2];
+    this.rod(P(a[0], a[1], 0.028), P(b[0], b[1], 0.028), 0.0075, mat);
+    for (const e of [a, b]) this.rod(P(e[0] * 0.85, e[1] * 0.85, 0), P(e[0] * 0.85, e[1] * 0.85, 0.028), 0.006, mat);
+  }
+
+  /** Bedside locker: plinth, rounded carcass, drawer + door with bar handles, overhanging top (top surface at h + 0.025). */
+  locker(x, z, w = 0.46, h = 0.72, d = 0.44, ry = 0) {
+    const body = this.mat('hCabinetW'), face = this.mat('hDrawerFace'), top = this.mat('hWorkTop');
+    const c = Math.cos(ry), s = Math.sin(ry);
+    const at = (dz) => [x + dz * s, z + dz * c];
+    this.rb(w - 0.05, 0.06, d - 0.05, 0.01, this.mat('hSkirt'), x, 0.03, z, { ry });
+    this.rb(w, h - 0.05, d, 0.022, body, x, 0.05 + (h - 0.05) / 2, z, { ry });
+    this.rb(w + 0.02, 0.028, d + 0.02, 0.012, top, x, h + 0.011, z, { ry });
+    const [fx, fz] = at(d / 2 + 0.004);
+    this.rb(w - 0.04, 0.17, 0.014, 0.006, face, fx, h - 0.11, fz, { ry });
+    this.rb(w - 0.04, h - 0.3, 0.014, 0.006, face, fx, 0.07 + (h - 0.3) / 2, fz, { ry });
+    this.barHandle(fx, h - 0.11, fz, 0.14, 'x', this.mat('steel'), ry);
+    this.barHandle(fx + (w / 2 - 0.07) * c, 0.07 + (h - 0.3) * 0.75, fz - (w / 2 - 0.07) * s, 0.12, 'y', this.mat('steel'), ry);
+  }
+
+  /** Upholstered visitor armchair facing +z (rotated by ry): sled legs, cushions with piping, padded arms. */
+  armchair(x, z, ry, vinyl) {
+    const g = new THREE.Group();
+    const sd = this.mat('steelDark');
+    const wood = this.mat('hArmWood', { map: TX.veneer(), color: 0xd8b088, roughness: 0.45 });
+    this.inGroup(g, () => {
+      for (const sx of [-0.27, 0.27]) {
+        this.tube([[sx, 0.42, 0.22], [sx, 0.05, 0.24], [sx, 0.02, 0.15], [sx, 0.02, -0.15], [sx, 0.05, -0.22], [sx, 0.42, -0.2]], 0.014, sd, { seg: 48, tension: 0.1 });
+        this.rb(0.08, 0.2, 0.5, 0.035, vinyl, sx * 1.12, 0.55, 0.0);
+        this.rb(0.09, 0.03, 0.5, 0.012, wood, sx * 1.12, 0.665, 0.0);
+      }
+      this.rb(0.56, 0.06, 0.48, 0.02, sd, 0, 0.36, 0);
+      this.rb(0.5, 0.13, 0.48, 0.05, vinyl, 0, 0.45, 0.01, { seg: 4 });
+      this.rb(0.52, 0.55, 0.12, 0.05, vinyl, 0, 0.73, -0.23, { rx: -0.12, seg: 4 });
+      this.rb(0.42, 0.2, 0.05, 0.03, vinyl, 0, 0.66, -0.17, { rx: -0.12 });
+    });
+    g.position.set(x, 0, z); g.rotation.y = ry;
+    this.root.add(g);
+    return g;
+  }
+
   hDoor(x, z, { w = 1.0, h = 2.15, color = 0x6a7480, sign, push = false } = {}) {
     const g = new THREE.Group();
     const frameMat = this.mat('hDoorFrame', { color: 0x4a5258, roughness: 0.45, metalness: 0.3 });
@@ -1347,11 +1705,23 @@ export class HospitalScene extends LocationBase {
   }
 
   radiator(x, y, z, w) {
+    // cast-iron column radiator: rounded sections joined by top/bottom hubs, feet, a valve and its pipe
     const m = this.mat('hRadiator', { color: 0xe4e4dc, roughness: 0.5 });
-    const n = Math.round(w / 0.07);
-    for (let i = 0; i < n; i++) this.bx(0.045, 0.6, 0.1, m, x - w / 2 + (i + 0.5) * (w / n), y, z);
-    this.bx(w, 0.04, 0.06, m, x, y - 0.26, z);
-    this.cy(0.015, 0.015, y - 0.3, 6, this.mat('steel'), x - w / 2 - 0.05, (y - 0.3) / 2, z);
+    const n = Math.round(w / 0.065);
+    for (let i = 0; i < n; i++) {
+      const sx = x - w / 2 + (i + 0.5) * (w / n);
+      this.rb(0.048, 0.6, 0.11, 0.022, m, sx, y, z, { seg: 2 });
+    }
+    for (const yy of [y + 0.25, y - 0.25]) this.rod([x - w / 2 + 0.01, yy, z], [x + w / 2 - 0.01, yy, z], 0.022, m);
+    for (const fx of [x - w / 2 + 0.08, x + w / 2 - 0.08]) this.rb(0.06, y - 0.3, 0.09, 0.015, m, fx, (y - 0.3) / 2, z);
+    const steel = this.mat('steel');
+    const vx = x - w / 2 - 0.06;
+    this.rod([x - w / 2 - 0.01, y - 0.25, z], [vx, y - 0.25, z], 0.014, steel);
+    this.lathe([[0, -0.03], [0.022, -0.03], [0.024, 0.0], [0.022, 0.03], [0, 0.03]], steel, vx, y - 0.25, z);
+    this.rod([vx, y - 0.22, z], [vx, y - 0.16, z], 0.006, steel);
+    this.torus(0.03, 0.006, this.mat('hValve', { color: 0xa82020, roughness: 0.5 }), vx, y - 0.16, z, { rx: Math.PI / 2, ts: 20, rs: 8 });
+    this.rod([vx, y - 0.28, z], [vx, 0, z], 0.014, steel);
+    this.lathe([[0.028, 0], [0.028, 0.012], [0, 0.012]], steel, vx, 0, z);
   }
 
   plant(x, z, parent, height = 1.6, seed = 7) {
@@ -1439,13 +1809,22 @@ export class HospitalScene extends LocationBase {
 
     // bed, monitor (on a wall arm), IV, cabinet, chair, sink
     const bed = this.bed(bedX, bedZ);
-    const black = this.mat('hBlack');
-    for (const sx of [-0.95, 0.95]) for (const sz of [-0.4, 0.4]) { const wh = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.04, 16), black); wh.rotation.x = Math.PI / 2; wh.position.set(sx, 0.05, sz); bed.add(wh); }
-    this.box(0.04, 0.3, 0.24, this.mat('hClipboard'), 1.06, 0.72, 0.15, bed);
-    this.box(0.01, 0.26, 0.2, this.mat('hPaper'), 1.085, 0.72, 0.15, bed);
-    this.box(0.3, 0.1, 0.86, this.mat(patient ? 'hKnit' : 'blanket', patient ? { map: TX.knit(), color: 0xffffff, roughness: 0.95 } : {}), 0.78, 0.8, 0, bed);
+    this.inGroup(bed, () => {
+      // chart on the footboard: board, clip, paper; the folded blanket at the foot
+      this.rb(0.018, 0.3, 0.24, 0.008, this.mat('hClipboard'), 1.075, 0.86, 0.15);
+      this.rb(0.006, 0.26, 0.2, 0.002, this.mat('hPaper'), 1.087, 0.85, 0.15);
+      this.rb(0.02, 0.03, 0.08, 0.008, this.mat('steel'), 1.09, 0.995, 0.15);
+      const fold = this.pillowGeo(0.3, 0.86, 0.1, 0.04, 0.35);
+      fold.rotateX(-Math.PI / 2);
+      this._add(fold, this.mat(patient ? 'hKnit' : 'blanket', patient ? { map: TX.knit(), color: 0xffffff, roughness: 0.95 } : {}), 0.78, 0.79, 0);
+    });
     const mon = this.monitor(bedX - 1.45, 1.45, BACK - 2.9);
-    this.bx(0.06, 0.06, 0.6, this.mat('steelDark'), bedX - 1.45, 1.45, (zb + BACK - 3.0) / 2 + 0.03);
+    // wall arm: a wall plate, an articulated arm, a tilt head under the monitor
+    const sd = this.mat('steelDark');
+    const armZ0 = zb + 0.06, armZ1 = BACK - 3.06;
+    this.rb(0.14, 0.2, 0.025, 0.01, sd, bedX - 1.45, 1.42, armZ0 + 0.012);
+    this.rod([bedX - 1.45, 1.4, armZ0 + 0.02], [bedX - 1.45, 1.4, armZ1], 0.022, sd, { seg: 18 });
+    this.lathe([[0, 0], [0.034, 0], [0.034, 0.08], [0, 0.08]], sd, bedX - 1.45, 1.36, (armZ0 + armZ1) / 2);
     const iv = this.ivStand(bedX - 1.25, BACK - 1.3, patient ? 0x8a0010 : 0xdde8f0);
     if (patient) {
       // the blood bag must read from the corridor: a deeper glow, hidden together with the bag
@@ -1468,11 +1847,8 @@ export class HospitalScene extends LocationBase {
     this.bx(0.36, 0.015, 0.1, readM, bedX - 0.8, 2.023, zb + 0.1);
     // bedside cabinet + what's on it
     const cabX = bedX - 1.45, cabZ = BACK - 2.35;
-    this.bx(0.46, 0.72, 0.44, this.mat('hCabinetW'), cabX, 0.37, cabZ);
-    this.bx(0.42, 0.18, 0.01, this.mat('hDrawerFace'), cabX, 0.6, cabZ + 0.225);
-    this.bx(0.14, 0.02, 0.02, this.mat('steel'), cabX, 0.6, cabZ + 0.235);
-    this.bx(0.48, 0.025, 0.46, this.mat('hWorkTop'), cabX, 0.745, cabZ);
-    this.cy(0.035, 0.03, 0.1, 8, this.mat('hCup', { color: 0xf0f2f4, roughness: 0.4, transparent: true, opacity: 0.85 }), cabX + 0.12, 0.81, cabZ + 0.1);
+    this.locker(cabX, cabZ, 0.46, 0.72, 0.44);
+    this.lathe([[0, 0], [0.03, 0], [0.032, 0.004], [0.036, 0.1], [0.033, 0.1], [0.029, 0.006], [0, 0.006]], this.mat('hCup', { color: 0xf0f2f4, roughness: 0.4, transparent: true, opacity: 0.85 }), cabX + 0.12, 0.76, cabZ + 0.1);
     this.cy(0.004, 0.004, 0.14, 4, this.mat('hStraw', { color: 0xe05a8a }), cabX + 0.13, 0.86, cabZ + 0.1, { rz: 0.25 });
     if (patient) {
       // flowers, cards, a photo — someone visits her
@@ -1494,27 +1870,40 @@ export class HospitalScene extends LocationBase {
     // visitor chair (vinyl armchair)
     const chairX = x1 - 0.45, chairZ = zb + 0.55;
     const vinyl = this.mat(patient ? 'hChairVinylW' : 'hChairVinyl', { color: patient ? 0x8a5a4a : 0x3a6a76, roughness: 0.55 });
-    this.bx(0.56, 0.12, 0.52, vinyl, chairX, 0.44, chairZ, { ry: -0.3 });
-    this.bx(0.56, 0.5, 0.1, vinyl, chairX + 0.06, 0.76, chairZ - 0.24, { ry: -0.3 });
-    for (const s of [-1, 1]) this.bx(0.07, 0.22, 0.5, vinyl, chairX + Math.cos(0.3) * s * 0.3, 0.56, chairZ + Math.sin(0.3) * s * 0.3, { ry: -0.3 });
-    this.bx(0.5, 0.36, 0.46, this.mat('steelDark'), chairX, 0.2, chairZ, { ry: -0.3 });
-    if (patient) this.bx(0.5, 0.5, 0.03, this.mat('hKnit'), chairX + 0.05, 0.76, chairZ - 0.18, { ry: -0.3, rx: -0.15 });
-    // sink corner: basin, mirror, towels, soap
-    const sink = new THREE.Group();
-    this.box(0.5, 0.12, 0.4, this.mat('sink', { color: 0xf0f2f2, roughness: 0.3 }), 0, 0.85, 0, sink);
-    this.box(0.04, 0.2, 0.04, this.mat('steel'), 0, 1.0, -0.15, sink);
-    this.box(0.04, 0.03, 0.14, this.mat('steel'), 0, 1.1, -0.1, sink);
-    this.box(0.08, 0.6, 0.08, this.mat('hPlasticW'), 0, 0.5, -0.1, sink);
-    sink.position.set(x0 + 0.5, 0, zb + 0.35); root.add(sink);
-    this.bx(0.46, 0.6, 0.02, this.mat('hMirror', { color: 0x8a9aa8, metalness: 0.9, roughness: 0.08 }), x0 + 0.5, 1.55, zb + 0.07);
-    this.bx(0.26, 0.32, 0.12, this.mat('hPlasticW'), x0 + 0.95, 1.5, zb + 0.11);
+    this.armchair(chairX, chairZ, -0.3, vinyl);
+    if (patient) {
+      this.rb(0.46, 0.4, 0.035, 0.015, this.mat('hKnit'), chairX + 0.05, 0.8, chairZ - 0.17, { ry: -0.3, rx: -0.12 });
+    }
+    // sink corner: wall-hung basin with a gooseneck tap, pedestal shroud, mirror, towel dispenser
+    const sx0 = x0 + 0.5, sz0 = zb + 0.35;
+    const porcelain = this.mat('sink', { color: 0xf0f2f2, roughness: 0.3 });
+    const chrome = this.mat('hChrome', { color: 0xdfe4e8, metalness: 0.75, roughness: 0.22 });
+    {
+      const basin = new THREE.LatheGeometry([[0, 0.79], [0.1, 0.795], [0.18, 0.83], [0.215, 0.88], [0.225, 0.912], [0.222, 0.922], [0.208, 0.924], [0.198, 0.905], [0.17, 0.87], [0.11, 0.85], [0.03, 0.845], [0, 0.845]].map(([r, y]) => new THREE.Vector2(r, y)), 32);
+      basin.scale(1.15, 1, 0.9);
+      this._add(basin, porcelain, sx0, 0, sz0 + 0.02);
+      this.rb(0.5, 0.06, 0.08, 0.02, porcelain, sx0, 0.89, sz0 - 0.17);
+    }
+    this.lathe([[0, 0], [0.025, 0], [0.025, 0.012], [0.012, 0.02], [0, 0.02]], chrome, sx0, 0.915, sz0 - 0.15);
+    this.tube([[sx0, 0.93, sz0 - 0.15], [sx0, 1.06, sz0 - 0.15], [sx0, 1.1, sz0 - 0.1], [sx0, 1.07, sz0 - 0.05], [sx0, 1.03, sz0 - 0.04]], 0.011, chrome, { seg: 40 });
+    this.rod([sx0 - 0.03, 0.98, sz0 - 0.15], [sx0 - 0.11, 0.98, sz0 - 0.15], 0.008, chrome);
+    this.rb(0.1, 0.62, 0.1, 0.03, this.mat('hPlasticW'), sx0, 0.48, sz0 - 0.1);
+    this.rb(0.5, 0.64, 0.025, 0.012, this.mat('hMirrorFrame', { color: 0xb8bec4, metalness: 0.5, roughness: 0.3 }), sx0, 1.55, zb + 0.065);
+    this.bx(0.46, 0.6, 0.02, this.mat('hMirror', { color: 0x8a9aa8, metalness: 0.9, roughness: 0.08 }), sx0, 1.55, zb + 0.072);
+    this.rb(0.26, 0.32, 0.12, 0.03, this.mat('hPlasticW'), x0 + 0.95, 1.5, zb + 0.11);
+    this.rb(0.2, 0.06, 0.02, 0.008, this.mat('hPlasticG'), x0 + 0.95, 1.4, zb + 0.172);
+    this.rb(0.16, 0.012, 0.01, 0.004, this.mat('hPaper'), x0 + 0.95, 1.365, zb + 0.175);
     this.sanitizer(x0 + 0.2, 1.25, zb + 0.06);
     // patient whiteboard
     this.framed(TX.wardBoard(+number), 0.6, 0.4, x0 + 0.62, 2.25, zb + 0.06, 0xb8bcc0, `hWB-${number}`);
-    // TV on an arm in the back-right corner
-    this.bx(0.06, 0.4, 0.06, this.mat('steelDark'), x1 - 0.2, 2.5, zb + 0.15);
-    this.bx(0.06, 0.06, 0.4, this.mat('steelDark'), x1 - 0.2, 2.3, zb + 0.35);
-    this.bx(0.6, 0.36, 0.05, this.mat('hTv', { color: 0x141618, roughness: 0.3, metalness: 0.2 }), x1 - 0.42, 2.2, zb + 0.6, { ry: -0.5 });
+    // TV on an articulated arm in the back-right corner
+    const sdk = this.mat('steelDark');
+    this.rb(0.12, 0.18, 0.03, 0.01, sdk, x1 - 0.2, 2.48, zb + 0.07);
+    this.rod([x1 - 0.2, 2.45, zb + 0.08], [x1 - 0.22, 2.36, zb + 0.4], 0.018, sdk);
+    this.lathe([[0, 0], [0.03, 0], [0.03, 0.07], [0, 0.07]], sdk, x1 - 0.22, 2.32, zb + 0.4);
+    this.rod([x1 - 0.22, 2.36, zb + 0.4], [x1 - 0.38, 2.24, zb + 0.56], 0.015, sdk);
+    this.rb(0.62, 0.38, 0.045, 0.02, this.mat('hTv', { color: 0x141618, roughness: 0.3, metalness: 0.2 }), x1 - 0.42, 2.2, zb + 0.6, { ry: -0.5 });
+    this.rb(0.56, 0.32, 0.01, 0.004, this.mat('hTvScreen', { color: 0x0a0d10, roughness: 0.08, metalness: 0.4 }), x1 - 0.42 + Math.sin(-0.5) * 0.024, 2.2, zb + 0.6 + Math.cos(-0.5) * 0.024, { ry: -0.5 });
     // privacy curtain bunched against the right wall, on a ceiling track
     this.bx(0.03, 0.03, depth - 0.6, this.mat('steel'), x1 - 0.18, H - 0.06, BACK - depth / 2 - 0.2);
     this.bx(w - 0.5, 0.03, 0.03, this.mat('steel'), cx + 0.1, H - 0.06, zb + 0.5);

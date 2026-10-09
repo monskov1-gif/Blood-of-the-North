@@ -3,7 +3,7 @@ import { flareSource } from '../../fx/WindowLight.js';
 import { LocationBase } from '../LocationBase.js';
 import { canvasTexture, rng, glowTexture } from '../../render/textures.js';
 import { glow } from '../props.js';
-import { fbm3, rockGeometry, rockMaterial, roundedBox, reliefSheet, shaftTexture, mistTexture } from '../nature.js';
+import { fbm3, rockGeometry, rockMaterial, roundedBox, reliefSheet, shaftTexture, mistTexture, smoothNormals } from '../nature.js';
 
 const sat = (v) => Math.max(0, Math.min(1, v));
 
@@ -55,6 +55,80 @@ const outsideTex = () => canvasTexture('cave-outside', 128, 128, (ctx, w, h) => 
   for (let i = 0; i < 30; i++) { ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.fillRect(r() * w, r() * h * 0.4, 1, 1); }
 });
 
+/** Sandstone grain for the walls: fine streaks along the layers, no crack lines. */
+const sandGrainTex = () => canvasTexture('cave-sandgrain', 256, 128, (ctx, w, h) => {
+  const img = ctx.createImageData(w, h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const v = 170 + (fbm3(x / 40, y / 6, 1, 71, 4) - 0.5) * 90 + (fbm3(x / 4, y / 3, 2, 72, 2) - 0.5) * 40;
+    const i = (y * w + x) * 4; img.data[i] = v; img.data[i + 1] = v * 0.97; img.data[i + 2] = v * 0.93; img.data[i + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+}, { aniso: 4 });
+const flameTex = () => canvasTexture('cave-flame', 32, 64, (ctx, w, h) => {
+  const g = ctx.createRadialGradient(w / 2, h * 0.72, 1, w / 2, h * 0.6, h * 0.55);
+  g.addColorStop(0, 'rgba(255,250,220,1)'); g.addColorStop(0.3, 'rgba(255,190,90,0.9)'); g.addColorStop(0.7, 'rgba(230,90,30,0.4)'); g.addColorStop(1, 'rgba(200,40,10,0)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(w / 2, 0); ctx.bezierCurveTo(w * 0.95, h * 0.5, w * 0.9, h, w / 2, h); ctx.bezierCurveTo(w * 0.1, h, w * 0.05, h * 0.5, w / 2, 0); ctx.fill();
+}, { color: false });
+const glowTex = () => glowTexture();
+/** A ragged arch: the mouth seen from inside. */
+const archMask = () => canvasTexture('cave-arch', 64, 64, (ctx, w, h) => {
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, h);
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(w * 0.12, h);
+  for (let i = 0; i <= 20; i++) { const a = Math.PI - (i / 20) * Math.PI; const rr = 0.42 + Math.sin(i * 2.3) * 0.04; ctx.lineTo(w / 2 + Math.cos(a) * w * rr, h * 0.62 - Math.sin(a) * h * 0.5); }
+  ctx.lineTo(w * 0.88, h); ctx.closePath(); ctx.fill();
+}, { color: false });
+
+/**
+ * The sandstone wall as a height field (metres, + towards the viewer): broad bulges, scalloped
+ * pockets, stepped layers that overhang the next one, and fine grain. Used twice: coarse for the
+ * geometry, per pixel for the baked wall texture (so the relief stays crisp).
+ */
+function wallHeight(x, y, fine = false) {
+  let d = (fbm3(x * 0.32, y * 0.32, 0, 23, 4) - 0.5) * 1.5;
+  d -= Math.max(0, fbm3(x * 0.7, y * 0.7, 5, 25, 3) - 0.5) * 3.6;                   // scallops
+  const cell = Math.abs(fbm3(x * 1.3, y * 1.6, 6, 29, 3) - 0.5);
+  d -= Math.max(0, 0.13 - cell) * 2.6;                                               // sharp-rimmed pockets
+  const fr = (y * 1.25 + fbm3(x * 0.22, y * 0.3, 4, 22, 3) * 2.6) % 1;              // layers: a long slope, then a softer drop
+  const lay = fr < 0.75 ? fr / 0.75 : (1 - fr) / 0.25;
+  d += lay * lay * (3 - 2 * lay) * 0.15;
+  if (fine) {
+    d += (fbm3(x * 4, y * 4, 2, 35, 3) - 0.5) * 0.1;
+    d -= Math.max(0, 0.04 - Math.abs(fbm3(x * 2.4, y * 5, 7, 39, 2) - 0.5)) * 1.2;   // hairline cracks along the layers
+  }
+  d += Math.max(0, 0.9 - y) * 0.7;
+  d += Math.max(0, y - 3.4) * 0.9;
+  return d;
+}
+
+/** The wall texture: the same height field, shaded by light raking in from the mouth. */
+const wallBakedTex = (W, Hh) => canvasTexture(`cave-wallbake-${W}`, W, Hh, (ctx, w, h) => {
+  const img = ctx.createImageData(w, h);
+  const sx = 46 / w, sy = 6.4 / h;
+  const A = [0xc4, 0x9e, 0x76], B = [0x84, 0x62, 0x48], D = [0x30, 0x22, 0x18];
+  const L = [0.62, 0.55, 0.56];
+  const row = new Float32Array((w + 1) * 2);
+  for (let j = 0; j < h; j++) {
+    const y = 6.4 - j * sy;
+    for (let i = 0; i < w; i++) {
+      const x = -21 + i * sx;
+      const hc = wallHeight(x, y, true), hx = wallHeight(x + sx, y, true), hy = wallHeight(x, y + sy, true);
+      let nx = -(hx - hc) / sx * 0.6, ny = -(hy - hc) / sy * 0.6, nz = 1;
+      const nl = Math.hypot(nx, ny, nz); nx /= nl; ny /= nl; nz /= nl;
+      const lit = Math.max(0, nx * L[0] + ny * L[1] + nz * L[2]);
+      const t = fbm3(x * 0.5, y * 0.5, 3, 21, 3);
+      const band = (y * 1.25 + fbm3(x * 0.22, y * 0.3, 4, 22, 3) * 2.6) % 1;
+      const k = Math.max(0, Math.min(1, t * 1.8 - 0.4));
+      const shade = (0.3 + 1.0 * lit) * (0.8 + 0.28 * band);
+      const hollow = Math.max(0, Math.min(1, -hc * 0.9 - 0.05));
+      const o = (j * w + i) * 4;
+      for (let c = 0; c < 3; c++) img.data[o + c] = ((A[c] + (B[c] - A[c]) * k) * shade) * (1 - hollow) + D[c] * hollow;
+      img.data[o + 3] = 255;
+    }
+  }
+  void row;
+  ctx.putImageData(img, 0, 0);
+}, { aniso: 4 });
+
 export class CaveScene extends LocationBase {
   constructor(opts) {
     super(opts);
@@ -86,7 +160,7 @@ export class CaveScene extends LocationBase {
   /** A weathered sandstone boulder (reference: smooth, layered, warm). */
   boulder(seed, x, z, sx, sy, sz, parent = this.root, o = {}) {
     const b = new THREE.Mesh(rockGeometry(seed, { detail: 4, rough: 0.3, strata: 1, flat: -0.35, colA: 0x9a7654, colB: 0x6e5038, dark: 0.55, ...o }), this.sandMat);
-    b.position.set(x, 0, z); b.scale.set(sx, sy, sz); b.rotation.y = seed * 1.3;
+    b.position.set(x, -0.12 * sy, z); b.scale.set(sx, sy, sz); b.rotation.y = seed * 1.3;
     parent.add(b);
     return b;
   }
@@ -114,27 +188,39 @@ export class CaveScene extends LocationBase {
     const black = new THREE.Mesh(new THREE.PlaneGeometry(50, 12), new THREE.MeshBasicMaterial({ color: 0x020202 }));
     black.position.set(2, 4, BACK - 3.4); root.add(black);
     const sandA = new THREE.Color(0xc09a72), sandB = new THREE.Color(0x86644a), deep = new THREE.Color(0x3a281c);
-    const wallCol = (c, x, y, d) => {
+    // light baked into the rock: it rakes in from the mouth (upper right), so every ledge and pocket reads
+    const LX = 0.62, LY = 0.55, LZ = 0.56;
+    const wallCol = (c, x, y, d, nx = 0, ny = 0, nz = 1) => {
       const t = fbm3(x * 0.5, y * 0.5, 3, 21, 3);
       c.copy(sandA).lerp(sandB, sat(t * 1.8 - 0.4));
-      c.multiplyScalar(0.84 + 0.2 * (0.5 + 0.5 * Math.sin(y * 5.2 + t * 7)));     // layers
-      c.lerp(deep, sat(-d * 0.9 - 0.15));                                        // hollows go dark
+      const band = (y * 1.9 + fbm3(x * 0.3, y * 0.3, 4, 22, 2) * 2.2) % 1;
+      c.multiplyScalar(0.78 + 0.3 * band);                                         // alternating ochre / brown layers
+      const lit = Math.max(0, nx * LX + ny * LY + nz * LZ);
+      c.multiplyScalar(0.38 + 0.95 * lit);
+      c.lerp(deep, sat(-d * 1.1 - 0.1));                                         // hollows go dark
     };
-    const wallOff = (x, y) => {
+    const wallOff = (x, y) => wallHeight(x, y);
+    const wallOffOld = (x, y) => {
       let d = (fbm3(x * 0.32, y * 0.32, 0, 23, 4) - 0.5) * 1.5;
       d -= Math.max(0, fbm3(x * 0.7, y * 0.7, 5, 25, 3) - 0.5) * 3.6;            // scallops
       const cell = Math.abs(fbm3(x * 1.3, y * 1.6, 6, 29, 3) - 0.5);            // sharp-rimmed pockets (ridged)
       d -= Math.max(0, 0.16 - cell) * 3.2;
       d -= Math.max(0, fbm3(x * 2.6, y * 2.2, 8, 37, 2) - 0.58) * 0.8;
-      d += Math.sin(y * 5.2 + fbm3(x * 0.4, y * 0.4, 9, 27, 2) * 6) * 0.11;       // eroded layers
+      d += Math.sin(y * 5.2 + fbm3(x * 0.4, y * 0.4, 9, 27, 2) * 6) * 0.08;       // eroded layers
+      const sl = (y * 1.9 + fbm3(x * 0.3, y * 0.3, 4, 22, 2) * 2.2) % 1;          // stepped ledges: each layer overhangs the next
+      d += sl * 0.32 - 0.16;
       d += (fbm3(x * 3, y * 3, 2, 35, 2) - 0.5) * 0.08;                           // grain
       d += Math.max(0, 0.9 - y) * 0.7;                                            // flares into the floor
       d += Math.max(0, y - 3.4) * 0.9;                                            // leans over into the vault
       return d;
     };
-    const wgeo = reliefSheet(46, 6.4, this.low ? 160 : 230, this.low ? 24 : 34, (x, y) => wallOff(x + 2, y + 3.2), (c, x, y, d) => wallCol(c, x + 2, y + 3.2, d));
+    void wallOffOld;
+    // geometry gives the silhouette and parallax; the baked texture carries the crisp relief
+    const wgeo = reliefSheet(46, 6.4, this.low ? 140 : 200, this.low ? 30 : 44, (x, y) => wallOff(x + 2, y + 3.2), (c, x, y, d) => c.setScalar(1 - sat(-d * 0.5 - 0.2) * 0.5));
     const wallMat = rockMaterial(this.low, { roughness: 0.95 });
-    wallMat.map = wallMat.map.clone(); wallMat.map.needsUpdate = true; wallMat.map.repeat.set(14, 2);
+    wallMat.map = wallBakedTex(this.low ? 1024 : 1536, this.low ? 144 : 214); wallMat.map.repeat.set(1, 1); wallMat.map.wrapS = wallMat.map.wrapT = THREE.ClampToEdgeWrapping;
+    const vaultMat = rockMaterial(this.low, { roughness: 0.95 });
+    vaultMat.map = sandGrainTex(); vaultMat.map.repeat.set(16, 3);
     this.wallMat = wallMat;
     const wall = new THREE.Mesh(wgeo, wallMat);
     wall.position.set(2, 3.2, BACK - 0.5); root.add(wall);
@@ -142,17 +228,25 @@ export class CaveScene extends LocationBase {
     const cgeo = reliefSheet(46, 5.6, this.low ? 140 : 200, this.low ? 18 : 26, (x, y) => {
       const zz = -y;                                   // sheet y → world z after the rotation
       let d = (fbm3(x * 0.4, zz * 0.4, 7, 31, 4) - 0.5) * 1.1 - Math.max(0, fbm3(x * 0.8, zz * 0.8, 2, 33, 3) - 0.55) * 2;
-      d -= Math.max(0, zz - 0.5) * 0.35;               // lip towards the viewer
+      d -= Math.max(0, zz - 0.2) * 0.55;               // the lip hangs towards the viewer
       return d;
-    }, (c, x, y, d) => wallCol(c, x + 2, 4 + d, d - 0.2));
+    }, (c, x, y, d, nx, ny, nz) => { wallCol(c, x + 2, 4 + d, d - 0.2, nx, -nz, ny); c.multiplyScalar(0.7); });
     cgeo.rotateX(Math.PI / 2);
-    const vault = new THREE.Mesh(cgeo, wallMat);
-    vault.position.set(2, 4.3, -0.6); root.add(vault);
+    const vault = new THREE.Mesh(cgeo, vaultMat);
+    vault.position.set(2, 3.95, -0.4); root.add(vault);
     // boulders along the foot of the wall
     for (let x = -19; x < 23; x += 1.6 + r() * 2.4) {
       if (x > -15.4 && x < -12.6) continue;             // the slab stands free
       this.boulder(800 + Math.round(x * 3), x, BACK + 0.5 + r() * 0.5, 0.6 + r() * 0.9, 0.45 + r() * 0.7, 0.5 + r() * 0.5);
     }
+    // grit and pebbles along the foot of the wall and across the floor
+    const peb = new THREE.InstancedMesh(rockGeometry(870, { detail: 2, rough: 0.35, flat: -0.3, strata: 0.5, colA: 0x9a7a5a, colB: 0x5a4434, dark: 0.4 }), this.sandMat, 160);
+    { const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
+      for (let i = 0; i < 160; i++) {
+        const x = -19 + r() * 42, z = r() < 0.6 ? BACK + 0.9 + r() * 0.8 : -2 + r() * 3.4, sc = r() < 0.6 ? 0.04 + r() * 0.06 : 0.1 + r() * 0.12;
+        q.setFromEuler(e.set(0, r() * 6, 0)); m.compose(new THREE.Vector3(x, 0, z), q, new THREE.Vector3(sc * (1 + r()), sc, sc)); peb.setMatrixAt(i, m);
+      } }
+    root.add(peb);
     this.buildRitual();
     this.buildHall();
     this.buildNiche();
@@ -173,7 +267,10 @@ export class CaveScene extends LocationBase {
     // torches wedged in the rock along the passage: warm, dirty pools of light
     this.torches = [];
     for (const x of [-6.2, 5.0, 11.4, 16.6]) {
-      const t = glow(0xff9a48, 1.0, 0.55); t.position.set(x, 2.1, BACK + 0.75); root.add(t);
+      const t = glow(0xff9a48, 0.55, 0.4); t.position.set(x, 2.12, BACK + 0.75); root.add(t);
+      const fl = new THREE.Sprite(new THREE.SpriteMaterial({ map: flameTex(), color: 0xffc070, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+      fl.scale.set(0.16, 0.3, 1); fl.position.set(x, 2.16, BACK + 0.8); root.add(fl);
+      this.flames = this.flames || []; this.flames.push({ s: fl, ph: x });
       const l = new THREE.PointLight(0xff8a40, 5, 7, 1.4); l.position.set(x, 2.0, -1.4); root.add(l);
       this.torches.push(l);
       const tst = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.035, 0.5, 16), this.mat('torchStick', { color: 0x2a1c12 })); tst.position.set(x, 1.8, BACK + 0.65); tst.rotation.x = -0.3; root.add(tst);
@@ -211,14 +308,30 @@ export class CaveScene extends LocationBase {
 
   buildRitual() {
     const g = this.groups.ritual = new THREE.Group(); this.root.add(g);
-    const slab = new THREE.Mesh(rockGeometry(901, { detail: 5, rough: 0.16, strata: 0.6, flat: -0.6, top: 0.55, colA: 0x8a7464, colB: 0x6a564a, dark: 0.5 }), this.sandMat);
-    slab.position.set(-14.0, 0.5, -1.3); slab.scale.set(1.45, 0.9, 0.85); g.add(slab);
+    const sgeo = roundedBox(2.6, 0.55, 1.3, 0.07, 4);
+    { const p = sgeo.attributes.position; const col = new Float32Array(p.count * 3); const c = new THREE.Color();
+      for (let i = 0; i < p.count; i++) {
+        const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+        const k = (fbm3(x * 2, y * 2, z * 2, 61, 3) - 0.5) * 0.06;
+        p.setXYZ(i, x * (1 + k), y + (y > 0.2 ? k * 0.3 : 0), z * (1 + k));
+        c.setHex(0x8a7868).lerp(new THREE.Color(0x5a4a40), sat(fbm3(x, y, z, 62, 3) * 1.5 - 0.3));
+        if (y > 0.25 && fbm3(x * 1.5, 0, z * 1.5, 63, 3) > 0.52) c.lerp(new THREE.Color(0x3a1410), 0.7);   // old blood soaked into the stone
+        col.set([c.r, c.g, c.b], i * 3);
+      }
+      sgeo.setAttribute('color', new THREE.BufferAttribute(col, 3)); smoothNormals(sgeo); }
+    const slab = new THREE.Mesh(sgeo, this.sandMat);
+    slab.position.set(-14.0, 0.275, -1.3); slab.rotation.y = 0.04; g.add(slab);
+    for (const [dx, dz] of [[-1.1, -0.5], [1.15, 0.45]]) g.add(this.skull(-14.0 + dx, 0.62, -1.3 + dz, this.mat('caveBone', { color: 0xcfc4b0, roughness: 0.8 })));
     // old stains on the stone, antlers and skulls along the wall
     const stain = this.mat('oldStain', { map: bloodTex(1), transparent: true, alphaTest: 0.3, color: 0x6a4a40, depthWrite: false });
     for (let i = 0; i < 4; i++) { const d = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.9), stain); d.rotation.x = -Math.PI / 2; d.position.set(-15 + i * 0.7, 0.012, -0.4 + (i % 2) * 0.5); g.add(d); }
     const bone = this.mat('caveBone', { color: 0xcfc4b0, roughness: 0.8 });
-    for (let i = 0; i < 6; i++) g.add(this.skull(-17 + i * 1.1, 1.0 + (i % 2) * 0.5, BACK + 0.9, bone));
-    for (let i = 0; i < 3; i++) g.add(this.antlers(-16.4 + i * 2.4, 2.1, BACK + 0.85, bone));
+    // skulls piled at the foot of the wall, antlers hung on the rock (set against the relief, not in the air)
+    for (const [x, y, z] of [[-17.2, 0.14, BACK + 1.25], [-16.9, 0.14, BACK + 1.45], [-17.05, 0.32, BACK + 1.33], [-12.0, 0.14, BACK + 1.3], [-11.7, 0.14, BACK + 1.5], [-15.6, 0.14, BACK + 1.4]]) g.add(this.skull(x, y, z, bone));
+    for (let i = 0; i < 3; i++) {
+      const ax = -16.4 + i * 2.4;
+      g.add(this.antlers(ax, 1.9, BACK - 0.5 + wallHeight(ax, 2.2) + 0.08, bone));
+    }
     // the red light of the chamber (L5)
     this.ritualLight = new THREE.PointLight(0xc03a20, 0, 9, 1.3); this.ritualLight.position.set(-14, 2.6, 0.4); g.add(this.ritualLight);
     this.ritualFire = this.fire(-11.6, -2.4, 0.9, g);
@@ -243,7 +356,21 @@ export class CaveScene extends LocationBase {
     const g = this.groups.niche = new THREE.Group(); this.root.add(g);
     // straw beds, a blanket, a heap of food (too much food)
     const straw = this.mat('straw', { color: 0xa88a4a, roughness: 1, flatShading: true });
-    for (const [x, z] of [[-0.6, -2.2], [0.8, -2.5], [2.2, -2.2]]) this.rock(x, 0.06, z, 0.75, 0.12, 0.45, straw, g, x);
+    // straw beds: loose heaps of stalks, not pillows; a fur thrown over one
+    const stalk = new THREE.PlaneGeometry(0.018, 0.34); stalk.translate(0, 0.17, 0);
+    const stM = this.mat('strawStalk', { color: 0xc8a45a, roughness: 1, side: THREE.DoubleSide });
+    const sr = rng(744), N = 540;
+    const st = new THREE.InstancedMesh(stalk, stM, N);
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), col = new THREE.Color();
+    const beds = [[-0.6, -2.2], [0.8, -2.5], [2.2, -2.2]];
+    for (let i = 0; i < N; i++) {
+      const [bx, bz] = beds[i % 3], a = sr() * 6.28, d = Math.sqrt(sr());
+      q.setFromEuler(e.set(Math.PI / 2 - 0.15 - sr() * 0.5, sr() * 6.28, (sr() - 0.5) * 0.6));
+      m4.compose(new THREE.Vector3(bx + Math.cos(a) * d * 0.75, 0.02 + (1 - d) * 0.1 * sr(), bz + Math.sin(a) * d * 0.42), q, new THREE.Vector3(1, 0.6 + sr() * 0.8, 1));
+      st.setMatrixAt(i, m4); st.setColorAt(i, col.setScalar(0.65 + sr() * 0.5));
+    }
+    g.add(st);
+    for (const [x, z] of beds) { const lump = this.rock(x, 0.0, z, 0.7, 0.07, 0.4, straw, g, x); lump.position.y = 0.02; }
     this.pelt(0.8, -2.5, 0.2, g, 0x5a2a2a, 0.15);
     const meat = this.mat('rawMeat', { color: 0x7a2a22, roughness: 0.7, flatShading: true });
     const berry = this.mat('berries', { color: 0x3a2a5a, roughness: 0.6 });
@@ -295,6 +422,12 @@ export class CaveScene extends LocationBase {
     st.rotation.x = -Math.PI / 2; st.position.set(13.2, 0.013, -2.2); this.purielGroup.add(st);
     // the tunnel narrows; moonlight at the mouth
     for (let i = 0; i < 5; i++) this.boulder(950 + i, 16 + i * 1.3, 1.1 + (i % 2) * 0.3, 0.5, 0.45, 0.35, g);
+    const mouthOpen = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 2.4), new THREE.MeshBasicMaterial({ map: outsideTex(), alphaMap: archMask(), transparent: true, depthWrite: false }));
+    mouthOpen.position.set(21.0, 1.2, BACK + 0.55); g.add(mouthOpen);
+    this.boulder(960, 19.8, BACK + 0.9, 0.7, 2.2, 0.6, g, { colA: 0x4a3828, colB: 0x2a1e16 });
+    this.boulder(961, 22.3, BACK + 0.9, 0.8, 2.4, 0.6, g, { colA: 0x4a3828, colB: 0x2a1e16 });
+    const pool = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 2.0), new THREE.MeshBasicMaterial({ map: glowTex(), color: 0x6a88c0, transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending }));
+    pool.rotation.x = -Math.PI / 2; pool.position.set(20.6, 0.03, -1.4); g.add(pool);
     const moon = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 2.6), new THREE.MeshBasicMaterial({ map: outsideTex() }));
     moon.position.set(22.6, 1.3, -1.4); moon.rotation.y = -Math.PI / 2; g.add(moon);
     const mg = glow(0xa8b8d8, 4.0, 0.35); mg.position.set(22.0, 1.3, -0.8); g.add(mg);
@@ -312,7 +445,7 @@ export class CaveScene extends LocationBase {
 
   buildForeground() {
     const fg = (name) => { const g = new THREE.Group(); g.name = name; this.root.add(g); this.foregroundGroups.push(g); return g; };
-    for (const [x, w, h] of [[-17.2, 1.4, 0.9], [-10.6, 1.0, 0.6], [-3.2, 1.3, 0.55], [7.4, 1.2, 0.7], [12.2, 1.0, 0.5], [19.4, 1.5, 0.8]]) {
+    for (const [x, w, h] of [[-17.6, 1.3, 0.55], [-3.2, 1.1, 0.4], [9.0, 1.0, 0.4]]) {
       const g = fg(`fg-rock-${x}`);
       this.boulder(970 + Math.round(x * 5), x, 2.5, w, h, 0.6, g, { colA: 0x4a3828, colB: 0x2a1e16, dark: 0.6 });
     }
@@ -320,6 +453,7 @@ export class CaveScene extends LocationBase {
 
   skull(x, y, z, m) {
     const g = new THREE.Group();
+    g.scale.setScalar(1.5);
     const cr = new THREE.Mesh(new THREE.SphereGeometry(0.1, 14, 10), m); cr.scale.set(1, 0.85, 1.15); g.add(cr);
     const sn = new THREE.Mesh(roundedBox(0.09, 0.07, 0.1, 0.025), m); sn.position.set(0, -0.05, 0.09); g.add(sn);
     const eye = new THREE.MeshBasicMaterial({ color: 0x0a0806 });
@@ -330,10 +464,15 @@ export class CaveScene extends LocationBase {
 
   antlers(x, y, z, m) {
     const g = new THREE.Group();
-    for (const side of [-1, 1]) {
-      const main = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.03, 0.8, 16), m); main.position.set(side * 0.18, 0.3, 0); main.rotation.z = -side * 0.5; g.add(main);
-      for (let k = 0; k < 3; k++) { const t = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.016, 0.24, 16), m); t.position.set(side * (0.14 + k * 0.1), 0.24 + k * 0.17, 0); t.rotation.z = side * 0.35; g.add(t); }
+    const tube = (pts, r) => new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts.map(([a, b, c]) => new THREE.Vector3(a, b, c))), 16, r, 8), m);
+    for (const s of [-1, 1]) {
+      g.add(tube([[s * 0.05, 0, 0], [s * 0.22, 0.12, 0.04], [s * 0.34, 0.36, 0.06], [s * 0.36, 0.66, 0.02], [s * 0.3, 0.86, -0.02]], 0.022));
+      for (const [t0, len, lean] of [[0.12, 0.22, 0.4], [0.36, 0.26, 0.2], [0.6, 0.2, 0.1]]) {
+        const bx = s * (0.22 + t0 * 0.2), by = 0.12 + t0 * 0.9;
+        g.add(tube([[bx, by, 0.03], [bx + s * 0.04, by + len * 0.5, 0.05], [bx - s * lean * 0.2, by + len, 0.04]], 0.012));
+      }
     }
+    const skull = this.skull(0, -0.04, 0.02, m); skull.scale.setScalar(1.1); g.add(skull);
     g.position.set(x, y, z);
     return g;
   }
@@ -386,6 +525,7 @@ export class CaveScene extends LocationBase {
     super.update(dt);
     const t = this.time;
     if (this.followTarget) this.fill.position.x = this.followTarget().position.x;
+    for (const f of this.flames || []) { const k = 0.85 + Math.sin(t * 11 + f.ph) * 0.1 + Math.sin(t * 27 + f.ph * 3) * 0.06; f.s.scale.set(0.16 * (2 - k), 0.3 * k, 1); f.s.material.opacity = 0.75 + 0.25 * k; }
     for (const f of this.fires) {
       const k = 0.82 + Math.sin(t * 9 + f.ph) * 0.08 + Math.sin(t * 23 + f.ph * 2) * 0.06;
       if (f.g.visible && f.light.intensity > 0) { f.light.intensity = f.base * k; f.flame.scale.y = f.baseH * (0.8 + 0.3 * k); f.flame.material.opacity = 0.75 + 0.2 * k; }

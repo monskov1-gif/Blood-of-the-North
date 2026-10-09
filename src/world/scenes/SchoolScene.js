@@ -76,16 +76,24 @@ const floorTex = () => TEX('floor2', 256, 256, (ctx, w, h) => {
     ctx.fillStyle = c < 0.4 ? 'rgba(150,140,124,0.6)' : c < 0.7 ? 'rgba(240,236,228,0.8)' : c < 0.9 ? 'rgba(120,104,90,0.5)' : 'rgba(170,80,60,0.35)';
     ctx.fillRect(r() * w, r() * h, 1 + r() * 2, 1 + r() * 2);
   }
-  ctx.fillStyle = 'rgba(110,100,90,0.6)'; ctx.fillRect(0, 0, w, 1); ctx.fillRect(0, 0, 1, h);
+  for (let j = 0; j < 2; j++) for (let i = 0; i < 2; i++) { ctx.fillStyle = (i + j) % 2 ? 'rgba(120,100,70,0.07)' : 'rgba(255,250,240,0.05)'; ctx.fillRect(i * w / 2, j * h / 2, w / 2, h / 2); }   // two tones of tile
+  ctx.fillStyle = 'rgba(110,100,90,0.6)'; ctx.fillRect(0, 0, w, 1); ctx.fillRect(0, 0, 1, h); ctx.fillRect(w / 2, 0, 1, h); ctx.fillRect(0, h / 2, w, 1);
   for (let i = 0; i < 14; i++) { ctx.fillStyle = 'rgba(90,96,104,0.12)'; ctx.fillRect(r() * w, r() * h, 6, 3); }   // wet boot prints
 });
 
 /** Acoustic ceiling tiles with a grid. */
-const ceilTex = () => TEX('ceil2', 64, 64, (ctx, w, h) => {
+const ceilTex = () => TEX('ceil3', 64, 128, (ctx, w, h) => {
   const r = rng(615);
-  ctx.fillStyle = '#e4e0d6'; ctx.fillRect(0, 0, w, h);
-  for (let i = 0; i < 500; i++) { ctx.fillStyle = 'rgba(150,146,136,0.4)'; ctx.fillRect(r() * w, r() * h, 1, 1); }
-  ctx.fillStyle = '#b8b4aa'; ctx.fillRect(0, 0, w, 2); ctx.fillRect(0, 0, 2, h);
+  ctx.fillStyle = '#ebe7dc'; ctx.fillRect(0, 0, w, h);
+  for (let i = 0; i < 1400; i++) { ctx.fillStyle = 'rgba(150,146,136,0.35)'; ctx.fillRect(r() * w, r() * h, 1, 1); }   // fissured acoustic tile
+  ctx.fillStyle = '#f8f6f0'; ctx.fillRect(0, 0, w, 3); ctx.fillRect(0, 0, 3, h);                                       // white T-bar grid
+  ctx.fillStyle = 'rgba(120,116,108,0.5)'; ctx.fillRect(0, 3, w, 1); ctx.fillRect(3, 0, 1, h);
+});
+/** Troffer diffuser: prismatic lens in a white frame. */
+const trofferTex = () => TEX('troffer', 64, 128, (ctx, w, h) => {
+  ctx.fillStyle = '#d8d4cc'; ctx.fillRect(0, 0, w, h);
+  ctx.fillStyle = '#fffaf0'; ctx.fillRect(4, 4, w - 8, h - 8);
+  ctx.fillStyle = 'rgba(200,196,186,0.5)'; for (let y = 6; y < h - 6; y += 3) ctx.fillRect(4, y, w - 8, 1); for (let x = 6; x < w - 6; x += 3) ctx.fillRect(x, 4, 1, h - 8);
 });
 
 /** Oak veneer for the classroom doors. */
@@ -114,6 +122,18 @@ const boardTex = () => TEX('board2', 192, 128, (ctx, w, h) => {
   }
   ctx.fillStyle = '#1a2a4a'; ctx.fillRect(140, 88, 44, 32); ctx.fillStyle = '#f2d860'; ctx.font = 'bold 9px sans-serif'; ctx.fillText('WINTER', 146, 102); ctx.fillText('FORMAL', 146, 113);
 });
+
+const smearTex = () => TEX('smear', 32, 128, (ctx, w, h) => {
+  const g = ctx.createLinearGradient(0, 0, 0, h); g.addColorStop(0, 'rgba(255,255,255,0.9)'); g.addColorStop(0.5, 'rgba(255,255,255,0.35)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+  ctx.globalCompositeOperation = 'destination-in';
+  const s = ctx.createLinearGradient(0, 0, w, 0); s.addColorStop(0, 'rgba(0,0,0,0)'); s.addColorStop(0.15, 'rgba(0,0,0,1)'); s.addColorStop(0.85, 'rgba(0,0,0,1)'); s.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = s; ctx.fillRect(0, 0, w, h);
+}, { color: false });
+const shadowTex = () => TEX('cshadow', 64, 32, (ctx, w, h) => {
+  const g = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.save(); ctx.scale(1, h / w * 2); ctx.fillStyle = g; ctx.fillRect(0, 0, w, w); ctx.restore();
+}, { color: false });
 
 const ReflShader = {
   uniforms: { color: { value: null }, tDiffuse: { value: null }, textureMatrix: { value: null }, uStrength: { value: 0.42 } },
@@ -151,7 +171,7 @@ export class SchoolScene extends LocationBase {
     this.id = 'school';
     this.title = 'Школа';
     this.background = 0x1a1c20;
-    this.camera = { distance: 7.6, height: 2.1, lookHeight: 1.3, lookZ: -0.9 };
+    this.camera = { distance: 7.4, height: 1.65, lookHeight: 1.4, lookZ: -1.0 };
     this.bounds = { walk: { areas: [{ minX: -9.4, maxX: 9.6, minZ: -2.4, maxZ: 0.9 }] }, camera: { minX: -6.2, maxX: 6.4 } };
   }
 
@@ -159,7 +179,7 @@ export class SchoolScene extends LocationBase {
     const root = this.root;
     // ---- the floor: polished terrazzo + a planar reflection
     const ft = floorTex().clone(); ft.needsUpdate = true; ft.wrapS = ft.wrapT = THREE.RepeatWrapping; ft.repeat.set(24 / 1.2, 22 / 1.2);
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(24, 22), this.mat('schoolFloor2', { map: ft, color: 0xffffff, roughness: 0.18, metalness: 0.0 }));
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(24, 22), this.mat('schoolFloor3', { map: ft, color: 0xe2d8c6, roughness: 0.14, metalness: 0.0, forceStandard: true }));
     floor.rotation.x = -Math.PI / 2; floor.position.set(0, 0, -8.4); root.add(floor);
     if (!this.low) {
       const refl = new Reflector(new THREE.PlaneGeometry(24, 22), {
@@ -172,6 +192,20 @@ export class SchoolScene extends LocationBase {
       // low quality: a soft fake sheen of the ceiling panels on the floor
       for (const x of [-7, -2.5, 2, 6.5]) { const s = glow(0xfff8e8, 2.2, 0.16); s.position.set(x, 0.01, -1.6); s.scale.set(1.4, 0.5, 1); root.add(s); }
     }
+    // ---- reflections painted on the polish (red lockers, the doors, the light panels) and contact shadows
+    const refl = (x, w, depth, color, op, z0 = BACK + 0.47) => {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(w, depth), new THREE.MeshBasicMaterial({ map: smearTex(), color, transparent: true, opacity: op, depthWrite: false, blending: THREE.AdditiveBlending }));
+      m.rotation.x = -Math.PI / 2; m.position.set(x, 0.004, z0 + depth / 2); root.add(m); return m;
+    };
+    refl(-1.6, 3.6, 1.6, 0xb01818, this.low ? 0.5 : 0.25);
+    refl(8.85, 1.7, 1.6, 0xb01818, this.low ? 0.5 : 0.25);
+    refl(3.45, 1.0, 1.4, 0xb07a40, this.low ? 0.35 : 0.18, BACK + 0.05);
+    for (const x of [-7.5, -4.5, -1.5, 1.5, 4.5, 7.5]) refl(x, 0.5, 2.6, 0xfff4e0, this.low ? 0.35 : 0.15, -2.4);
+    const shadow = (x, z, w, d, op = 0.45) => {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshBasicMaterial({ map: shadowTex(), color: 0x000000, transparent: true, opacity: op, depthWrite: false }));
+      m.rotation.x = -Math.PI / 2; m.position.set(x, 0.006, z); root.add(m);
+    };
+    shadow(-1.6, BACK + 0.5, 3.9, 0.35); shadow(8.85, BACK + 0.5, 2.0, 0.35); shadow(4.6, BACK + 0.32, 0.7, 0.4, 0.35); shadow(6.4, BACK + 0.55, 2.5, 0.7, 0.4);
     // ---- the back wall: tile, a darker band, a dark base cove; holes for the window, the cross corridor, the doors
     const tt = tileTex().clone(); tt.needsUpdate = true; tt.wrapS = tt.wrapT = THREE.RepeatWrapping; tt.repeat.set(24 / 1.2, H / 1.2);
     const tileM = this.mat('schoolTile', { map: tt, color: 0xffffff, roughness: 0.25, metalness: 0.0 });
@@ -192,13 +226,14 @@ export class SchoolScene extends LocationBase {
       this.box(w, 0.14, 0.03, cove, cx, 0.07, BACK + 0.015);
     }
     // ---- the ceiling: acoustic tiles, recessed fluorescent panels (+ their light)
-    const ct = ceilTex().clone(); ct.needsUpdate = true; ct.wrapS = ct.wrapT = THREE.RepeatWrapping; ct.repeat.set(24 / 0.6, 6 / 0.6);
-    const ceil = new THREE.Mesh(new THREE.PlaneGeometry(24, 6), this.mat('schoolCeil2', { map: ct, color: 0xffffff, roughness: 1 }));
+    const ct = ceilTex().clone(); ct.needsUpdate = true; ct.wrapS = ct.wrapT = THREE.RepeatWrapping; ct.repeat.set(24 / 0.6, 6 / 1.2);
+    const ceil = new THREE.Mesh(new THREE.PlaneGeometry(24, 6), this.mat('schoolCeil3', { map: ct, color: 0xffffff, roughness: 1, emissive: 0x4a463e }));
     ceil.rotation.x = Math.PI / 2; ceil.position.set(0, H, -0.2); root.add(ceil);
-    const panelM = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xfff8ea, emissiveIntensity: 1.6 });
-    for (const x of [-7, -2.5, 2, 6.5]) {
-      const p = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.6), panelM); p.rotation.x = Math.PI / 2; p.position.set(x, H - 0.005, -1.4); root.add(p);
-      const l = new THREE.PointLight(0xfff4e0, 6, 7.5, 1.3); l.position.set(x, H - 0.25, -1.2); root.add(l);
+    const panelM = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xfffbea, emissiveIntensity: 1.3, emissiveMap: trofferTex() });
+    for (const x of [-7.5, -4.5, -1.5, 1.5, 4.5, 7.5]) {
+      const p = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 1.2), panelM); p.rotation.x = Math.PI / 2; p.position.set(x, H - 0.005, -1.2); root.add(p);
+      if (x === -4.5 || x === 4.5) continue;
+      const l = new THREE.PointLight(0xfff4e0, 5, 8, 1.2); l.position.set(x, H - 0.7, -1.0); root.add(l);
     }
     // ---- the cross corridor, running away from the camera (the reference's perspective)
     this.buildCross(tileM, band, cove, ceil.material, panelM);
@@ -241,9 +276,12 @@ export class SchoolScene extends LocationBase {
     this.colliders.push({ x: 6.4, z: BACK + 0.5, r: 0.5 });
     // ---- a wall-mounted water fountain, backpacks by the bench
     const steel = this.mat('fountain2', { color: 0xc8ccd0, metalness: 0.8, roughness: 0.25 });
-    const basin = new THREE.Mesh(roundedBox(0.5, 0.22, 0.38, 0.06), steel); basin.position.set(4.6, 0.86, BACK + 0.2); root.add(basin);
-    const ped = new THREE.Mesh(roundedBox(0.3, 0.75, 0.12, 0.03), steel); ped.position.set(4.6, 0.4, BACK + 0.07); root.add(ped);
-    const spout = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.015, 0.06, 16), steel); spout.position.set(4.6, 0.99, BACK + 0.24); root.add(spout);
+    const bowl = new THREE.Mesh(new THREE.LatheGeometry([[0, 0], [0.2, 0.0], [0.24, 0.05], [0.25, 0.16], [0.24, 0.17], [0.2, 0.08], [0.0, 0.06]].map(([a, b]) => new THREE.Vector2(a, b)), 28), steel);
+    bowl.scale.set(1, 1, 0.75); bowl.position.set(4.6, 0.78, BACK + 0.2); root.add(bowl);
+    const back = new THREE.Mesh(roundedBox(0.5, 0.42, 0.06, 0.02), steel); back.position.set(4.6, 0.86, BACK + 0.03); root.add(back);
+    const apron = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.06, 0.24, 24, 1, true, Math.PI / 2, Math.PI), steel); apron.scale.z = 0.75; apron.position.set(4.6, 0.66, BACK + 0.06); root.add(apron);
+    const bub = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.026, 0.06, 16), this.mat('chrome', { color: 0xe8ecf0, metalness: 1, roughness: 0.12 })); bub.position.set(4.6, 0.9, BACK + 0.26); root.add(bub);
+    const bar = new THREE.Mesh(roundedBox(0.3, 0.05, 0.03, 0.012), this.mats.cache.get('chrome')); bar.position.set(4.6, 0.86, BACK + 0.39); root.add(bar);
     const packGeo = roundedBox(0.32, 0.42, 0.2, 0.07), pocketGeo = roundedBox(0.24, 0.16, 0.07, 0.03);
     const pack = (x, z, c, ry) => {
       const m = this.mat(`pack2${c}`, { color: c, roughness: 0.9 });
@@ -263,7 +301,9 @@ export class SchoolScene extends LocationBase {
     const pt = tileTex().clone(); pt.needsUpdate = true; pt.wrapS = pt.wrapT = THREE.RepeatWrapping; pt.repeat.set(0.5, H / 1.2);
     const pillar = new THREE.Mesh(roundedBox(0.5, H, 0.5, 0.04), new THREE.MeshStandardMaterial({ map: pt, roughness: 0.3 })); pillar.position.set(-3.0, H / 2, 2.4); fg.add(pillar);
     // ---- light: cool daylight from the window and the door, warm-white panels
-    const hemi = new THREE.HemisphereLight(0xf6f2e8, 0x8a7a64, 1.0);
+    const hemi = new THREE.HemisphereLight(0xf6f2e8, 0xc8bca8, 1.05);
+    // a soft key from the front-left so the dark outfits separate from the cork board and the lockers
+    const rim = new THREE.DirectionalLight(0xfff0dc, 0.55); rim.position.set(-4, 3, 6); root.add(rim);
     const sun = new THREE.DirectionalLight(0xeef2ff, 0.6); sun.position.set(-4, 4, -6);
     root.add(hemi, sun);
     this.lights = { hemi, sun };
@@ -318,7 +358,7 @@ export class SchoolScene extends LocationBase {
   /** The corridor that runs into the depth behind the opening: lockers both sides, panels, a far door. */
   buildCross(tileM, band, cove, ceilM, panelM) {
     const root = this.root;
-    const X0 = 0.4, X1 = 2.6, Z0 = BACK, Z1 = BACK - 16;
+    const X0 = 0.4, X1 = 2.6, Z0 = BACK, Z1 = BACK - 30;
     const L = Z0 - Z1, cz = (Z0 + Z1) / 2;
     for (const [x, ry] of [[X0, Math.PI / 2], [X1, -Math.PI / 2]]) {
       const tt = tileM.map.clone(); tt.needsUpdate = true; tt.repeat.set(L / 1.2, H / 1.2);
@@ -326,9 +366,9 @@ export class SchoolScene extends LocationBase {
       w.position.set(x, H / 2, cz); w.rotation.y = ry; root.add(w);
       // lockers along both walls (seen in steep perspective)
       const doorM = this.mat('lockerDoor2-0', { map: lockerTex(0), color: 0xffffff, roughness: 0.32, metalness: 0.35 });
-      for (let k = 0; k < 30; k++) {
+      for (let k = 0; k < 66; k++) {
         const zz = Z0 - 0.6 - k * 0.4;
-        if (k > 9 && k < 13) continue;                  // a classroom door on each side
+        if ((k > 9 && k < 13) || (k > 39 && k < 43)) continue;     // classroom doors on each side
         const d = new THREE.Mesh(roundedBox(0.37, 1.84, 0.4, 0.01, 1), doorM);
         d.position.set(x + (ry > 0 ? 0.21 : -0.21), 1.05, zz); d.rotation.y = ry; root.add(d);
       }
@@ -338,8 +378,8 @@ export class SchoolScene extends LocationBase {
     const ct = ceilM.map.clone(); ct.needsUpdate = true; ct.repeat.set((X1 - X0) / 0.6, L / 0.6);
     const ceil = new THREE.Mesh(new THREE.PlaneGeometry(X1 - X0, L), new THREE.MeshStandardMaterial({ map: ct, roughness: 1 }));
     ceil.rotation.x = Math.PI / 2; ceil.position.set((X0 + X1) / 2, H, cz); root.add(ceil);
-    for (let k = 0; k < 5; k++) {
-      const z = Z0 - 1.8 - k * 3.2;
+    for (let k = 0; k < 10; k++) {
+      const z = Z0 - 1.8 - k * 3.0;
       const p = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 0.5), panelM); p.rotation.x = Math.PI / 2; p.position.set((X0 + X1) / 2, H - 0.005, z); root.add(p);
       if (k % 2 === 0) { const l = new THREE.PointLight(0xfff4e0, 1.6, 5, 1.6); l.position.set((X0 + X1) / 2, H - 0.3, z); root.add(l); }
     }
@@ -347,7 +387,9 @@ export class SchoolScene extends LocationBase {
     const dd = new THREE.Mesh(roundedBox(1.4, 2.2, 0.05, 0.01, 1), this.mat('farDoors', { color: 0x9a1a18, roughness: 0.4, metalness: 0.3 })); dd.position.set((X0 + X1) / 2, 1.1, Z1 + 0.03); root.add(dd);
     const seam = this.mat('farSeam', { color: 0x2a0a0a }); this.box(0.02, 2.2, 0.06, seam, (X0 + X1) / 2, 1.1, Z1 + 0.04);
     // the far end is brighter: a window over the doors
-    const g = glow(0xf8f4e8, 1.2, 0.18); g.position.set((X0 + X1) / 2, 2.7, Z1 + 0.2); root.add(g);
+    const win = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 0.5), new THREE.MeshBasicMaterial({ color: 0xe8ecf0 })); win.position.set((X0 + X1) / 2, 2.6, Z1 + 0.02); root.add(win);
+    const exit = this.textSign('EXIT', { w: 0.42, h: 0.16, bg: '#1a0a0a', fg: '#ff3a2a', font: 'bold 80px sans-serif' }); exit.position.set((X0 + X1) / 2, 2.32, Z1 + 0.05); root.add(exit);
+    const g = glow(0xff4030, 0.5, 0.25); g.position.set((X0 + X1) / 2, 2.32, Z1 + 0.1); root.add(g);
     void band; void cove;
   }
 }

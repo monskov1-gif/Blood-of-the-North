@@ -183,13 +183,13 @@ export function barkTexture(kind = 'spruce') {
       return;
     }
     const mossy = kind === 'mossy';
-    ctx.fillStyle = mossy ? '#3a3a30' : '#4a3a30'; ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = mossy ? '#3a3a30' : '#3e3832'; ctx.fillRect(0, 0, w, h);
     // vertical plates separated by dark fissures
     for (let x = 0; x < w; x += 3 + r() * 5) {
       const wd = 3 + r() * 6;
       for (let y = 0; y < h; y += 6 + r() * 14) {
         const hh = 8 + r() * 24, v = 60 + r() * 40;
-        ctx.fillStyle = `rgb(${v + 12},${v},${v - 8})`;
+        ctx.fillStyle = `rgb(${v + 4},${v},${v - 4})`;
         ctx.fillRect(x, y, wd, hh);
         ctx.fillStyle = 'rgba(255,240,220,0.08)'; ctx.fillRect(x, y, 1, hh);
       }
@@ -297,7 +297,8 @@ export function spruceStand(trees, { low = false, snow = 1, variant = 0, tint = 
     const H = (t.kind === 'tall' ? 13 + r() * 6 : 6.2 + r() * 2.4) * s;
     const crownBase = t.kind === 'tall' ? H * (0.42 + r() * 0.16) : 0.25 * s;
     const R = (t.kind === 'tall' ? 1.5 : 1.35) * s * (0.85 + r() * 0.3);
-    trunks.push({ x: t.x, y: t.y || 0, z: t.z, h: H * 0.96, r: (t.kind === 'tall' ? 0.2 : 0.12) * s * (0.85 + r() * 0.3), lean: (r() - 0.5) * 0.03 });
+    trunks.push({ x: t.x, y: t.y || 0, z: t.z, h: H * 0.96, r: (t.kind === 'tall' ? 0.12 : 0.09) * s * (0.75 + r() * 0.5), lean: (r() - 0.5) * 0.06 });
+    if (t.snag) continue;                                   // a dead snag: just the bare trunk
     const tiers = Math.max(6, Math.round((H - crownBase) / (0.42 * s)));
     for (let k = 0; k < tiers; k++) {
       const f = k / tiers;
@@ -486,7 +487,8 @@ export function reliefSheet(w, h, sw, sh, offset, colorAt) {
   for (let i = 0; i < p.count; i++) p.setZ(i, offset(p.getX(i), p.getY(i)));
   geo.computeVertexNormals();
   const col = new Float32Array(p.count * 3), c = new THREE.Color();
-  for (let i = 0; i < p.count; i++) { colorAt(c, p.getX(i), p.getY(i), p.getZ(i)); col.set([c.r, c.g, c.b], i * 3); }
+  const n = geo.attributes.normal;
+  for (let i = 0; i < p.count; i++) { colorAt(c, p.getX(i), p.getY(i), p.getZ(i), n.getX(i), n.getY(i), n.getZ(i)); col.set([c.r, c.g, c.b], i * 3); }
   geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
   return geo;
 }

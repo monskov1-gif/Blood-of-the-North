@@ -103,9 +103,9 @@ const methods = {
     await this.lzEnter('school', null, 'lizzie_1');
     const w = g.world, L = this.julian;
     L.placeAt(-3.4, -0.6, 1);
-    const pu = this.lzCastIn('puriel', 'lz_puriel', 5.7, -2.3, -1);
+    const pu = this.lzCastIn('puriel', 'lz_puriel', 5.3, -2.2, -1);
     const ol = this.lzCastIn('olivia', 'lz_olivia', 6.7, -2.4, -1);
-    const vi = this.lzCastIn('vikki', 'lz_vikki', 7.8, -2.2, -1);
+    const vi = this.lzCastIn('vikki', 'lz_vikki', 8.1, -2.1, -1);
     this.lzCast = { pu, ol, vi };
     g.narrative.setChar('lizzie', 'curious');
     this.setAmbience(['amb.room']);
@@ -229,9 +229,12 @@ const methods = {
     this.lzFollow = [pu, ol, vi];
     // the herd at the river: deer and hares, pressed together
     const deer = [];
-    for (let i = 0; i < 9; i++) deer.push(w.critter('deer', 0.6 + i * 0.95 + (i % 3) * 0.2, -3.0 - (i % 3) * 0.75, i % 2));
-    for (let i = 0; i < 6; i++) w.critter('hare', -1.5 + i * 1.6, -2.6 - (i % 2) * 0.4, i);
-    deer.forEach((d, i) => { if (i % 3 === 1) d.userData.setPose('graze'); d.scale.x = i % 2 ? -1 : 1; });
+    // a herd, not a row: bunched, at different depths, heads up and down, facing both ways
+    const hx = [0.6, 1.5, 2.1, 2.9, 3.6, 4.3, 5.0, 5.7, 6.6], hz = [-3.4, -2.9, -3.95, -3.15, -4.3, -2.8, -3.65, -4.05, -3.0];
+    const hs = [1.0, 0.9, 1.08, 0.86, 1.04, 0.95, 1.1, 0.88, 1.0], hf = [1, -1, 1, 1, -1, 1, -1, 1, -1], hg = [0, 1, 0, 1, 1, 0, 0, 1, 0];
+    for (let i = 0; i < 9; i++) deer.push(w.critter('deer', hx[i], hz[i], i % 2));
+    for (let i = 0; i < 6; i++) w.critter('hare', -1.5 + i * 1.6 + (i % 2) * 0.4, -2.6 - (i % 3) * 0.35, i);
+    deer.forEach((d, i) => { if (hg[i]) d.userData.setPose('graze'); d.scale.set(hf[i] * hs[i], hs[i], 1); });
     this.lzDeer = deer;
     this.setAmbience(['amb.wind']);
     g.hud.show(false);

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { Reflector } from 'three/addons/objects/Reflector.js';
 import { flareSource } from '../../fx/WindowLight.js';
 import { LocationBase } from '../LocationBase.js';
 import { canvasTexture, rng, glowTexture } from '../../render/textures.js';
@@ -87,26 +88,26 @@ const pathTexAutumn = () => PX('pathAut', 64, 32, (ctx, w, h) => {
 });
 
 /** Low undergrowth (blueberry, ferns) for November: dark green and rust. */
-const undergrowthTex = () => canvasTexture('forest-undergrowth', 128, 64, (ctx, w, h) => {
+const undergrowthTex = () => canvasTexture('forest-undergrowth2', 128, 64, (ctx, w, h) => {
   const r = rng(306);
   ctx.clearRect(0, 0, w, h);
-  const cols = ['#1e2a1c', '#26341f', '#2e3c24', '#3a4228', '#5a4a26', '#6a3c1e'];
-  for (let i = 0; i < 520; i++) {
-    const x = w / 2 + (r() - 0.5) * w * 0.9 * Math.sqrt(r()), base = h;
-    const top = h * (0.15 + r() * 0.55) + Math.abs(x - w / 2) * 0.5;
-    ctx.strokeStyle = cols[Math.floor(r() * cols.length)]; ctx.lineWidth = 1 + r() * 1.5;
-    ctx.beginPath(); ctx.moveTo(x, base); ctx.quadraticCurveTo(x + (r() - 0.5) * 10, (base + top) / 2, x + (r() - 0.5) * 14, top); ctx.stroke();
-    if (r() < 0.5) { ctx.fillStyle = cols[Math.floor(r() * 4)]; ctx.beginPath(); ctx.ellipse(x + (r() - 0.5) * 10, top + r() * 6, 2 + r() * 3, 1 + r() * 1.5, r() * 3, 0, 7); ctx.fill(); }
+  // willow shrubs: thin reddish-brown stems fanning up, a few last leaves
+  for (let i = 0; i < 26; i++) {
+    const x0 = w / 2 + (r() - 0.5) * w * 0.5, lean = (x0 - w / 2) * 0.9 + (r() - 0.5) * 20, top = h * (0.08 + r() * 0.4);
+    ctx.strokeStyle = r() < 0.5 ? '#5a3424' : '#3e2a20'; ctx.lineWidth = 1 + r();
+    ctx.beginPath(); ctx.moveTo(x0, h); ctx.quadraticCurveTo(x0 + lean * 0.3, (h + top) / 2, x0 + lean, top); ctx.stroke();
+    for (let k = 0; k < 3; k++) { const t = 0.4 + r() * 0.5; const bx = x0 + lean * t * t, by = h - (h - top) * t; ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx + (r() - 0.5) * 14, by - 4 - r() * 8); ctx.stroke(); }
+    if (r() < 0.6) { ctx.fillStyle = ['#8a6a2a', '#6a4a20', '#4a4a26'][Math.floor(r() * 3)]; ctx.beginPath(); ctx.ellipse(x0 + lean, top, 2.5, 1.2, r() * 3, 0, 7); ctx.fill(); }
   }
+  // fireweed: tall rust stalks with pale seed fluff
+  for (let i = 0; i < 6; i++) {
+    const x = 10 + r() * (w - 20), top = h * (0.02 + r() * 0.2);
+    ctx.strokeStyle = '#7a3a28'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(x, h); ctx.lineTo(x + (r() - 0.5) * 6, top); ctx.stroke();
+    for (let k = 0; k < 5; k++) { ctx.fillStyle = 'rgba(220,214,200,0.7)'; ctx.fillRect(x + (r() - 0.5) * 5, top + k * 3, 2, 2); }
+  }
+  // low blueberry / moss mats at the base
+  for (let i = 0; i < 160; i++) { ctx.fillStyle = ['#1e2a1c', '#26341f', '#3a2a1c', '#5a3a20'][Math.floor(r() * 4)]; ctx.beginPath(); ctx.ellipse(w / 2 + (r() - 0.5) * w * 0.9, h - r() * 12, 2 + r() * 3, 1 + r() * 2, 0, 0, 7); ctx.fill(); }
 }, { aniso: 4 });
-
-/** The trodden path: packed snow, boot prints, a tyre rut at the trailhead. */
-const pathTex = () => PX('path', 64, 32, (ctx, w, h) => {
-  const r = rng(302);
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const n = (r() - 0.5) * 12; ctx.fillStyle = rgb(176 + n, 180 + n, 186 + n); ctx.fillRect(x, y, 1, 1); }
-  for (let i = 0; i < 26; i++) { const x = r() * w, y = r() * h; ctx.fillStyle = 'rgba(110,104,96,0.55)'; ctx.fillRect(x, y, 3, 2); ctx.fillRect(x + 1, y + 2, 2, 1); }
-  for (let i = 0; i < 14; i++) { ctx.fillStyle = 'rgba(96,84,66,0.5)'; ctx.fillRect(r() * w, r() * h, 2 + r() * 4, 1); }
-});
 
 /** Spruce bark, aspen bark (pale with dark eyes), birch bark. */
 const barkTex = (kind) => PX(`bark${kind}`, 16, 64, (ctx, w, h) => {
@@ -171,7 +172,7 @@ const deerTex = (pose, coat = 0) => PX(`deer-${pose}-${coat}`, 96, 72, (ctx, w, 
   ell(28, 32, 9, 9, c(1.02));                       // haunch
   ell(58, 31, 9, 9, c(0.98));                       // shoulder
   ell(44, 41, 18, 3.5, '#d6c6a4');                  // pale belly
-  ell(21, 30, 5, 6, '#ece4d4'); ctx.fillStyle = '#2a2018'; ctx.fillRect(18, 27, 3, 6);   // white rump, black-tipped tail
+  ell(22, 30, 3.5, 4.5, '#c8bcaa'); ctx.fillStyle = '#2a2018'; ctx.fillRect(19, 27, 2, 5);   // white rump, black-tipped tail
   ctx.fillStyle = c(0.82); ctx.fillRect(30, 25, 26, 2);                                   // darker back line
   leg(30, 38, 27, 1, c(0.72)); leg(64, 38, 27, -1, c(0.72));
   if (g) {
@@ -185,7 +186,7 @@ const deerTex = (pose, coat = 0) => PX(`deer-${pose}-${coat}`, 96, 72, (ctx, w, 
     ctx.fillStyle = '#1a1410'; ctx.fillRect(81, 13, 2, 2); ctx.fillRect(72, 10, 2, 2);   // nose, eye
     ell(66, 6, 2.5, 5, c(0.85), -0.5); ell(70, 5, 2.2, 4.6, c(0.75), -0.2);              // big mule-deer ears
     ell(66, 7, 1.2, 3, '#d8b8a0', -0.5);
-    ell(74, 17, 3, 1.4, '#e8e0d0');                  // pale throat patch
+    ell(74, 17, 2.4, 1.1, '#cfc4b4');                  // pale throat patch
   }
   // grain so it reads as fur, not flat paint
   const r = rng(77 + coat + (g ? 5 : 0));
@@ -266,6 +267,27 @@ const iceTex = () => canvasTexture('forest-ice', 256, 128, (ctx, w, h) => {
   ctx.strokeStyle = 'rgba(40,56,70,0.5)'; ctx.lineWidth = 1;
   for (let k = 0; k < 14; k++) { let x = r() * w, y = r() * h; ctx.beginPath(); ctx.moveTo(x, y); for (let s = 0; s < 6; s++) { x += (r() - 0.5) * 30; y += (r() - 0.5) * 16; ctx.lineTo(x, y); } ctx.stroke(); }
 }, { repeat: [12, 1] });
+
+const RiverReflShader = {
+  uniforms: { color: { value: null }, tDiffuse: { value: null }, textureMatrix: { value: null }, uTime: { value: 0 } },
+  vertexShader: /* glsl */`
+    uniform mat4 textureMatrix; varying vec4 vUv; varying vec3 vW;
+    #include <common>
+    #include <logdepthbuf_pars_vertex>
+    void main() { vUv = textureMatrix * vec4(position, 1.0); vW = (modelMatrix * vec4(position, 1.0)).xyz; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    #include <logdepthbuf_vertex>
+    }`,
+  fragmentShader: /* glsl */`
+    uniform sampler2D tDiffuse; uniform float uTime; varying vec4 vUv; varying vec3 vW;
+    #include <logdepthbuf_pars_fragment>
+    void main() {
+      #include <logdepthbuf_fragment>
+      vec2 uv = vUv.xy / vUv.w;
+      uv.x += sin(vW.x * 3.0 + uTime * 0.8) * 0.002 + sin(vW.z * 11.0 + uTime * 1.3) * 0.0015;
+      uv.y += sin(vW.x * 1.7 - uTime * 0.6) * 0.004;
+      gl_FragColor = vec4(texture2D(tDiffuse, uv).rgb * 0.38, 1.0);
+    }`,
+};
 
 /** A dead hare (small pixel sprite), torn open. */
 const hareTex = (kind) => PX(`hare${kind}`, 24, 12, (ctx, w, h) => {
@@ -354,6 +376,14 @@ export class ForestScene extends LocationBase {
       m.position.set(-14 + i * 8 + mr() * 4, 1.6 + mr() * 2.5, -18 - mr() * 14);
       m.userData.vx = 0.15 + mr() * 0.2;
       root.add(m); this.banks.push(m);
+    }
+    // low ground fog drifting between the trunks (mid-ground, not only on the back plane)
+    this.lowFog = [];
+    for (let i = 0; i < 12; i++) {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(7 + mr() * 6, 1.4 + mr() * 0.8), new THREE.MeshBasicMaterial({ map: mistTexture(1 + (i % 3)), color: 0xe4e8ee, transparent: true, opacity: 0.3, depthWrite: false }));
+      m.position.set(-16 + i * 5.4 + mr() * 2, 0.45 + mr() * 0.5, -3.4 - mr() * 3.2);
+      m.userData.vx = 0.08 + mr() * 0.1;
+      root.add(m); this.lowFog.push(m);
     }
     // moon (dusk only)
     this.moon = new THREE.Mesh(new THREE.CircleGeometry(2.2, 20), new THREE.MeshBasicMaterial({ color: 0xf2f0e4, transparent: true, depthWrite: false, fog: false }));
@@ -486,6 +516,15 @@ export class ForestScene extends LocationBase {
     this.waterMat = water;
     const wm = new THREE.Mesh(new THREE.PlaneGeometry(70, 5.6), water);
     wm.rotation.x = -Math.PI / 2; wm.position.set(12, -0.4, -8.6); this.root.add(wm);
+    if (!this.low) {
+      // the far bank and the sky mirrored in the slow black water (rippled)
+      const refl = new Reflector(new THREE.PlaneGeometry(70, 5.6), {
+        textureWidth: Math.floor(window.innerWidth * 0.4), textureHeight: Math.floor(window.innerHeight * 0.4), shader: RiverReflShader, clipBias: 0.003,
+      });
+      refl.material.transparent = true; refl.material.blending = THREE.AdditiveBlending; refl.material.depthWrite = false;
+      refl.rotation.x = -Math.PI / 2; refl.position.set(12, -0.395, -8.6); refl.renderOrder = 1;
+      this.root.add(refl); this.riverRefl = refl;
+    }
     // shelf ice along both banks: thick plates with a broken inner edge, snow streaks over grey ice
     const iceMat = this.iceMat = this.mat('riverIce', { map: iceTex(), color: 0xffffff, roughness: 0.35, metalness: 0.05 });
     const shelf = (zEdge, dir, seed) => {
@@ -516,11 +555,11 @@ export class ForestScene extends LocationBase {
     shelf(-11.2, 1, 602);
     // stones in the shallows, snow on their tops
     const sr = rng(345);
-    for (let i = 0; i < 26; i++) {
-      const rg = rockGeometry(700 + i, { detail: 3, rough: 0.35, flat: -0.35, snow: 0.55, colA: 0x5e5a56, colB: 0x46423e });
+    for (let i = 0; i < 64; i++) {
+      const rg = rockGeometry(700 + (i % 26), { detail: 3, rough: 0.35, flat: -0.35, snow: 0.55, colA: 0x5e5a56, colB: 0x46423e });
       const st = new THREE.Mesh(rg, this.rockMat);
       const zz = sr() < 0.5 ? -6.0 - sr() * 0.8 : -11.2 + sr() * 0.8;
-      st.position.set(-20 + sr() * 64, -0.35, zz); st.scale.set(0.25 + sr() * 0.45, 0.2 + sr() * 0.3, 0.25 + sr() * 0.35); st.rotation.y = sr() * 6;
+      const big = i < 22; st.position.set(-20 + sr() * 64, -0.35, zz); st.scale.set((big ? 0.25 + sr() * 0.45 : 0.08 + sr() * 0.12), (big ? 0.2 + sr() * 0.3 : 0.06 + sr() * 0.08), (big ? 0.25 + sr() * 0.35 : 0.08 + sr() * 0.1)); st.rotation.y = sr() * 6;
       this.root.add(st);
     }
     // reeds on the far bank, a pale strip of frozen grass
@@ -567,12 +606,13 @@ export class ForestScene extends LocationBase {
     const open = (x) => (x > -3.5 && x < 10.5) || (x > 19 && x < 28.5); // the site, the clearing: river in view
     const near = [], bankTrees = [], far = [];
     // first row behind the lane: tall trunks (crowns above the frame) and young snowy spruces
-    for (let x = -18; x < 50; x += 1.6 + r() * 1.9) {
+    for (let x = -18; x < 50; x += (r() < 0.3 ? 3.5 + r() * 3 : 0.7 + r() * 1.2)) {   // clusters and gaps, not a picket fence
       if (x > 31 && x < 46) continue;
       const z = -3.6 - r() * 1.8;
       if (open(x) && r() < 0.75) continue;
       const k = r();
-      if (k < 0.5) near.push({ x, z, s: 0.95 + r() * 0.3, kind: 'tall', y: this.groundH(x, z) });
+      if (k < 0.08) near.push({ x, z, s: 0.8 + r() * 0.3, kind: 'tall', snag: true, y: this.groundH(x, z) });
+      else if (k < 0.5) near.push({ x, z, s: 0.95 + r() * 0.3, kind: 'tall', y: this.groundH(x, z) });
       else if (k < 0.78) near.push({ x, z: z - 0.4, s: 0.55 + r() * 0.35, kind: 'young', y: this.groundH(x, z - 0.4) });
       else this.bare(x, z, 0.95 + r() * 0.3, r() < 0.5 ? 1 : 2);
     }
@@ -583,8 +623,10 @@ export class ForestScene extends LocationBase {
       bankTrees.push({ x, z, s: 0.6 + r() * 0.5, kind: r() < 0.5 ? 'tall' : 'young', y: this.groundH(x, z) });
     }
     // the far bank: a dense wall of spruce climbing the slope, a few birches between
+    const clearing = (x) => (x > 2 && x < 7.5) || (x > 21 && x < 25.5) || (x > -16 && x < -12.5);
     for (let x = -26; x < 58; x += 0.7 + r() * 0.8) {
       for (let row = 0; row < 3; row++) {
+        if (clearing(x) && row < 2 && r() < 0.85) continue;
         const z = -12.4 - row * 3.2 - r() * 2.6;
         if (r() < 0.12 && row === 0) { this.bare(x, z, 1.1, 2); continue; }
         far.push({ x: x + r() * 0.5, z, s: 0.75 + r() * 0.55, kind: r() < 0.6 ? 'tall' : 'young', y: this.groundH(x, z) });
@@ -693,12 +735,11 @@ export class ForestScene extends LocationBase {
     this.ravens = [];
     for (let i = 0; i < 4; i++) {
       const x = 12.4 + i * 1.3, z = -2.5 - (i % 2) * 0.6;
-      const c = new THREE.Mesh(this.carcassGeo || (this.carcassGeo = rockGeometry(31, { detail: 3, rough: 0.2, flat: -0.4, colA: 0x6a5240, colB: 0x4a3a2e, dark: 0.35 })), this.mat('carcass', { vertexColors: true, color: 0xffffff, roughness: 0.85 }));
-      c.position.set(x, 0.12, z); c.scale.set(0.75, 0.3, 0.36); c.rotation.y = i * 0.7; g.add(c);
-      const t = new THREE.Mesh(this.tornGeo || (this.tornGeo = rockGeometry(32, { detail: 3, rough: 0.4, flat: -0.5, colA: 0x7a1c16, colB: 0x4a0c0a, dark: 0.4 })), this.mat('tornV', { vertexColors: true, color: 0xffffff, roughness: 0.5 }));
-      t.position.set(x + 0.15, 0.2, z + 0.12); t.scale.set(0.3, 0.14, 0.2); g.add(t);
-      const leg = this.mat('carcassLeg', { color: 0x3a2c22, roughness: 0.9 });
-      for (let k = 0; k < 2; k++) { const l = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.035, 0.7, 16), leg); l.position.set(x - 0.4 + k * 0.25, 0.22, z + 0.15); l.rotation.set(0.3, 0, 1.2 - k * 0.3); g.add(l); }
+      const dm = new THREE.MeshLambertMaterial({ map: deerTex('dead', i % 2), transparent: true, alphaTest: 0.5, emissive: 0x1a1612, side: THREE.DoubleSide });
+      const dg = new THREE.PlaneGeometry(1.6, 1.2); dg.translate(0, 0.6 - 0.62, 0);
+      const c = new THREE.Mesh(dg, dm); c.position.set(x, 0, z); c.scale.x = i % 2 ? -1 : 1; g.add(c);
+      const pool = new THREE.Mesh(new THREE.CircleGeometry(0.55, 20), this.mat('carcBlood', { color: 0x3a0e0a, roughness: 0.7, transparent: true, opacity: 0.7, depthWrite: false }));
+      pool.rotation.x = -Math.PI / 2; pool.scale.set(1.5, 0.7, 1); pool.position.set(x, 0.012, z + 0.1); g.add(pool);
       for (let k = 0; k < 4; k++) { const rib = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.015, 3, 8, Math.PI), bone); rib.position.set(x - 0.2 + k * 0.08, 0.2, z); rib.rotation.y = Math.PI / 2; g.add(rib); }
     }
     for (let i = 0; i < 6; i++) {
@@ -899,6 +940,10 @@ export class ForestScene extends LocationBase {
     this.far2.material.color.set(dark ? 0x1c2432 : grey ? 0x2a3228 : 0x6a7680);
     this.hazes.forEach((h, i) => { h.material.color.set(dark ? 0x3a4a68 : grey ? 0x9aa0a6 : 0xdfe6ee); h.material.opacity = (dark ? [0.35, 0.25, 0.16] : [0.45, 0.35, 0.22])[i]; });
     this.banks.forEach((b) => { b.material.color.set(dark ? 0x46567a : grey ? 0xa4aab0 : 0xe4e8ee); b.material.opacity = dark ? 0.28 : 0.4; });
+    this.lowFog.forEach((b) => { b.material.color.set(dark ? 0x3e4c66 : grey ? 0x9aa0a6 : 0xe8ecf0); b.material.opacity = dark ? 0.22 : grey ? 0.26 : 0.3; });
+    // the ground follows the grade of the hour (the dusk is blue, not olive)
+    this.groundAutumn.material.color.set(name === 'l2' ? 0x8a96b4 : 0xffffff);
+    this.undergrowth.material.color.set(name === 'l2' ? 0x8a96b4 : 0xffffff);
     // November (l1, l2): no snow on the ground or the branches yet
     const snowy = !nov;
     for (const st of this.allStands || []) setStandSnow(st, snowy ? 1 : 0);
@@ -938,6 +983,7 @@ export class ForestScene extends LocationBase {
     }
     if (this.caveMist) this.caveMist.material.opacity = 0.14 + Math.sin(this.time * 0.7) * 0.05;
     // the river moves; steam breathes over it; fog banks drift; shafts flicker as branches sway
+    if (this.riverRefl) this.riverRefl.material.uniforms.uTime.value = this.time;
     if (this.waterMat) { this.waterMat.normalMap.offset.x = this.time * 0.035; this.waterMat.normalMap.offset.y = Math.sin(this.time * 0.3) * 0.02; }
     const dark = this.state === 'night' || this.state === 'l2';
     for (const sp of this.steam) {
@@ -945,6 +991,7 @@ export class ForestScene extends LocationBase {
       sp.material.opacity = sp.userData.base * (dark ? 1.4 : 1) * (0.75 + 0.25 * Math.sin(this.time * 0.4 + sp.userData.ph));
     }
     for (const b of this.banks) { b.position.x += b.userData.vx * dt; if (b.position.x > 60) b.position.x = -24; }
+    for (const b of this.lowFog) { b.position.x += b.userData.vx * dt; if (b.position.x > 50) b.position.x = -20; }
     if (this.shafts.visible) for (const m of this.shafts.children) m.material.opacity = m.userData.base * (this.state === 'l1' ? 1 : 0.45) * (0.7 + 0.3 * Math.sin(this.time * 0.5 + m.userData.ph));
   }
 }
