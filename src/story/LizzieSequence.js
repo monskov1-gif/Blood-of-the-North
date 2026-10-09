@@ -17,7 +17,7 @@ const V = (x, y, z) => new THREE.Vector3(x, y, z);
 // the game's chapter numbers (01 Julian … 12 the crossing) and the dates of Lizzie's line:
 // time between her chapters is uneven on purpose — hours, days, weeks
 const CARDS = {
-  1: ['След', 'The Trail', 'ПЯТНИЦА, 5 НОЯБРЯ', 'Глава 2 · Лиззи'],
+  1: ['След', 'The Trail', 'СРЕДА, 3 НОЯБРЯ · ВЕЧЕР', 'Глава 2 · Лиззи'],
   2: ['Лес', 'The Forest', 'ЧЕТВЕРГ, 11 НОЯБРЯ · ВЕЧЕР', 'Глава 4 · Лиззи'],
   3: ['Пещера', 'The Cave', '13 НОЯБРЯ', 'Глава 7 · Лиззи'],
   4: ['Стая', 'The Pack', 'ДЕКАБРЬ · ДЕНЬ ДВАДЦАТЫЙ', 'Глава 9 · Лиззи'],
@@ -100,17 +100,37 @@ const methods = {
     const S = this.session;
     await this.lzCard(1);
     if (S !== this.session) return;
+    // the evening before: at home, Julian's case on the kitchen table (src/story/HomeSequence.js)
+    if (!g.state.get('lh_done')) {
+      if (!(await this.lzHome()) || S !== this.session) return;
+      g.state.set('lh_done', true);
+      g.fader.set(true);
+      await g.card.show('Пятница', { en: 'Friday', sub: '5 НОЯБРЯ · ШКОЛА', ms: 1700 });
+      if (S !== this.session) return;
+    }
     await this.lzEnter('school', null, 'lizzie_1');
-    const w = g.world, L = this.julian;
+    const L = this.julian;
     L.placeAt(-3.4, -0.6, 1);
-    const pu = this.lzCastIn('puriel', 'lz_puriel', 5.3, -2.2, -1);
-    const ol = this.lzCastIn('olivia', 'lz_olivia', 6.7, -2.4, -1);
-    const vi = this.lzCastIn('vikki', 'lz_vikki', 8.1, -2.1, -1);
-    this.lzCast = { pu, ol, vi };
     g.narrative.setChar('lizzie', 'curious');
     this.setAmbience(['amb.room']);
     g.hud.show(false);
     g.player.enabled = false;
+    // the girls wait in the cafeteria (CafeteriaScene); the corridor is full of the last break
+    const pu = this.lzCastIn('puriel', 'lz_puriel', 0, -2.2, -1);
+    const ol = this.lzCastIn('olivia', 'lz_olivia', 0, -2.4, -1);
+    const vi = this.lzCastIn('vikki', 'lz_vikki', 0, -2.1, -1);
+    this.lzCast = { pu, ol, vi };
+    const seatGirls = () => {
+      const w = g.world;
+      const t = w.spots?.girlsTable || { x: 3.2, z: -2.3 };
+      for (const [i, c] of [pu, ol, vi].entries()) {
+        w.root.add(c.root); c.setVisible(true);
+        c.placeAt(t.x + (i - 1) * 0.75, t.z - 0.05 * i, i === 0 ? 1 : -1);
+      }
+      w.shots = { ...(w.shots || {}), school: { fov: 34, pos: [t.x - 0.5, 1.55, 2.6], look: [t.x + 0.2, 1.3, t.z - 0.4] } };
+    };
+    [pu, ol, vi].forEach((c) => c.setVisible(false));
+    this.schoolCrowd('school');
     g.cameraSys.snap();
     await g.fader.to(false, 1400);
     if (!(await this.lines(g.dialogue.dialogues.l1_open))) return;
@@ -124,17 +144,39 @@ const methods = {
         await g.dialogue.start('l1_girls');
         if (S !== this.session) return;
         g.narrative.setChar('lizzie', 'investigative');
+        this.endPlace();
         await this.lzL1Sites();
         resolve();
       };
-      g.interactions.setItems([
-        { id: 'l1_window', label: 'Окно', at: { x: -4.6, z: -2.0 }, radius: 0.9, anchor: w.anchors.window, run: this.lzSay('l1_window') },
-        { id: 'l1_trophy', label: 'Кубки', at: { x: -7.2, z: -2.0 }, radius: 0.8, anchor: w.anchors.trophy, run: this.lzSay('l1_trophy') },
-        { id: 'l1_lockers', label: 'Мой шкафчик', at: { x: -1.6, z: -2.0 }, radius: 0.6, anchor: w.anchors.lockers, run: this.lzSay('l1_lockers') },
-        { id: 'l1_board', label: 'Доска объявлений', at: { x: 6.0, z: -1.6 }, radius: 0.5, anchor: w.anchors.board, run: this.lzSay('l1_board') },
-        { id: 'l1_girls', label: 'Девочки', at: { x: 5.0, z: -1.4 }, radius: 1.0, anchor: V(6.6, 2.0, -2.3), run: talk },
-        { id: 'l1_exit', label: 'Выход', at: { x: -9.0, z: -2.0 }, radius: 0.9, anchor: w.anchors.exit, run: () => (g.state.get('lz_l1_agreed') ? null : g.dialogue.start('l1_exit_wait')) },
-      ]);
+      this.setPlace({
+        onEnter: (loc) => {
+          this.schoolCrowd(loc);
+          if (loc === 'cafeteria') seatGirls();
+          else [pu, ol, vi].forEach((c) => c.setVisible(false));
+        },
+        items: (loc) => {
+          const w = g.world;
+          if (loc === 'school') {
+            return [
+              { id: 'l1_window', label: 'Окно', at: { x: -4.6, z: -2.0 }, radius: 0.9, anchor: w.anchors.window, run: this.lzSay('l1_window') },
+              { id: 'l1_trophy', label: 'Кубки', at: { x: -7.2, z: -2.0 }, radius: 0.8, anchor: w.anchors.trophy, run: this.lzSay('l1_trophy') },
+              { id: 'l1_lockers', label: 'Мой шкафчик', at: { x: -1.6, z: -2.0 }, radius: 0.6, anchor: w.anchors.lockers, run: this.lzSay('l1_lockers') },
+              { id: 'l1_board', label: 'Доска объявлений', at: { x: 6.0, z: -1.6 }, radius: 0.5, anchor: w.anchors.board, run: this.lzSay('l1_board') },
+              { id: 'l1_exit', label: 'Выход', at: { x: -9.0, z: -2.0 }, radius: 0.9, anchor: w.anchors.exit, run: () => g.dialogue.start('l1_exit_wait') },
+            ];
+          }
+          if (loc === 'cafeteria') {
+            const t = w.spots?.girlsTable || { x: 3.2, z: -2.3 };
+            const A = w.anchors || {};
+            const it = [{ id: 'l1_girls', label: 'Девочки', at: { x: t.x - 1.3, z: -1.4 }, radius: 1.1, anchor: new THREE.Vector3(t.x, 1.9, t.z), run: talk }];
+            if (A.menu) it.push({ id: 'l1_menu', label: 'Меню', at: { x: A.menu.x, z: -1.6 }, radius: 0.7, anchor: A.menu, run: this.lzSay('l1_menu') });
+            if (A.banner) it.push({ id: 'l1_banner', label: 'Плакат', at: { x: A.banner.x, z: -1.6 }, radius: 0.7, anchor: A.banner, run: this.lzSay('l1_banner') });
+            if (A.vending) it.push({ id: 'l1_vending', label: 'Автомат', at: { x: A.vending.x, z: -1.6 }, radius: 0.7, anchor: A.vending, run: this.lzSay('l1_vending') });
+            return it;
+          }
+          return [];
+        },
+      });
     });
   },
 
@@ -796,7 +838,7 @@ const methods = {
     const route = g.state.get('investigation_route');
     if (n === 1) await this.startStation();
     if (n === 2) await this.startNight();
-    if (n === 3) await (route === 'WEREWOLF' ? this.startForest() : this.vampireChain());
+    if (n === 3) await this.startHome(2);
     if (n === 4) {
       if (route === 'WEREWOLF') await this.startForestNight();
       else { g.fader.set(true); await g.card.show('Без отражения', { num: 'Глава 10', en: 'No Reflection', sub: 'РАССЛЕДОВАНИЕ ДЖУЛИАНА — В РАЗРАБОТКЕ', ms: 2600, style: 'chapter-b' }); await this.playLizzie(5); }

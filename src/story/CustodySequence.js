@@ -13,6 +13,7 @@ const STAGE_MUSIC = {
   hospital_return: 'hospital_night', recovery: 'recovery', street: 'street',
   station_return: 'station', forest: 'street', forest_night: 'hospital_night',
   lizzie_1: 'recovery', lizzie_2: 'street', lizzie_3: 'hospital_night', lizzie_4: 'interrogation', lizzie_5: 'hospital_night',
+  home_1: 'hospital_night', home_2: 'recovery',
 };
 import { glow } from '../world/props.js';
 import { sleep } from './Director.js';
@@ -1137,8 +1138,8 @@ const methods = {
     await g.fader.to(true, 2600);
     g.keyScene = false;
     if (S !== this.session) return;
-    // a week later: back at the station
-    await this.startStationReturn();
+    // home first (the empty flat, her room), then a week later: back at the station
+    await this.startHome(1);
   },
 
   // ------------------------------------------------------------------ per frame + loading

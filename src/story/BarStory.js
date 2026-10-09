@@ -9,6 +9,8 @@ import { installMorning } from './MorningSequence.js';
 import { installCustody, CUSTODY_STAGES } from './CustodySequence.js';
 import { installInvestigation, INVESTIGATION_STAGES } from './InvestigationSequence.js';
 import { installLizzie, LIZZIE_STAGES } from './LizzieSequence.js';
+import { installPlaces } from './Places.js';
+import { installHome, HOME_STAGES } from './HomeSequence.js';
 
 /**
  * Scene logic for the prologue in the "Northern Rose" bar:
@@ -26,7 +28,7 @@ export class BarStory {
   }
 
   /** Invalidates running sequences (new game / load / title). */
-  bump() { this.session++; this.escaping = false; }
+  bump() { this.session++; this.escaping = false; this.traveling = false; this.place = null; this.clearCrowd?.(); }
 
   // ------------------------------------------------------------------ setup
 
@@ -567,6 +569,10 @@ export class BarStory {
       await this.loadLizzie(st);
       return;
     }
+    if (HOME_STAGES.includes(st)) {
+      await this.loadHome(st);
+      return;
+    }
     if (INVESTIGATION_STAGES.includes(st)) {
       await this.loadInvestigation(st);
       return;
@@ -620,3 +626,5 @@ installMorning(BarStory);
 installCustody(BarStory);
 installInvestigation(BarStory);
 installLizzie(BarStory);
+installPlaces(BarStory);
+installHome(BarStory);

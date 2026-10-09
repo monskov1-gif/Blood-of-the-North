@@ -93,7 +93,18 @@ export const CHARACTERS = {
   packD: { id: 'packD', name: 'Марта', nameEn: 'MARTHA', rig: 'grey', poses: { idle: 'wolf_grey', eat: 'wolf_grey_eat' }, speed: 1.6, scale: 1.0, tint: 0xd0b49a, selfLight: 0x6a5a4a },
   packE: { id: 'packE', name: 'Рыжая', nameEn: 'THE RED ONE', rig: 'red', poses: { idle: 'wolf_red', eat: 'wolf_red_eat' }, speed: 1.7, scale: 1.05, selfLight: 0x6a5a4a },
   // Julian as a separate cast member inside Lizzie's chapters (route WEREWOLF)
-  julianL: { id: 'julianL', name: 'Джулиан Рид', nameEn: 'JULIAN REED', poses: { idle: 'jul_idle', talk: 'jul_talk' }, speed: 1.55 },
+  julianL: { id: 'julianL', name: 'Джулиан Рид', nameEn: 'JULIAN REED', portrait: 'julian', poses: { idle: 'jul_idle', talk: 'jul_talk', think: 'julian_think' }, speed: 1.55 },
+  // v0.14: the school crowd (re-dyed classmates, tools/build_sprites.py)
+  stuG0: { id: 'stuG0', name: 'Ученица', nameEn: 'STUDENT', poses: { idle: 'stu_g0_idle' }, speed: 1.35 },
+  stuG1: { id: 'stuG1', name: 'Ученица', nameEn: 'STUDENT', poses: { idle: 'stu_g1_idle' }, speed: 1.35 },
+  stuG2: { id: 'stuG2', name: 'Ученица', nameEn: 'STUDENT', poses: { idle: 'stu_g2_idle' }, speed: 1.35 },
+  stuG3: { id: 'stuG3', name: 'Ученица', nameEn: 'STUDENT', poses: { idle: 'stu_g3_idle' }, speed: 1.35 },
+  stuG4: { id: 'stuG4', name: 'Ученица', nameEn: 'STUDENT', poses: { idle: 'stu_g4_idle' }, speed: 1.35 },
+  stuG5: { id: 'stuG5', name: 'Ученица', nameEn: 'STUDENT', poses: { idle: 'stu_g5_idle' }, speed: 1.35 },
+  stuB0: { id: 'stuB0', name: 'Ученик', nameEn: 'STUDENT', poses: { idle: 'stu_b0' }, speed: 1.4, scale: 0.93 },
+  stuB1: { id: 'stuB1', name: 'Ученик', nameEn: 'STUDENT', poses: { idle: 'stu_b1' }, speed: 1.4, scale: 0.97 },
+  stuB2: { id: 'stuB2', name: 'Ученик', nameEn: 'STUDENT', poses: { idle: 'stu_b2' }, speed: 1.4, scale: 0.93 },
+  stuB3: { id: 'stuB3', name: 'Ученик', nameEn: 'STUDENT', poses: { idle: 'stu_b3' }, speed: 1.4, scale: 0.97 },
   // the werewolf in human form (seen from far away in the forest)
   stranger: { id: 'stranger', name: 'Человек', nameEn: 'MAN', poses: { idle: 'npc_bluecoat_side' }, speed: 1.2, selfLight: 0x5a6680 },
 };

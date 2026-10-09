@@ -862,6 +862,48 @@ for name in ['wyatt_side', 'quinn_side']:
     frames[name + '_walk1'] = walk(frames[name], 7, False, hip)
     frames[name + '_walk2'] = walk(frames[name], 7, True, hip)
 
+# v0.14: school crowd — classmates re-dyed from the four girls and two young men (no redrawing):
+# grey/black garments take a new colour with their shading kept, hair goes black/auburn/ginger
+def hue_of(a):
+    rgb = a[..., :3] / 255.0
+    mx, mn = rgb.max(-1), rgb.min(-1); d = mx - mn
+    h = np.zeros_like(mx); m = d > 1e-5
+    r_, g_, b_ = rgb[..., 0], rgb[..., 1], rgb[..., 2]
+    i = m & (mx == r_); h[i] = ((g_ - b_)[i] / d[i]) % 6
+    i = m & (mx == g_); h[i] = (b_ - r_)[i] / d[i] + 2
+    i = m & (mx == b_); h[i] = (r_ - g_)[i] / d[i] + 4
+    return h / 6
+
+
+def dye(a, cloth, hair=None, extra=None, cloth_sat=0.28, keep=0.72, head=0.0, value=1.0, hair_rel=0.62, vmax=1.01):
+    a = a.copy()
+    s, v = hsv(a); h = hue_of(a)
+    op = opaque(a); y = rows(a)
+    top = op.any(1).argmax()
+    rel = (y - top) / max(1, op.shape[0] - top)
+    skin = op & (h < 0.11) & (s > 0.18) & (s < 0.62) & (v > 0.5)
+    haircol = op & ~skin & (h > 0.0) & (h < 0.15) & (s > 0.2) & (v < 0.66) & (rel < hair_rel)
+    garment = op & ~skin & ~haircol & (s < cloth_sat) & (rel > head) & (v > 0.06) & (v < vmax)
+    regrade(a, garment, cloth, value, keep)
+    if hair is not None:
+        regrade(a, haircol, hair, 1.0, 0.8)
+    if extra is not None:   # saturated accents (a scarf, a bag): new colour
+        acc = op & ~skin & ~haircol & (s >= cloth_sat) & (rel > 0.2)
+        regrade(a, acc, extra, 1.0, 0.75)
+    return a
+
+
+STUDENTS_G = [('olivia', (60, 82, 140), None, None), ('vikki', (150, 52, 60), (196, 150, 90), None),
+              ('olivia', (190, 140, 60), (130, 60, 36), None), ('vikki', (96, 118, 90), (30, 26, 24), None),
+              ('olivia', (112, 62, 108), None, None), ('vikki', (74, 80, 96), (120, 58, 34), None)]
+for k, (src, cloth, hair, extra) in enumerate(STUDENTS_G):
+    for n in ['idle', 'idle_walk1', 'idle_walk2']:
+        frames[f'stu_g{k}_{n}'] = dye(frames[f'{src}_{n}'], cloth, hair, extra)
+STUDENTS_B = [('npc_glasses_side', (54, 66, 100)), ('npc_vest_side', (140, 40, 44)), ('npc_glasses_side', (96, 104, 84)), ('npc_vest_side', (60, 90, 120))]
+for k, (src, cloth) in enumerate(STUDENTS_B):
+    for n in ['', '_walk1', '_walk2']:
+        frames[f'stu_b{k}{n}'] = dye(frames[f'{src}{n}'], cloth, (38, 30, 26) if k % 2 else None, None, cloth_sat=0.5, keep=0.8, head=0.17, hair_rel=0.17, vmax=0.72)
+
 # simple shelf packing, 2px padding
 PAD = 2
 order = sorted(frames, key=lambda n: -frames[n].shape[0])

@@ -8,6 +8,8 @@ import { StreetScene } from './StreetScene.js';
 import { ForestScene } from './ForestScene.js';
 import { SchoolScene } from './SchoolScene.js';
 import { CaveScene } from './CaveScene.js';
+import { CafeteriaScene } from './CafeteriaScene.js';
+import { ApartmentScene, ApartmentBedroomScene, ApartmentAtticScene } from './ApartmentScene.js';
 
 /**
  * Scene registry: each entry pairs a 3D world builder with its story script.
@@ -27,4 +29,8 @@ export const LOCATIONS = {
   forest: ForestScene,
   school: SchoolScene,
   cave: CaveScene,
+  cafeteria: CafeteriaScene,
+  apartment: ApartmentScene,
+  apt_bedroom: ApartmentBedroomScene,
+  apt_attic: ApartmentAtticScene,
 };

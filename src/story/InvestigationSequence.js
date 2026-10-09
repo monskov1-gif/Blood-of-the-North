@@ -435,8 +435,8 @@ const methods = {
     const S = this.session;
     if (!g.state.get('lizzie_chapter_3_complete') && !(await this.playLizzie(3))) return;
     if (S !== this.session) return;
-    if (g.state.get('investigation_route') === 'WEREWOLF') return this.startForest();
-    return this.vampireChain();
+    // the morning at home, then his own investigation by route
+    return this.startHome(2);
   },
 
   /** Route VAMPIRE: Julian goes after the man from the bar (his chapters 8 and 10 are still in development). */

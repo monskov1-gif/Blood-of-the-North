@@ -514,10 +514,10 @@ const TITLE_PLACES = {
   hospital_return: { id: 'hospital', state: 'night', x: 18 }, recovery: { id: 'hospital', state: 'day', x: 18 },
   street: { id: 'street' },
   station_return: { id: 'station' }, forest: { id: 'forest', state: 'day' }, forest_night: { id: 'forest', state: 'night' },
-  lizzie_1: { id: 'school' }, lizzie_2: { id: 'forest', state: 'l2' }, lizzie_3: { id: 'cave', state: 'L3' }, lizzie_4: { id: 'cave', state: 'L4' }, lizzie_5: { id: 'cave', state: 'L5' },
+  lizzie_1: { id: 'school' }, home_1: { id: 'apartment', state: 'night' }, home_2: { id: 'apartment', state: 'day' }, lizzie_2: { id: 'forest', state: 'l2' }, lizzie_3: { id: 'cave', state: 'L3' }, lizzie_4: { id: 'cave', state: 'L4' }, lizzie_5: { id: 'cave', state: 'L5' },
 };
 
-const INTERACTIVE_STAGES = new Set(['explore', 'morning', 'car', 'station', 'interrogation', 'hospital_day', 'hospital_night', 'hospital_return', 'station_return', 'forest', 'forest_night', 'lizzie_1', 'lizzie_2', 'lizzie_3', 'lizzie_4', 'lizzie_5']);
+const INTERACTIVE_STAGES = new Set(['explore', 'morning', 'car', 'station', 'interrogation', 'hospital_day', 'hospital_night', 'hospital_return', 'station_return', 'forest', 'forest_night', 'lizzie_1', 'lizzie_2', 'lizzie_3', 'lizzie_4', 'lizzie_5', 'home_1', 'home_2']);
 
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 
