@@ -126,11 +126,14 @@ export class StreetScene extends LocationBase {
 
   B(w, h, d, mat, x, y, z, parent = this.root, tile = 0.64) {
     const m = this.box(w, h, d, mat, x, y, z, parent);
-    const uv = m.geometry.attributes.uv;
-    const dims = [[d, h], [d, h], [w, d], [w, d], [w, h], [w, h]];
-    for (let f = 0; f < 6; f++) for (let k = 0; k < 4; k++) {
-      const i = f * 4 + k;
-      uv.setXY(i, uv.getX(i) * dims[f][0] / tile, uv.getY(i) * dims[f][1] / tile);
+    const params = m.geometry.parameters;
+    m.geometry = m.geometry.clone(); m.geometry.parameters = params;   // box() geometry is shared: never edit it in place
+    const p = m.geometry.attributes.position, n = m.geometry.attributes.normal, uv = m.geometry.attributes.uv;
+    for (let i = 0; i < p.count; i++) {                  // tile the texture by size, projected along each face
+      const ax = Math.abs(n.getX(i)), ay = Math.abs(n.getY(i)), az = Math.abs(n.getZ(i));
+      if (ax >= ay && ax >= az) uv.setXY(i, p.getZ(i) / tile, p.getY(i) / tile);
+      else if (ay >= az) uv.setXY(i, p.getX(i) / tile, p.getZ(i) / tile);
+      else uv.setXY(i, p.getX(i) / tile, p.getY(i) / tile);
     }
     return m;
   }

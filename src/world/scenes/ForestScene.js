@@ -455,7 +455,8 @@ export class ForestScene extends LocationBase {
     this.root.add(this.groundAutumn);
     // the trail: a packed strip along the walk lane
     const pt = pathTex().clone(); pt.needsUpdate = true; pt.wrapS = pt.wrapT = THREE.RepeatWrapping; pt.repeat.set(60 / 1.28, 1);
-    const path = new THREE.Mesh(new THREE.PlaneGeometry(60, 1.5), this.mat('forestPath', { map: pt, color: 0xffffff, roughness: 0.9, transparent: true, opacity: 0.7 }));
+    const pathAlpha = canvasTexture('forest-pathalpha', 4, 64, (ctx, w, h) => { const g = ctx.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#000'); g.addColorStop(0.3, '#fff'); g.addColorStop(0.7, '#fff'); g.addColorStop(1, '#000'); ctx.fillStyle = g; ctx.fillRect(0, 0, w, h); }, { color: false });
+    const path = new THREE.Mesh(new THREE.PlaneGeometry(60, 1.9), this.mat('forestPath', { map: pt, alphaMap: pathAlpha, color: 0xffffff, roughness: 0.9, transparent: true, opacity: 0.7, depthWrite: false }));
     path.rotation.x = -Math.PI / 2; path.position.set(16, 0.008, 0.2); this.root.add(path);
     this.pathMesh = path;
     this.pathSnowTex = pt;
@@ -487,6 +488,18 @@ export class ForestScene extends LocationBase {
       m.compose(new THREE.Vector3(x, this.groundH(x, z) - 0.03, z), q, new THREE.Vector3(sc, sc * (0.7 + r() * 0.6), 1)); ugm.setMatrixAt(i, m);
     }
     this.undergrowth = ugm; ugm.visible = false;
+    const blade = new THREE.PlaneGeometry(0.03, 0.5, 1, 3); blade.translate(0, 0.25, 0);
+    { const bp = blade.attributes.position; for (let i = 0; i < bp.count; i++) { const y = bp.getY(i); bp.setX(i, bp.getX(i) * (1 - y * 1.8) + y * y * 0.5); } }
+    const gm = new THREE.InstancedMesh(blade, this.mat('dryGrassMass', { color: 0xb09a62, roughness: 1, side: THREE.DoubleSide }), 2600);
+    const gc = new THREE.Color();
+    for (let i = 0; i < 2600; i++) {
+      const cx = -16 + (Math.floor(i / 20) * 0.53) % 64, cz = Math.floor(i / 20) % 2 ? -2.6 - r() * 2.4 : 1.9 + r() * 1.4;
+      const x = cx + (r() - 0.5) * 0.9, z = cz + (r() - 0.5) * 0.5;
+      q.setFromEuler(e.set(0, r() * 6, (r() - 0.5) * 0.9));
+      m.compose(new THREE.Vector3(x, this.groundH(x, z) - 0.03, z), q, new THREE.Vector3(1, 0.5 + r() * 0.9, 1)); gm.setMatrixAt(i, m);
+      gm.setColorAt(i, gc.setRGB(0.75 + r() * 0.3, 0.7 + r() * 0.25, 0.5 + r() * 0.2));
+    }
+    this.grassMass = gm; gm.visible = false; this.root.add(gm);
     this.root.add(ugm);
     // dead grass poking through: thin bent blades in tufts
     const grass = this.mat('deadGrass', { color: 0x9a8458, roughness: 1, side: THREE.DoubleSide });
@@ -556,7 +569,7 @@ export class ForestScene extends LocationBase {
         const f = new THREE.Mesh(fg, this.mat('floe', { vertexColors: true, color: 0xffffff, roughness: 0.4 }));
         f.scale.set(0.3 + r() * 0.5, 0.06, 0.2 + r() * 0.35); f.rotation.y = r() * 3;
         f.position.set(-18 + r() * 60, -0.39, zEdge + dir * (1.6 + r() * 0.8));
-        this.root.add(f);
+        this.root.add(f); (this.floes ||= []).push(f);
       }
     };
     shelf(-6.0, -1, 601);
@@ -622,7 +635,7 @@ export class ForestScene extends LocationBase {
       if (k < 0.08) near.push({ x, z, s: 0.8 + r() * 0.3, kind: 'tall', snag: true, y: this.groundH(x, z) });
       else if (k < 0.5) near.push({ x, z, s: 0.95 + r() * 0.3, kind: 'tall', y: this.groundH(x, z) });
       else if (k < 0.78) near.push({ x, z: z - 0.4, s: 0.55 + r() * 0.35, kind: 'young', y: this.groundH(x, z - 0.4) });
-      else this.bare(x, z, 0.95 + r() * 0.3, r() < 0.5 ? 1 : 2);
+      else if (r() < 0.35) this.bare(x, z, 0.95 + r() * 0.3, r() < 0.5 ? 1 : 2);
     }
     // the near bank right at the water
     for (let x = -20; x < 48; x += 1.2 + r() * 1.6) {
@@ -640,9 +653,9 @@ export class ForestScene extends LocationBase {
         far.push({ x: x + r() * 0.5, z, s: 0.75 + r() * 0.55, kind: r() < 0.6 ? 'tall' : 'young', y: this.groundH(x, z) });
       }
     }
-    const stand = (list, variant, tint) => { const g = spruceStand(list, { low: this.low, snow: 1, variant, tint }); this.root.add(g); this.stands.push(g); return g; };
+    const stand = (list, variant, tint, bark = 'spruce') => { const g = spruceStand(list, { low: this.low, snow: 1, variant, tint, bark }); this.root.add(g); this.stands.push(g); return g; };
     this.stands = [];
-    stand(near, 0, 0xffffff);
+    stand(near, 0, 0xffffff, 'mossy');
     stand(bankTrees, 1, 0xf0f0f0);
     stand(far, 2, 0xe4e8ec);
     // undergrowth: small snow-buried spruces and fallen logs along the lane
@@ -748,7 +761,8 @@ export class ForestScene extends LocationBase {
       const c = new THREE.Mesh(dg, dm); c.position.set(x, 0, z); c.scale.x = i % 2 ? -1 : 1; g.add(c);
       const pool = new THREE.Mesh(new THREE.CircleGeometry(0.55, 20), this.mat('carcBlood', { color: 0x3a0e0a, roughness: 0.7, transparent: true, opacity: 0.7, depthWrite: false }));
       pool.rotation.x = -Math.PI / 2; pool.scale.set(1.5, 0.7, 1); pool.position.set(x, 0.012, z + 0.1); g.add(pool);
-      for (let k = 0; k < 4; k++) { const rib = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.015, 3, 8, Math.PI), bone); rib.position.set(x - 0.2 + k * 0.08, 0.2, z); rib.rotation.y = Math.PI / 2; g.add(rib); }
+      const ribM = this.mat('ribDull', { color: 0x8a6a5a, roughness: 0.8 });
+      for (let k = 0; k < 3; k++) { const rib = new THREE.Mesh(new THREE.TorusGeometry(0.14, 0.012, 6, 16, Math.PI), ribM); rib.position.set(x - 0.2 + k * 0.08, 0.2, z); rib.rotation.y = Math.PI / 2; g.add(rib); }
     }
     for (let i = 0; i < 6; i++) {
       const m = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.32), new THREE.MeshLambertMaterial({ map: ravenTex(0), transparent: true, alphaTest: 0.5 }));
@@ -768,12 +782,14 @@ export class ForestScene extends LocationBase {
   /** A deer / hare at (x, z); `pose` swaps its sprite. Returned so the story can move it. */
   critter(kind, x, z, coat = 0) {
     const tex = kind === 'deer' ? deerTex('stand', coat) : hareTex(coat % 2);
-    const mat = new THREE.MeshLambertMaterial({ map: tex, transparent: true, alphaTest: 0.5, emissive: 0x2a2620 });
+    const mat = new THREE.MeshLambertMaterial({ map: tex, transparent: true, alphaTest: 0.5, emissive: this.state === 'l2' || this.state === 'night' ? 0x0a0a0e : 0x2a2620 });
     const geo = kind === 'deer' ? new THREE.PlaneGeometry(1.6, 1.2) : new THREE.PlaneGeometry(0.42, 0.21);
     geo.translate(0, kind === 'deer' ? 0.6 : 0.1, 0);
     const m = new THREE.Mesh(geo, mat);
     m.position.set(x, 0, z);
     m.userData = { kind, coat, pose: 'stand', setPose: (p) => { if (kind !== 'deer') return; m.userData.pose = p; mat.map = deerTex(p, coat); mat.needsUpdate = true; } };
+    const sh = new THREE.Mesh(new THREE.CircleGeometry(kind === 'deer' ? 0.55 : 0.18, 20), new THREE.MeshBasicMaterial({ map: glowTexture(), color: 0x000000, transparent: true, opacity: 0.55, depthWrite: false }));
+    sh.rotation.x = -Math.PI / 2; sh.scale.set(1, 0.35, 1); sh.position.set(0, 0.015, 0.05); m.add(sh);
     this.herd.add(m);
     this.critters.push(m);
     return m;
@@ -786,7 +802,7 @@ export class ForestScene extends LocationBase {
   buildClearing() {
     // a snow-covered rock outcrop Julian crouches behind (only his head and shoulders show)
     for (const [x, y, z, sx, sy, sz, ry] of [[16.75, 0.0, -0.85, 0.85, 0.75, 0.65, 0.4], [17.75, 0.0, -0.8, 0.95, 0.95, 0.7, 1.1], [18.7, 0.0, -0.9, 0.8, 0.66, 0.62, 2.0], [17.3, 0.0, -0.45, 0.55, 0.36, 0.42, 0.7], [18.3, 0.0, -0.5, 0.48, 0.3, 0.4, 2.6]]) {
-      const geo = rockGeometry(Math.round(x * 10), { detail: 4, rough: 0.3, flat: -0.05, snow: 0.6, sharp: 0.6, colA: 0x6e6a66, colB: 0x55524e });
+      const geo = rockGeometry(Math.round(x * 10), { detail: 4, rough: 0.3, flat: -0.05, snow: 0.6, sharp: 0.6, colA: 0x8e8a84, colB: 0x6e6a66, strata: 0.3 });
       const b = new THREE.Mesh(geo, this.rockMat); b.position.set(x, y, z); b.scale.set(sx, sy, sz); b.rotation.y = ry; this.root.add(b);
     }
     this.colliders.push({ x: 16.7, z: -0.75, r: 0.6 }, { x: 17.75, z: -0.7, r: 0.6 }, { x: 18.75, z: -0.8, r: 0.6 });
@@ -950,7 +966,8 @@ export class ForestScene extends LocationBase {
     this.banks.forEach((b) => { b.material.color.set(dark ? 0x46567a : grey ? 0xa4aab0 : 0xe4e8ee); b.material.opacity = dark ? 0.28 : 0.4; });
     this.lowFog.forEach((b) => { b.material.color.set(dark ? 0x3e4c66 : grey ? 0x9aa0a6 : 0xe8ecf0); b.material.opacity = dark ? 0.22 : grey ? 0.26 : 0.3; });
     // the ground follows the grade of the hour (the dusk is blue, not olive)
-    this.groundAutumn.material.color.set(name === 'l2' ? 0x8a96b4 : 0xffffff);
+    this.groundAutumn.material.color.set(name === 'l2' ? 0xa8b4cc : 0xffffff);
+    if (name === 'l2') L.key.intensity = 5.5;
     this.undergrowth.material.color.set(name === 'l2' ? 0x8a96b4 : 0xffffff);
     // November (l1, l2): no snow on the ground or the branches yet
     const snowy = !nov;
@@ -962,7 +979,9 @@ export class ForestScene extends LocationBase {
     this.undergrowth.visible = !snowy;
     this.pathMesh.material.map = snowy ? this.pathSnowTex : this.pathAutTex; this.pathMesh.material.needsUpdate = true;
     this.pathMesh.material.opacity = snowy ? 0.7 : 0.85;
-    this.iceMat.color.set(snowy ? 0xffffff : 0x5e6a74);            // November: thin dark ice, not snow
+    this.iceMat.color.set(snowy ? 0xffffff : 0x3e4852);            // November: thin dark ice, not snow
+    for (const f of this.floes || []) f.visible = snowy;
+    this.grassMass.visible = !snowy;
     this.snow.points.visible = name !== 'l1';
     this.moon.visible = this.moonGlow.visible = dark;
     this.sunDisc.visible = golden;

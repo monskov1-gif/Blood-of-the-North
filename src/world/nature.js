@@ -303,11 +303,12 @@ export function spruceStand(trees, { low = false, snow = 1, variant = 0, tint = 
     for (let k = 0; k < tiers; k++) {
       const f = k / tiers;
       const y = crownBase + (H - crownBase) * f;
-      const width = R * 2 * Math.pow(1 - f, 0.92) * (0.85 + r() * 0.3) + 0.25 * s;
+      if (t.kind === 'young' && k > 1 && r() < 0.18) continue;          // a missing whorl: young spruces are ragged
+      const width = R * 2 * Math.pow(1 - f, 0.92) * (t.kind === 'young' ? 0.65 + r() * 0.7 : 0.85 + r() * 0.3) + 0.25 * s;
       const height = width * (0.42 + r() * 0.12);
             // two cards turned towards the camera (never edge-on), a narrower one across for depth
       const shade = 0.82 + r() * 0.3 - (1 - f) * 0.08;
-      for (const [yaw, ww] of [[-0.45 + (r() - 0.5) * 0.3, 1], [0.45 + (r() - 0.5) * 0.3, 0.92], [Math.PI / 2 + (r() - 0.5) * 0.4, 0.7]]) cards.push({ x: t.x, y: (t.y || 0) + y + height * 0.9, z: t.z, yaw, w: width * ww, h: height, shade });
+      for (const [yaw, ww] of [[-0.45 + (r() - 0.5) * 0.3, 1], [0.45 + (r() - 0.5) * 0.3, 0.92], [Math.PI / 2 + (r() - 0.5) * 0.4, 0.7]]) cards.push({ x: t.x + (t.kind === 'young' ? (r() - 0.5) * 0.12 * s : 0), y: (t.y || 0) + y + height * 0.9, z: t.z, yaw, w: width * ww, h: height, shade });
     }
     // the leader
     cards.push({ x: t.x, y: (t.y || 0) + H + 0.4 * s, z: t.z, yaw: r() * 3, w: 0.35 * s, h: 0.6 * s, shade: 1 });

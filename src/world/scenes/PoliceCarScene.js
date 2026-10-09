@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { flareSource } from '../../fx/WindowLight.js';
-import { bevelBox, spruceStand } from '../nature.js';
+import { bevelBox, spruceStand, roundedBox } from '../nature.js';
 import { LocationBase } from '../LocationBase.js';
 import { canvasTexture, rng, glowTexture } from '../../render/textures.js';
 import { glow, lightPool } from '../props.js';
@@ -371,11 +371,14 @@ export class PoliceCarScene extends LocationBase {
   /** Box with UVs scaled to its size, so pixel textures keep ~1 cm texels. */
   B(w, h, d, mat, x, y, z, parent = this.root, tile = 0.32) {
     const m = this.box(w, h, d, mat, x, y, z, parent);
-    const uv = m.geometry.attributes.uv;
-    const dims = [[d, h], [d, h], [w, d], [w, d], [w, h], [w, h]];
-    for (let f = 0; f < 6; f++) for (let k = 0; k < 4; k++) {
-      const i = f * 4 + k;
-      uv.setXY(i, uv.getX(i) * dims[f][0] / tile, uv.getY(i) * dims[f][1] / tile);
+    const params = m.geometry.parameters;
+    m.geometry = m.geometry.clone(); m.geometry.parameters = params;   // box() geometry is shared: never edit it in place
+    const p = m.geometry.attributes.position, n = m.geometry.attributes.normal, uv = m.geometry.attributes.uv;
+    for (let i = 0; i < p.count; i++) {                  // tile the texture by size, projected along each face
+      const ax = Math.abs(n.getX(i)), ay = Math.abs(n.getY(i)), az = Math.abs(n.getZ(i));
+      if (ax >= ay && ax >= az) uv.setXY(i, p.getZ(i) / tile, p.getY(i) / tile);
+      else if (ay >= az) uv.setXY(i, p.getX(i) / tile, p.getZ(i) / tile);
+      else uv.setXY(i, p.getX(i) / tile, p.getY(i) / tile);
     }
     return m;
   }
@@ -448,12 +451,16 @@ export class PoliceCarScene extends LocationBase {
       // livery: a thin yellow over blue band along the body side (RCMP-ish), dim in the dawn
       for (let x = 0; x < w; x++) { ctx.fillStyle = 'rgb(92,78,30)'; ctx.fillRect(x, Math.round(h * 0.36), 1, 1); ctx.fillStyle = 'rgb(28,40,82)'; ctx.fillRect(x, Math.round(h * 0.36) + 1, 1, 2); }
     }, { nearest: true, aniso: 1 });
-    const mat = new THREE.MeshBasicMaterial({ map: paint }); mat.userData.noLightingState = true;
-    const sec = new THREE.Mesh(new THREE.ShapeGeometry(shape, 8), mat);
-    // ShapeGeometry UVs are world x/y: map the car's extent onto the texture
+    // the body panel has thickness and rounded edges: the shoulder, roof and hood catch the street light
+    const mat = new THREE.MeshLambertMaterial({ map: paint, emissive: 0xffffff, emissiveMap: paint, emissiveIntensity: 0.75 });
+    mat.userData.noLightingState = true;
+    const geo = new THREE.ExtrudeGeometry(shape, { depth: 0.05, bevelEnabled: true, bevelThickness: 0.05, bevelSize: 0.045, bevelSegments: 4, curveSegments: 10 });
+    // Extrude UVs are world x/y on the caps: map the car's extent onto the texture
     paint.repeat.set(1 / 4.9, 1 / 2.2); paint.offset.set(2.45 / 4.9, 0.4 / 2.2);
-    sec.position.z = 0.36; sec.renderOrder = 2;
+    const sec = new THREE.Mesh(geo, mat);
+    sec.position.z = 0.31; sec.renderOrder = 2;
     this.root.add(sec);
+    this.buildBodyDetail();
     // the paint edge catches a little street light: a faint line on the roof and hood
     const rim = new THREE.Line(new THREE.BufferGeometry().setFromPoints(BODY_TOP.map(([x, y]) => new THREE.Vector3(x, y, 0.37))),
       new THREE.LineBasicMaterial({ color: 0x6a7c92 }));
@@ -465,7 +472,15 @@ export class PoliceCarScene extends LocationBase {
     }
     // roof light bar: housing with its top face catching the sky, red and blue lenses (off), feet
     const barM = new THREE.MeshBasicMaterial({ color: 0x1e2128 });
-    const bar = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.09), barM); bar.position.set(-0.24, 1.74, 0.37); this.root.add(bar);
+    const housing = new THREE.Mesh(roundedBox(0.94, 0.07, 0.3, 0.03), new THREE.MeshLambertMaterial({ color: 0x2a2e36, emissive: 0x0e1014 }));
+    housing.position.set(-0.24, 1.73, 0.2); this.root.add(housing);
+    const chrome = new THREE.Mesh(roundedBox(0.98, 0.02, 0.32, 0.008), new THREE.MeshLambertMaterial({ color: 0x8a96a4, emissive: 0x30363e }));
+    chrome.position.set(-0.24, 1.69, 0.2); this.root.add(chrome);
+    for (const [x, c] of [[-0.48, 0x5a1414], [0.0, 0x14204a]]) {
+      const dome = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.34, 20, 1, false, 0, Math.PI), new THREE.MeshLambertMaterial({ color: c, emissive: c, emissiveIntensity: 0.5, transparent: true, opacity: 0.9 }));
+      dome.rotation.z = Math.PI / 2; dome.position.set(x, 1.765, 0.2); this.root.add(dome);
+    }
+    const bar = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.09), barM); bar.position.set(-0.24, 1.74, 0.37); bar.visible = false; this.root.add(bar);
     const top = new THREE.Mesh(new THREE.PlaneGeometry(0.88, 0.015), new THREE.MeshBasicMaterial({ color: 0x5a6676 })); top.position.set(-0.24, 1.787, 0.372); this.root.add(top);
     for (const [x, c, hi] of [[-0.48, 0x3a1212, 0x7a3030], [0.0, 0x10183a, 0x34509a]]) {
       const lens = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.055), new THREE.MeshBasicMaterial({ color: c }));
@@ -479,6 +494,13 @@ export class PoliceCarScene extends LocationBase {
     const capM = new THREE.MeshBasicMaterial({ color: 0x3a4047 }), capHi = new THREE.MeshBasicMaterial({ color: 0x565e68 }), lugM = new THREE.MeshBasicMaterial({ color: 0x24272c });
     for (const [x, y] of WHEELS) {
       const w = new THREE.Group();
+      // a tyre with a bulging sidewall, a dished steel rim with five spokes, lug nuts and a centre cap
+      const tyreL = new THREE.MeshLambertMaterial({ color: 0x2a2c30, emissive: 0x101114 });
+      const t3 = new THREE.Mesh(new THREE.TorusGeometry(WHEEL_R * 0.8, WHEEL_R * 0.24, 14, 40), tyreL); t3.scale.z = 0.8; w.add(t3);
+      const rimM = new THREE.MeshLambertMaterial({ color: 0x5a626c, emissive: 0x15181c });
+      const rim = new THREE.Mesh(new THREE.LatheGeometry([[0, 0.02], [WHEEL_R * 0.25, 0.02], [WHEEL_R * 0.32, -0.01], [WHEEL_R * 0.55, -0.02], [WHEEL_R * 0.6, 0.02]].map(([a, b]) => new THREE.Vector2(a, b)), 32), rimM);
+      rim.rotation.x = Math.PI / 2; rim.position.z = 0.02; w.add(rim);
+      for (let k = 0; k < 5; k++) { const sp = new THREE.Mesh(bevelBox(WHEEL_R * 0.32, 0.03, 0.02), rimM); const a = (k / 5) * Math.PI * 2; sp.position.set(Math.cos(a) * WHEEL_R * 0.4, Math.sin(a) * WHEEL_R * 0.4, 0.035); sp.rotation.z = a; w.add(sp); }
       w.add(new THREE.Mesh(new THREE.CircleGeometry(WHEEL_R, 28), tyre));
       const sw = new THREE.Mesh(new THREE.RingGeometry(WHEEL_R * 0.62, WHEEL_R * 0.7, 28), wall); sw.position.z = 0.001; w.add(sw);
       const cap = new THREE.Mesh(new THREE.CircleGeometry(WHEEL_R * 0.56, 24), capM); cap.position.z = 0.002; w.add(cap);
@@ -488,10 +510,36 @@ export class PoliceCarScene extends LocationBase {
         const lug = new THREE.Mesh(new THREE.CircleGeometry(0.014, 6), lugM); lug.position.set(Math.cos(a) * WHEEL_R * 0.24, Math.sin(a) * WHEEL_R * 0.24, 0.004); w.add(lug);
       }
       const hub = new THREE.Mesh(new THREE.CircleGeometry(0.03, 10), lugM); hub.position.z = 0.004; w.add(hub);
-      w.position.set(x, y, 0.365); w.renderOrder = 2;
+      w.position.set(x, y, 0.33); w.renderOrder = 2;
+      const arch = new THREE.Mesh(new THREE.TorusGeometry(WHEEL_R * 1.12, 0.03, 8, 32, Math.PI), new THREE.MeshLambertMaterial({ color: 0x0c0d10 })); arch.position.set(x, y, 0.39); this.root.add(arch);
       this.root.add(w);
       this.wheels.push(w);
     }
+  }
+
+  /** Handles, mirror, bumpers, lamps, sill, antenna: the things that make the section read as a car. */
+  buildBodyDetail() {
+    const L = (c, e = 0) => new THREE.MeshLambertMaterial({ color: c, emissive: e });
+    const add = (geo, m, x, y, z, rz = 0) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.rotation.z = rz; o.renderOrder = 3; this.root.add(o); return o; };
+    const chrome = L(0x9aa4b0, 0x2a3038), plast = L(0x121316, 0x050506);
+    // door handles (rear door, front door)
+    for (const x of [-0.62, 0.44]) add(roundedBox(0.16, 0.035, 0.03, 0.012), chrome, x, 0.27, 0.43);   // under the cut, on the door skin
+    // side mirror on the A pillar
+    add(roundedBox(0.18, 0.11, 0.06, 0.03), plast, 0.98, 1.06, 0.44, -0.15);
+    add(roundedBox(0.06, 0.03, 0.03, 0.01), plast, 0.9, 1.02, 0.42);
+    // bumpers wrapping the ends, a rubber strip on each
+    add(roundedBox(0.26, 0.2, 0.12, 0.05), plast, 2.3, 0.18, 0.4);
+    add(roundedBox(0.26, 0.2, 0.12, 0.05), plast, -2.36, 0.18, 0.4);
+    // headlamp and tail lamp lenses
+    add(roundedBox(0.08, 0.12, 0.05, 0.02), L(0xf0e8c8, 0xb8a878), 2.31, 0.66, 0.42);
+    add(roundedBox(0.08, 0.14, 0.05, 0.02), L(0x8a1010, 0x5a0808), -2.4, 0.66, 0.42);
+    // rocker sill under the doors, wheel-arch lips
+    add(roundedBox(2.0, 0.07, 0.06, 0.025), plast, 0, 0.02, 0.43);
+    // window chrome along the beltline (the top edge of the doors)
+    add(roundedBox(0.95, 0.02, 0.03, 0.008), chrome, -1.88, 0.93, 0.43);                              // beltline trim only on the body,
+    add(roundedBox(1.25, 0.02, 0.03, 0.008), chrome, 1.66, 0.96, 0.43);                               // never across the cabin cut
+    // a whip antenna on the trunk
+    const ant = add(new THREE.CylinderGeometry(0.005, 0.008, 0.6, 8), plast, -2.0, 1.27, 0.2); ant.rotation.z = 0.25;
   }
 
   /** Black all around the body, open only where the side windows are. */
@@ -580,10 +628,10 @@ export class PoliceCarScene extends LocationBase {
     this.B(0.05, ROOF_IN - FL, 0.04, this.mat('cageSteel'), -0.33, (ROOF_IN + FL) / 2, 0.18);
     // front seats (driver near, passenger far): low cushions, raked backs, headrests
     for (const z of [-0.36, -1.0]) {
-      this.B(0.46, 0.1, 0.5, seat, 0.06, 0.66, z);
+      { const c = new THREE.Mesh(roundedBox(0.46, 0.12, 0.5, 0.05, 2), seat); c.position.set(0.06, 0.67, z); root.add(c); }
       this.B(0.4, 0.3, 0.44, dark, 0.06, 0.46, z);
       this.slab(-0.15, 0.68, -0.24, 1.2, 0.11, seat, z, 0.5);
-      this.B(0.1, 0.16, 0.26, seat, -0.25, 1.32, z);
+      { const hr = new THREE.Mesh(roundedBox(0.1, 0.17, 0.26, 0.045, 2), seat); hr.position.set(-0.25, 1.32, z); root.add(hr); }
       for (const dz of [-0.06, 0.06]) this.B(0.012, 0.07, 0.012, steel, -0.245, 1.22, z + dz);
     }
     // center console between the front seats: cup holder (coffee), the bottle, radio head

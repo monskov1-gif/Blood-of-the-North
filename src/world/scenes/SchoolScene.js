@@ -97,12 +97,12 @@ const trofferTex = () => TEX('troffer', 64, 128, (ctx, w, h) => {
 });
 
 /** Oak veneer for the classroom doors. */
-const oakTex = () => TEX('oak2', 64, 256, (ctx, w, h) => {
+const oakTex = () => TEX('oak3', 64, 256, (ctx, w, h) => {
   const r = rng(616);
   ctx.fillStyle = '#c08a4a'; ctx.fillRect(0, 0, w, h);
-  for (let i = 0; i < 60; i++) {
-    ctx.strokeStyle = `rgba(${r() < 0.5 ? '120,70,30' : '220,170,110'},${0.15 + r() * 0.25})`; ctx.lineWidth = 1 + r() * 2;
-    const x = r() * w; ctx.beginPath(); ctx.moveTo(x, 0); for (let y = 0; y <= h; y += 16) ctx.lineTo(x + Math.sin(y * 0.03 + i) * 3, y); ctx.stroke();
+  for (let i = 0; i < 140; i++) {
+    ctx.strokeStyle = `rgba(${r() < 0.5 ? '120,70,30' : '220,170,110'},${0.1 + r() * 0.18})`; ctx.lineWidth = 0.5 + r();
+    const x = r() * w; ctx.beginPath(); ctx.moveTo(x, 0); for (let y = 0; y <= h; y += 16) ctx.lineTo(x + Math.sin(y * 0.01 + i) * 0.8, y); ctx.stroke();
   }
 });
 
@@ -171,7 +171,7 @@ export class SchoolScene extends LocationBase {
     this.id = 'school';
     this.title = 'Школа';
     this.background = 0x1a1c20;
-    this.camera = { distance: 7.4, height: 1.65, lookHeight: 1.4, lookZ: -1.0 };
+    this.camera = { distance: 7.0, height: 1.45, lookHeight: 1.45, lookZ: -1.1 };
     this.bounds = { walk: { areas: [{ minX: -9.4, maxX: 9.6, minZ: -2.4, maxZ: 0.9 }] }, camera: { minX: -6.2, maxX: 6.4 } };
   }
 
@@ -227,13 +227,13 @@ export class SchoolScene extends LocationBase {
     }
     // ---- the ceiling: acoustic tiles, recessed fluorescent panels (+ their light)
     const ct = ceilTex().clone(); ct.needsUpdate = true; ct.wrapS = ct.wrapT = THREE.RepeatWrapping; ct.repeat.set(24 / 0.6, 6 / 1.2);
-    const ceil = new THREE.Mesh(new THREE.PlaneGeometry(24, 6), this.mat('schoolCeil3', { map: ct, color: 0xffffff, roughness: 1, emissive: 0x4a463e }));
+    const ceil = new THREE.Mesh(new THREE.PlaneGeometry(24, 6), this.mat('schoolCeil4', { map: ct, color: 0xffffff, roughness: 1, emissive: 0x6c6a64 }));
     ceil.rotation.x = Math.PI / 2; ceil.position.set(0, H, -0.2); root.add(ceil);
-    const panelM = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xfffbea, emissiveIntensity: 1.3, emissiveMap: trofferTex() });
+    const panelM = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xf8fbff, emissiveIntensity: 1.9, emissiveMap: trofferTex() });
     for (const x of [-7.5, -4.5, -1.5, 1.5, 4.5, 7.5]) {
       const p = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 1.2), panelM); p.rotation.x = Math.PI / 2; p.position.set(x, H - 0.005, -1.2); root.add(p);
       if (x === -4.5 || x === 4.5) continue;
-      const l = new THREE.PointLight(0xfff4e0, 5, 8, 1.2); l.position.set(x, H - 0.7, -1.0); root.add(l);
+      const l = new THREE.PointLight(0xf6f8ff, 5, 8, 1.2); l.position.set(x, H - 0.7, -1.0); root.add(l);
     }
     // ---- the cross corridor, running away from the camera (the reference's perspective)
     this.buildCross(tileM, band, cove, ceil.material, panelM);
@@ -267,15 +267,15 @@ export class SchoolScene extends LocationBase {
     }
     // ---- notice board + bench (where the girls meet)
     const board = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 1.4), this.mat('schoolBoard2', { map: boardTex(), color: 0xffffff, roughness: 0.9 }));
-    board.position.set(6.4, 1.6, BACK + 0.04); root.add(board);
+    board.position.set(6.4, 1.82, BACK + 0.04); root.add(board);
     const bframe = this.mat('boardFrame', { color: 0x6a4a2a, roughness: 0.5 });
-    for (const [w, h, x, y] of [[2.32, 0.06, 6.4, 2.33], [2.32, 0.06, 6.4, 0.87], [0.06, 1.46, 5.27, 1.6], [0.06, 1.46, 7.53, 1.6]]) { const m = new THREE.Mesh(roundedBox(w, h, 0.05, 0.015, 1), bframe); m.position.set(x, y, BACK + 0.04); root.add(m); }
+    for (const [w, h, x, y] of [[2.32, 0.06, 6.4, 2.55], [2.32, 0.06, 6.4, 1.09], [0.06, 1.46, 5.27, 1.82], [0.06, 1.46, 7.53, 1.82]]) { const m = new THREE.Mesh(roundedBox(w, h, 0.05, 0.015, 1), bframe); m.position.set(x, y, BACK + 0.04); root.add(m); }
     const yt = this.textSign('F.H. COLLINS · YUKON', { w: 2.4, h: 0.26, bg: '#5a0e0e', fg: '#f2d860', font: 'bold 40px sans-serif' });
     yt.position.set(-1.6, 2.95, BACK + 0.04); root.add(yt);
     this.bench(6.4, BACK + 0.5, 2.2, 0x7a5a3a);
     this.colliders.push({ x: 6.4, z: BACK + 0.5, r: 0.5 });
     // ---- a wall-mounted water fountain, backpacks by the bench
-    const steel = this.mat('fountain2', { color: 0xc8ccd0, metalness: 0.8, roughness: 0.25 });
+    const steel = this.mat('fountain3', { color: 0x8a9096, metalness: 0.8, roughness: 0.25 });
     const bowl = new THREE.Mesh(new THREE.LatheGeometry([[0, 0], [0.2, 0.0], [0.24, 0.05], [0.25, 0.16], [0.24, 0.17], [0.2, 0.08], [0.0, 0.06]].map(([a, b]) => new THREE.Vector2(a, b)), 28), steel);
     bowl.scale.set(1, 1, 0.75); bowl.position.set(4.6, 0.78, BACK + 0.2); root.add(bowl);
     const back = new THREE.Mesh(roundedBox(0.5, 0.42, 0.06, 0.02), steel); back.position.set(4.6, 0.86, BACK + 0.03); root.add(back);
@@ -301,7 +301,7 @@ export class SchoolScene extends LocationBase {
     const pt = tileTex().clone(); pt.needsUpdate = true; pt.wrapS = pt.wrapT = THREE.RepeatWrapping; pt.repeat.set(0.5, H / 1.2);
     const pillar = new THREE.Mesh(roundedBox(0.5, H, 0.5, 0.04), new THREE.MeshStandardMaterial({ map: pt, roughness: 0.3 })); pillar.position.set(-3.0, H / 2, 2.4); fg.add(pillar);
     // ---- light: cool daylight from the window and the door, warm-white panels
-    const hemi = new THREE.HemisphereLight(0xf6f2e8, 0xc8bca8, 1.05);
+    const hemi = new THREE.HemisphereLight(0xf0f4fa, 0xc4bcae, 1.05);
     // a soft key from the front-left so the dark outfits separate from the cork board and the lockers
     const rim = new THREE.DirectionalLight(0xfff0dc, 0.55); rim.position.set(-4, 3, 6); root.add(rim);
     const sun = new THREE.DirectionalLight(0xeef2ff, 0.6); sun.position.set(-4, 4, -6);
@@ -318,7 +318,8 @@ export class SchoolScene extends LocationBase {
   lockers(x0, x1, z, dir = 1) {
     const root = this.root;
     const doorMs = Array.from({ length: 6 }, (_, v) => this.mat(`lockerDoor2-${v}`, { map: lockerTex(v), color: 0xffffff, roughness: 0.32, metalness: 0.35 }));
-    const bodyM = this.mat('lockerBody2', { color: 0x8a1210, roughness: 0.4, metalness: 0.3 });
+    const bodyM = this.mat('lockerBody3', { color: 0x2a0606, roughness: 0.5, metalness: 0.3 });
+    const capM = this.mat('lockerCap', { color: 0x9a1614, roughness: 0.35, metalness: 0.35 });
     const n = Math.floor((x1 - x0) / 0.4);
     const body = new THREE.Mesh(roundedBox(n * 0.4 + 0.04, 1.9, 0.44, 0.02, 1), bodyM);
     body.position.set(x0 + n * 0.2, 0.95 + 0.1, z); root.add(body);
@@ -329,8 +330,9 @@ export class SchoolScene extends LocationBase {
       d.position.set(x0 + 0.2 + i * 0.4, 1.05, z + dir * 0.225); root.add(d);
     }
     const base = this.mat('lockerBase', { color: 0x2a1a14, roughness: 0.6 });
-    this.box(n * 0.4 + 0.06, 0.1, 0.44, base, x0 + n * 0.2, 0.05, z);
-    this.box(n * 0.4 + 0.06, 0.04, 0.48, bodyM, x0 + n * 0.2, 2.02, z);
+    this.box(n * 0.4 + 0.02, 0.1, 0.38, base, x0 + n * 0.2, 0.05, z - 0.03);                 // recessed plinth
+    const cap = new THREE.Mesh(roundedBox(n * 0.4 + 0.06, 0.05, 0.5, 0.015), capM); cap.position.set(x0 + n * 0.2, 2.03, z); cap.rotation.x = -0.12; this.root.add(cap);   // sloped top
+    for (const ex of [x0 - 0.01, x0 + n * 0.4 + 0.01]) { const side = new THREE.Mesh(roundedBox(0.03, 1.92, 0.46, 0.01), capM); side.position.set(ex, 1.06, z); this.root.add(side); }
   }
 
   /** Oak classroom door in a steel frame: a tall narrow window, kick plate, lever handle, number. */
@@ -344,6 +346,7 @@ export class SchoolScene extends LocationBase {
     win.position.set(x + 0.28, 1.5, z + 0.006); root.add(win);
     const kick = new THREE.Mesh(roundedBox(0.94, 0.22, 0.01, 0.004, 1), this.mat('kick', { color: 0xb8bcc0, metalness: 0.8, roughness: 0.3 })); kick.position.set(x, 0.13, z + 0.008); root.add(kick);
     const lever = new THREE.Mesh(roundedBox(0.14, 0.025, 0.025, 0.01, 1), this.mats.cache.get('kick')); lever.position.set(x - 0.36, 1.0, z + 0.05); root.add(lever);
+    for (const hy of [0.3, 1.1, 1.9]) { const hg = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.11, 12), this.mats.cache.get('kick')); hg.position.set(x + 0.5, hy, z + 0.03); root.add(hg); }
     const sign = this.textSign(num, { w: 0.22, h: 0.12, bg: '#2a2a2a', fg: '#f2f2f2', font: 'bold 60px sans-serif' }); sign.position.set(x + 0.68, 1.75, z + 0.02); this.root.add(sign);
   }
 

@@ -94,7 +94,7 @@ function wallHeight(x, y, fine = false) {
     d += (fbm3(x * 4, y * 4, 2, 35, 3) - 0.5) * 0.1;
   }
   d += Math.max(0, 0.9 - y) * 0.7;
-  d += Math.max(0, y - 3.4) * 0.9;
+  d += Math.pow(Math.max(0, y - 2.6), 1.6) * 1.15;                                   // leans over into the vault
   return d;
 }
 
@@ -198,6 +198,8 @@ export class CaveScene extends LocationBase {
       c.lerp(deep, sat(-d * 1.1 - 0.1));                                         // hollows go dark
     };
     const wallOff = (x, y) => wallHeight(x, y);
+    // where the light comes from: torches, fires, the moonlit mouth (x, y, strength)
+    const LIGHTS = [[-6.2, 2.1, 1.0], [5.0, 2.1, 1.0], [11.4, 2.1, 0.9], [16.6, 2.1, 0.9], [-7.6, 0.6, 1.05], [-3.6, 0.6, 0.95], [1.8, 0.6, 0.95], [-11.6, 0.6, 0.9], [-14, 1.5, 0.85], [8.0, 2.2, 0.85], [21.0, 1.5, 1.0]];
     const wallOffOld = (x, y) => {
       let d = (fbm3(x * 0.32, y * 0.32, 0, 23, 4) - 0.5) * 1.5;
       d -= Math.max(0, fbm3(x * 0.7, y * 0.7, 5, 25, 3) - 0.5) * 3.6;            // scallops
@@ -214,7 +216,12 @@ export class CaveScene extends LocationBase {
     };
     void wallOffOld;
     // geometry gives the silhouette and parallax; the baked texture carries the crisp relief
-    const wgeo = reliefSheet(46, 6.4, this.low ? 140 : 200, this.low ? 30 : 44, (x, y) => wallOff(x + 2, y + 3.2), (c, x, y, d) => c.setScalar(1 - sat(-d * 0.5 - 0.2) * 0.5));
+    const wgeo = reliefSheet(46, 6.4, this.low ? 140 : 200, this.low ? 30 : 44, (x, y) => wallOff(x + 2, y + 3.2), (c, x, y, d) => {
+      const wx = x + 2, wy = y + 3.2;
+      let lit = 0.32;
+      for (const [lx, ly, k] of LIGHTS) lit = Math.max(lit, k * Math.exp(-((wx - lx) ** 2) / 18 - ((wy - ly) ** 2) / 10));
+      c.setScalar(Math.min(1.1, lit) * (1 - sat(-d * 0.5 - 0.2) * 0.5));
+    });
     const wallMat = rockMaterial(this.low, { roughness: 0.95 });
     wallMat.map = wallBakedTex(this.low ? 1024 : 1536, this.low ? 144 : 214); wallMat.map.repeat.set(1, 1); wallMat.map.wrapS = wallMat.map.wrapT = THREE.ClampToEdgeWrapping;
     const vaultMat = rockMaterial(this.low, { roughness: 0.95 });
@@ -236,6 +243,18 @@ export class CaveScene extends LocationBase {
     for (let x = -19; x < 23; x += 1.6 + r() * 2.4) {
       if (x > -15.4 && x < -12.6) continue;             // the slab stands free
       this.boulder(800 + Math.round(x * 3), x, BACK + 0.5 + r() * 0.5, 0.6 + r() * 0.9, 0.45 + r() * 0.7, 0.5 + r() * 0.5);
+    }
+    // sand drifted against the foot of the wall (no hard seam)
+    const drift = new THREE.InstancedMesh(rockGeometry(880, { detail: 3, rough: 0.2, flat: -0.05, colA: 0xb89470, colB: 0x9a7a5a, dark: 0.25 }), this.sandMat, 46);
+    { const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
+      for (let i = 0; i < 46; i++) { const x = -20 + i * 0.95 + r() * 0.5; q.setFromEuler(e.set(0, r() * 6, 0)); m.compose(new THREE.Vector3(x, -0.02, BACK + 0.3 + r() * 0.5), q, new THREE.Vector3(0.9 + r() * 0.8, 0.12 + r() * 0.14, 0.5 + r() * 0.3)); drift.setMatrixAt(i, m); } }
+    root.add(drift);
+    // a few flat, half-buried slabs and clustered small boulders between the big ones
+    for (let i = 0; i < 9; i++) {
+      const x = -18 + i * 4.6 + r() * 1.5;
+      if (x > -15.4 && x < -12.6) continue;
+      this.boulder(890 + i, x, BACK + 1.1 + r() * 0.4, 0.5 + r() * 0.4, 0.14 + r() * 0.1, 0.4 + r() * 0.3);
+      this.boulder(895 + i, x + 0.6, BACK + 1.3, 0.22 + r() * 0.15, 0.2 + r() * 0.12, 0.2);
     }
     // grit and pebbles along the foot of the wall and across the floor
     const peb = new THREE.InstancedMesh(rockGeometry(870, { detail: 2, rough: 0.35, flat: -0.3, strata: 0.5, colA: 0x9a7a5a, colB: 0x5a4434, dark: 0.4 }), this.sandMat, 160);
@@ -373,7 +392,9 @@ export class CaveScene extends LocationBase {
     const meat = this.mat('rawMeat', { color: 0x7a2a22, roughness: 0.7, flatShading: true });
     const berry = this.mat('berries', { color: 0x3a2a5a, roughness: 0.6 });
     const can = this.mat('can', { color: 0xa8b0b8, metalness: 0.7, roughness: 0.3 });
-    for (let i = 0; i < 6; i++) this.rock(4.0 + (i % 3) * 0.35, 0.12 + Math.floor(i / 3) * 0.16, -2.7 + (i % 2) * 0.2, 0.22, 0.12, 0.16, meat, g, i);
+    meat.color.set(0x5a1c14);
+    for (let i = 0; i < 6; i++) this.rock(4.0 + (i % 3) * 0.35, 0.1 + Math.floor(i / 3) * 0.14, -2.7 + (i % 2) * 0.2, 0.2, 0.1, 0.14, meat, g, i);
+    for (let i = 0; i < 4; i++) { const b = this.longBone(this.mat('caveBone', { color: 0xcfc4b0, roughness: 0.8 })); b.position.set(4.0 + i * 0.28, 0.24, -2.6 + (i % 2) * 0.15); b.rotation.set(0.3, i, 1.2); g.add(b); }
     for (let i = 0; i < 12; i++) { const b = new THREE.Mesh(new THREE.SphereGeometry(0.04, 14, 10), berry); b.position.set(3.4 + (i % 4) * 0.08, 0.05, -2.2 + Math.floor(i / 4) * 0.08); g.add(b); }
     for (let i = 0; i < 4; i++) { const c = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.12, 16), can); c.position.set(4.9 + i * 0.13, 0.06, -2.1 + (i % 2) * 0.1); if (i === 3) { c.rotation.z = Math.PI / 2; c.position.y = 0.05; } g.add(c); }
     const bucket = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.13, 0.3, 20, 1, true), this.mat('bucket', { color: 0x5a6068, metalness: 0.5, roughness: 0.4, side: THREE.DoubleSide })); bucket.position.set(2.9, 0.15, -2.9); g.add(bucket);
@@ -424,6 +445,7 @@ export class CaveScene extends LocationBase {
     mouthOpen.position.set(21.0, 1.2, BACK + 0.55); g.add(mouthOpen);
     this.boulder(960, 19.8, BACK + 0.9, 0.7, 2.2, 0.6, g, { colA: 0x4a3828, colB: 0x2a1e16 });
     this.boulder(961, 22.3, BACK + 0.9, 0.8, 2.4, 0.6, g, { colA: 0x4a3828, colB: 0x2a1e16 });
+    const lintel = this.boulder(962, 21.0, BACK + 0.8, 1.6, 0.5, 0.6, g, { colA: 0x4a3828, colB: 0x2a1e16 }); lintel.position.y = 2.35;
     const pool = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 2.0), new THREE.MeshBasicMaterial({ map: glowTex(), color: 0x6a88c0, transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending }));
     pool.rotation.x = -Math.PI / 2; pool.position.set(20.6, 0.03, -1.4); g.add(pool);
     const moon = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 2.6), new THREE.MeshBasicMaterial({ map: outsideTex() }));
@@ -437,7 +459,7 @@ export class CaveScene extends LocationBase {
     }
     this.moonLight = new THREE.PointLight(0x8aa0c8, 6, 9, 1.2); this.moonLight.position.set(21.4, 2.2, -0.6); g.add(this.moonLight);
     const snowM = this.mat('caveSnowIn', { color: 0xc8d0dc, roughness: 1 });
-    const sn = new THREE.Mesh(new THREE.CircleGeometry(1.6, 9), snowM); sn.rotation.x = -Math.PI / 2; sn.scale.set(1.4, 0.8, 1); sn.position.set(21.4, 0.01, -0.6); g.add(sn);
+    const sn = new THREE.Mesh(new THREE.PlaneGeometry(3.6, 2.2), new THREE.MeshLambertMaterial({ map: glowTexture(), color: 0xc8d0dc, transparent: true, opacity: 0.8, depthWrite: false })); sn.rotation.x = -Math.PI / 2; sn.position.set(21.4, 0.012, -0.6); g.add(sn); void snowM;
     this.anchors.mouth = new THREE.Vector3(21.6, 1.4, -0.8);
   }
 
@@ -464,13 +486,15 @@ export class CaveScene extends LocationBase {
     const g = new THREE.Group();
     const tube = (pts, r) => new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts.map(([a, b, c]) => new THREE.Vector3(a, b, c))), 16, r, 8), m);
     for (const s of [-1, 1]) {
-      g.add(tube([[s * 0.05, 0, 0], [s * 0.22, 0.12, 0.04], [s * 0.34, 0.36, 0.06], [s * 0.36, 0.66, 0.02], [s * 0.3, 0.86, -0.02]], 0.022));
+      g.add(tube([[s * 0.05, 0, 0], [s * 0.22, 0.12, 0.04], [s * 0.34, 0.36, 0.06], [s * 0.36, 0.66, 0.02], [s * 0.3, 0.86, -0.02]], 0.034));
       for (const [t0, len, lean] of [[0.12, 0.22, 0.4], [0.36, 0.26, 0.2], [0.6, 0.2, 0.1]]) {
         const bx = s * (0.22 + t0 * 0.2), by = 0.12 + t0 * 0.9;
-        g.add(tube([[bx, by, 0.03], [bx + s * 0.04, by + len * 0.5, 0.05], [bx - s * lean * 0.2, by + len, 0.04]], 0.012));
+        g.add(tube([[bx, by, 0.03], [bx + s * 0.04, by + len * 0.5, 0.05], [bx - s * lean * 0.2, by + len, 0.04]], 0.02));
       }
     }
-    const skull = this.skull(0, -0.04, 0.02, m); skull.scale.setScalar(1.1); g.add(skull);
+    const skull = this.skull(0, -0.04, 0.04, m); skull.scale.setScalar(1.5); g.add(skull);
+    const plaque = new THREE.Mesh(roundedBox(0.42, 0.55, 0.05, 0.02), this.mat('plaque', { color: 0x4a3020, roughness: 0.8 })); plaque.position.set(0, 0.0, -0.05); g.add(plaque);
+    const peg = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.12, 12), this.mat('peg', { color: 0x2a1a10 })); peg.rotation.x = Math.PI / 2; peg.position.set(0, 0.22, -0.08); g.add(peg);
     g.position.set(x, y, z);
     return g;
   }
@@ -506,7 +530,7 @@ export class CaveScene extends LocationBase {
     this.bounds.walk.areas = z.walk;
     this.bounds.camera = { ...z.cam };
     const L5 = name === 'L5';
-    this.ritualLight.intensity = L5 ? 9 : 0;
+    this.ritualLight.intensity = L5 ? 12 : 0;
     this.ritualFire.g.visible = L5;
     this.ritualFire.light.intensity = L5 ? this.ritualFire.base : 0;
     for (const f of this.hallFires) { f.g.visible = name !== 'L3'; f.light.intensity = name !== 'L3' ? f.base : 0; }

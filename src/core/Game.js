@@ -233,6 +233,7 @@ export class Game {
       if (!Def) throw new Error(`unknown location ${id}`);
       w = new Def({ renderer: this.renderer, bus: this.bus, quality: this.renderer.quality });
       w.build();
+      sanitizeNormals(w.root);
       w.initSafeZones();
       this.locations.set(id, w);
       this.story.registerSafeZones?.(w);
@@ -519,3 +520,22 @@ const TITLE_PLACES = {
 const INTERACTIVE_STAGES = new Set(['explore', 'morning', 'car', 'station', 'interrogation', 'hospital_day', 'hospital_night', 'hospital_return', 'station_return', 'forest', 'forest_night', 'lizzie_1', 'lizzie_2', 'lizzie_3', 'lizzie_4', 'lizzie_5']);
 
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
+
+/**
+ * A zero-length normal turns into NaN in the lighting shader, and the bloom pass smears one NaN pixel
+ * into a black block over half the screen. Degenerate vertices (lathe poles, collapsed bevels) get a
+ * safe upward normal instead.
+ */
+function sanitizeNormals(root) {
+  root.traverse((o) => {
+    const n = o.geometry?.attributes?.normal;
+    if (!n || o.geometry.userData.normalsOk) return;
+    let fixed = false;
+    for (let i = 0; i < n.count; i++) {
+      const x = n.getX(i), y = n.getY(i), z = n.getZ(i);
+      if (!(Math.hypot(x, y, z) > 1e-6)) { n.setXYZ(i, 0, 1, 0); fixed = true; }
+    }
+    if (fixed) n.needsUpdate = true;
+    o.geometry.userData.normalsOk = true;
+  });
+}
