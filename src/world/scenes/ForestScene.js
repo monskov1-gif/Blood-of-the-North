@@ -500,6 +500,15 @@ export class ForestScene extends LocationBase {
       gm.setColorAt(i, gc.setRGB(0.75 + r() * 0.3, 0.7 + r() * 0.25, 0.5 + r() * 0.2));
     }
     this.grassMass = gm; gm.visible = false; this.root.add(gm);
+    const leafG = new THREE.PlaneGeometry(0.07, 0.05);
+    const leaves = new THREE.InstancedMesh(leafG, this.mat('fallenLeaf', { color: 0xffffff, roughness: 1, side: THREE.DoubleSide }), 900);
+    const lc = [[0.62, 0.42, 0.16], [0.5, 0.26, 0.12], [0.7, 0.55, 0.22], [0.36, 0.3, 0.18]];
+    for (let i = 0; i < 900; i++) {
+      const x = -16 + r() * 64, z = r() < 0.5 ? 1.5 + r() * 2.5 : -2.4 - r() * 2.6;
+      q.setFromEuler(e.set(-Math.PI / 2 + (r() - 0.5) * 0.4, r() * 6, 0)); m.compose(new THREE.Vector3(x, this.groundH(x, z) + 0.01, z), q, new THREE.Vector3(1, 1, 1)); leaves.setMatrixAt(i, m);
+      const c = lc[i % 4]; leaves.setColorAt(i, gc.setRGB(c[0], c[1], c[2]));
+    }
+    this.fallenLeaves = leaves; leaves.visible = false; this.root.add(leaves);
     this.root.add(ugm);
     // dead grass poking through: thin bent blades in tufts
     const grass = this.mat('deadGrass', { color: 0x9a8458, roughness: 1, side: THREE.DoubleSide });
@@ -782,7 +791,8 @@ export class ForestScene extends LocationBase {
   /** A deer / hare at (x, z); `pose` swaps its sprite. Returned so the story can move it. */
   critter(kind, x, z, coat = 0) {
     const tex = kind === 'deer' ? deerTex('stand', coat) : hareTex(coat % 2);
-    const mat = new THREE.MeshLambertMaterial({ map: tex, transparent: true, alphaTest: 0.5, emissive: this.state === 'l2' || this.state === 'night' ? 0x0a0a0e : 0x2a2620 });
+    const dusk = this.state === 'l2' || this.state === 'night';
+    const mat = new THREE.MeshLambertMaterial({ map: tex, transparent: true, alphaTest: 0.5, color: dusk ? 0x9aa0b4 : 0xffffff, emissive: dusk ? 0x0a0a0e : 0x2a2620 });
     const geo = kind === 'deer' ? new THREE.PlaneGeometry(1.6, 1.2) : new THREE.PlaneGeometry(0.42, 0.21);
     geo.translate(0, kind === 'deer' ? 0.6 : 0.1, 0);
     const m = new THREE.Mesh(geo, mat);
@@ -955,7 +965,8 @@ export class ForestScene extends LocationBase {
     this.background = dark ? 0x1a2232 : grey ? 0x8e949a : 0xa8b2bc;
     this.fog.color.set(name === 'l2' ? 0x56647a : dark ? 0x1e2838 : grey ? 0x8a9096 : 0xb4bcc4);
     this.fog.density = dark ? 0.028 : golden ? 0.016 : 0.025;
-    if (dark) this.paintSky([[0, '#0c1222'], [0.45, '#22304e'], [0.6, '#46507a'], [0.68, '#7a6278'], [0.74, '#b07c5e'], [0.8, '#8a6258'], [1, '#3a3446']]);
+    if (name === 'l2') this.paintSky([[0, '#1a1e34'], [0.45, '#3e3c5e'], [0.62, '#6a5a78'], [0.72, '#9a7a72'], [0.8, '#7a6a72'], [1, '#4a4a5e']]);
+    else if (dark) this.paintSky([[0, '#0c1222'], [0.45, '#22304e'], [0.6, '#46507a'], [0.68, '#7a6278'], [0.74, '#b07c5e'], [0.8, '#8a6258'], [1, '#3a3446']]);
     else if (grey) this.paintSky([[0, '#5e6268'], [0.45, '#8a8e94'], [0.8, '#a8acb0'], [1, '#b4b6b8']]);
     else this.paintSky([[0, '#7a8696'], [0.55, '#aab4c0'], [1, '#cdd2d8']]);
     if (this.tapeMat) this.tapeMat.emissive.set(dark ? 0x6a5600 : 0x2a2400);
@@ -964,7 +975,7 @@ export class ForestScene extends LocationBase {
     this.mtn.material.color.set(dark ? 0x5a6884 : grey ? 0x6e7470 : 0xd8e0ea);
     this.far.material.color.set(dark ? 0x283246 : grey ? 0x3a4238 : 0x8e9aa4);
     this.far2.material.color.set(dark ? 0x1c2432 : grey ? 0x2a3228 : 0x6a7680);
-    this.hazes.forEach((h, i) => { h.material.color.set(dark ? 0x3a4a68 : grey ? 0x9aa0a6 : 0xdfe6ee); h.material.opacity = (dark ? [0.35, 0.25, 0.16] : [0.45, 0.35, 0.22])[i]; });
+    this.hazes.forEach((h, i) => { h.material.color.set(name === 'l2' ? 0x6a6a8a : dark ? 0x3a4a68 : grey ? 0x9aa0a6 : 0xdfe6ee); h.material.opacity = (dark ? [0.35, 0.25, 0.16] : [0.45, 0.35, 0.22])[i]; });
     this.banks.forEach((b) => { b.material.color.set(dark ? 0x46567a : grey ? 0xa4aab0 : 0xe4e8ee); b.material.opacity = dark ? 0.28 : 0.4; });
     this.lowFog.forEach((b) => { b.material.color.set(dark ? 0x3e4c66 : grey ? 0x9aa0a6 : 0xe8ecf0); b.material.opacity = dark ? 0.22 : grey ? 0.26 : 0.3; });
     // the ground follows the grade of the hour (the dusk is blue, not olive)
@@ -984,6 +995,7 @@ export class ForestScene extends LocationBase {
     this.iceMat.color.set(snowy ? 0xffffff : 0x3e4852);            // November: thin dark ice, not snow
     for (const f of this.floes || []) f.visible = snowy;
     this.grassMass.visible = !snowy;
+    this.fallenLeaves.visible = !snowy;
     this.snow.points.visible = name !== 'l1';
     this.moon.visible = this.moonGlow.visible = dark;
     this.sunDisc.visible = golden;
@@ -993,7 +1005,7 @@ export class ForestScene extends LocationBase {
     this.snow.speed = name === 'day' ? 0.8 : name === 'l2' ? 0.35 : 0.5;
     this.hares.visible = name === 'night';
     this.caveMist.material.color.set(dark ? 0x6a7a98 : 0x8a96a8);
-    this.steam.forEach((sp) => sp.material.color.set(dark ? 0x6a7a98 : 0xe8eef4));
+    this.steam.forEach((sp) => sp.material.color.set(name === 'l2' ? 0xa8b4cc : dark ? 0x6a7a98 : 0xe8eef4));
   }
 
   update(dt) {
@@ -1017,7 +1029,7 @@ export class ForestScene extends LocationBase {
     const dark = this.state === 'night' || this.state === 'l2';
     for (const sp of this.steam) {
       sp.position.x += sp.userData.vx * dt; if (sp.position.x > 46) sp.position.x = -20;
-      sp.material.opacity = sp.userData.base * (dark ? 1.4 : 1) * (0.75 + 0.25 * Math.sin(this.time * 0.4 + sp.userData.ph));
+      sp.material.opacity = sp.userData.base * (this.state === 'l2' ? 2.4 : dark ? 1.4 : 1) * (0.75 + 0.25 * Math.sin(this.time * 0.4 + sp.userData.ph));
     }
     for (const b of this.banks) { b.position.x += b.userData.vx * dt; if (b.position.x > 60) b.position.x = -24; }
     for (const b of this.lowFog) { b.position.x += b.userData.vx * dt; if (b.position.x > 50) b.position.x = -20; }

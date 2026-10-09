@@ -98,7 +98,7 @@ function wallHeight(x, y, fine = false) {
   let d = (fbm3(x * 0.32, y * 0.32, 0, 23, 4) - 0.5) * 1.5;
   d -= Math.max(0, fbm3(x * 0.7, y * 0.7, 5, 25, 3) - 0.5) * 3.6;                   // scallops
   d -= Math.pow(Math.max(0, fbm3(x * 1.1, y * 1.4, 6, 29, 3) - 0.52), 1.5) * 4.0;      // smaller wind-carved cups
-  const fr = (y * 1.25 + fbm3(x * 0.22, y * 0.3, 4, 22, 3) * 2.6) % 1;              // layers: a long slope, then a softer drop
+  const fr = (((y * 1.25 + x * 0.07 + Math.sin(x * 0.21) * 0.5 + fbm3(x * 0.12, y * 0.2, 4, 22, 3) * 4.2) % 1) + 1) % 1;   // layers bend and dip
   const lay = fr < 0.75 ? fr / 0.75 : (1 - fr) / 0.25;
   d += lay * lay * (3 - 2 * lay) * 0.15;
   if (fine) {
@@ -125,7 +125,7 @@ const wallBakedTex = (W, Hh) => canvasTexture(`cave-wallbake-${W}`, W, Hh, (ctx,
       const nl = Math.hypot(nx, ny, nz); nx /= nl; ny /= nl; nz /= nl;
       const lit = Math.max(0, nx * L[0] + ny * L[1] + nz * L[2]);
       const t = fbm3(x * 0.5, y * 0.5, 3, 21, 3);
-      const band = (y * 1.25 + fbm3(x * 0.22, y * 0.3, 4, 22, 3) * 2.6) % 1;
+      const band = (((y * 1.25 + x * 0.07 + Math.sin(x * 0.21) * 0.5 + fbm3(x * 0.12, y * 0.2, 4, 22, 3) * 4.2) % 1) + 1) % 1;
       const k = Math.max(0, Math.min(1, t * 1.8 - 0.4));
       const shade = (0.3 + 1.0 * lit) * (0.8 + 0.28 * band);
       const hollow = Math.max(0, Math.min(0.8, -hc * 0.55 - 0.2));
@@ -168,8 +168,8 @@ export class CaveScene extends LocationBase {
 
   /** A weathered sandstone boulder (reference: smooth, layered, warm). */
   boulder(seed, x, z, sx, sy, sz, parent = this.root, o = {}) {
-    const b = new THREE.Mesh(rockGeometry(seed, { detail: 4, rough: 0.3, strata: 1, flat: -0.35, colA: 0x9a7654, colB: 0x6e5038, dark: 0.55, ...o }), this.sandMat);
-    b.position.set(x, -0.12 * sy, z); b.scale.set(sx, sy, sz); b.rotation.y = seed * 1.3;
+    const b = new THREE.Mesh(rockGeometry(seed, { detail: 4, rough: 0.46, sharp: 0.45, strata: 1.2, flat: -0.1, colA: 0x9a7654, colB: 0x6e5038, dark: 0.6, ...o }), this.sandMat);
+    b.position.set(x, -0.3 * sy, z); b.scale.set(sx, sy * 0.85, sz); b.rotation.y = seed * 1.3;
     parent.add(b);
     return b;
   }
@@ -340,7 +340,7 @@ export class CaveScene extends LocationBase {
     { const p = sgeo.attributes.position; const col = new Float32Array(p.count * 3); const c = new THREE.Color();
       for (let i = 0; i < p.count; i++) {
         const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
-        const k = (fbm3(x * 2, y * 2, z * 2, 61, 3) - 0.5) * 0.06;
+        const k = (fbm3(x * 2.5, y * 2.5, z * 2.5, 61, 3) - 0.5) * 0.16;
         p.setXYZ(i, x * (1 + k), y + (y > 0.2 ? k * 0.3 : 0), z * (1 + k));
         c.setHex(0x8a7868).lerp(new THREE.Color(0x5a4a40), sat(fbm3(x, y, z, 62, 3) * 1.5 - 0.3));
         if (y > 0.25 && fbm3(x * 1.5, 0, z * 1.5, 63, 3) > 0.52) c.lerp(new THREE.Color(0x3a1410), 0.7);   // old blood soaked into the stone
@@ -471,7 +471,9 @@ export class CaveScene extends LocationBase {
       const sh = new THREE.Mesh(new THREE.PlaneGeometry(1.4 + i * 0.3, 6), new THREE.MeshBasicMaterial({ map: shT, color: 0x9ab0d4, transparent: true, opacity: 0.07, depthWrite: false, blending: THREE.AdditiveBlending }));
       sh.position.set(20.4 - i * 0.55, 1.6, -1.4 + i * 0.2); sh.rotation.z = 1.05 + i * 0.04; g.add(sh);
     }
-    this.moonLight = new THREE.PointLight(0x8aa0c8, 6, 9, 1.2); this.moonLight.position.set(21.4, 2.2, -0.6); g.add(this.moonLight);
+    const moonSpot = new THREE.SpotLight(0x9ab4e0, 18, 16, 0.55, 0.6, 1.2);
+    moonSpot.position.set(22.2, 2.6, -1.6); moonSpot.target.position.set(15.5, 0, -0.4); g.add(moonSpot, moonSpot.target);
+    this.moonLight = new THREE.PointLight(0x8aa0c8, 9, 12, 1.2); this.moonLight.position.set(21.4, 2.2, -0.6); g.add(this.moonLight);
     const snowM = this.mat('caveSnowIn', { color: 0xc8d0dc, roughness: 1 });
     const sn = new THREE.Mesh(new THREE.PlaneGeometry(3.6, 2.2), new THREE.MeshLambertMaterial({ map: glowTexture(), color: 0xc8d0dc, transparent: true, opacity: 0.8, depthWrite: false })); sn.rotation.x = -Math.PI / 2; sn.position.set(21.4, 0.012, -0.6); g.add(sn); void snowM;
     this.anchors.mouth = new THREE.Vector3(21.6, 1.4, -0.8);
