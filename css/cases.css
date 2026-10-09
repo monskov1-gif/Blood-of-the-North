@@ -265,3 +265,9 @@
 .cf-lphone .date { margin-bottom: 3% !important; }
 .cf-lphone .ntf { padding: 3% 5% !important; font-size: calc(var(--f) * 0.8) !important; }
 .cf-lphone .crack { position: absolute; inset: 0; pointer-events: none; }
+.cf-lphone .notes { position: relative; z-index: 2; }
+.cf-lphone .ntf { opacity: 1 !important; animation: none !important; }
+.cf-lphone .ntf img.shot { height: calc(var(--f) * 3.6); width: auto; aspect-ratio: 16 / 9; margin-top: 3%; }
+.cf-lphone .notes { gap: calc(var(--f) * 0.3) !important; }
+.cf-lphone .ntf { line-height: 1.2 !important; }
+.cf-lphone .ntf img.shot { height: calc(var(--f) * 2.7) !important; }
