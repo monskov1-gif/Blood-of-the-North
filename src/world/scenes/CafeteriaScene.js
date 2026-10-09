@@ -343,8 +343,8 @@ const mustangTex = () => T('mustang', 512, 160, (ctx, w, h) => {
   ctx.fillStyle = '#7a1418'; ctx.beginPath(); ctx.arc(22, -26, 4, 0, 7); ctx.fill();
   ctx.fillStyle = '#e8b030'; for (let k = 0; k < 6; k++) { ctx.beginPath(); ctx.moveTo(-22 + k * 4, -36 + k * 14); ctx.lineTo(-48 - k * 3, -30 + k * 16); ctx.lineTo(-24 + k * 4, -26 + k * 14); ctx.fill(); }
   ctx.restore();
-  ctx.fillStyle = '#f2c84a'; ctx.font = 'bold 64px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('GO MUSTANGS!', 300, 70);
-  ctx.fillStyle = '#f4ece0'; ctx.font = 'bold 20px sans-serif'; ctx.fillText('F.H. COLLINS · YUKON TERRITORIAL CHAMPIONS', 300, 122);
+  ctx.fillStyle = '#f2c84a'; ctx.font = 'bold 54px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('GO MUSTANGS!', 330, 70);
+  ctx.fillStyle = '#f4ece0'; ctx.font = 'bold 20px sans-serif'; ctx.fillText('F.H. COLLINS · YUKON CHAMPIONS', 330, 122);
 });
 
 /** Small posters and notices (text + a simple graphic). */
@@ -535,10 +535,10 @@ export class CafeteriaScene extends LocationBase {
     this.anchors.banner = new THREE.Vector3(-0.4, 2.4, BACK + 0.1);
     this.anchors.door = this.doors[0].anchor;
     const seats = [];
-    for (const zc of [-3.35, -5.6]) for (const xc of [-3.4, 3.2]) for (const dx of [-0.85, 0, 0.85]) seats.push({ x: +(xc + dx).toFixed(2), z: +(zc - 0.62).toFixed(2), y: -0.45 });
+    for (const zc of [-3.35, -5.6]) for (const xc of [-3.4, 3.2]) for (const dx of [-0.85, 0, 0.85]) seats.push({ x: +(xc + dx).toFixed(2), z: +(zc - 0.6).toFixed(2), y: -0.35 });
     this.spots = {
       girlsTable: { x: 3.2, z: -2.3 },
-      seatsBehind: seats,                                  // on the far bench; lower the sprite by 0.45 m, the table chassis hides the rest
+      seatsBehind: seats,                                  // on the far bench: set root.position.y = y (−0.35…−0.45); the top + chassis panel hide the legs
       queue: [{ x: 8.5, z: -2.15 }, { x: 7.7, z: -2.12 }, { x: 6.9, z: -2.1 }, { x: 6.1, z: -2.08 }],   // [0] = at the till, facing +x
       walkLanes: [{ z: -0.9, minX: -9.5, maxX: 9.5 }, { z: -4.47, minX: -5.0, maxX: 4.2 }, { z: -6.6, minX: -5.0, maxX: 4.2 }],
     };
@@ -598,6 +598,8 @@ export class CafeteriaScene extends LocationBase {
     // entry wing (doors to the corridor) and serving wing (pass-through to the kitchen)
     this.wall(RX0, HX0, H, BACK, wallM, [{ x0: -9.5, x1: -7.7, y0: 0, y1: 2.38 }]);
     this.wall(HX1, RX1, H, BACK, wallM, [{ x0: 5.5, x1: 8.7, y0: 1.02, y1: 2.12 }]);
+    // red accent panels high on the wing walls (the reference's rhythm)
+    for (const x of [-11.1, -6.5, 5.15, 9.95]) this.box(0.55, 0.8, 0.02, redM, x, 3.15, BACK + 0.012);
     // the hall's side walls (seen in perspective)
     const lw = this.wall(-BACK, -FAR, H, 0, wallM); lw.position.set(HX0, 0, 0); lw.rotation.y = Math.PI / 2;
     const rw = this.wall(FAR, BACK, H, 0, wallM, [{ x0: -8.5, x1: -6.9, y0: 0.95, y1: 2.5 }, { x0: -11.7, x1: -10.1, y0: 0.95, y1: 2.5 }]);
@@ -702,13 +704,13 @@ export class CafeteriaScene extends LocationBase {
     for (const [w, h, x, y] of [[1.96, 0.08, 0, 2.36], [0.08, 2.36, -0.95, 1.18], [0.08, 2.36, 0.95, 1.18], [0.06, 2.32, 0, 1.16], [1.9, 0.2, 0, 0.1]]) {
       const m = new THREE.Mesh(roundedBox(w, h, 0.1, 0.015, 1), fm); m.position.set(x, y, 0); door.add(m);
     }
-    for (const s of [-1, 1]) { const pb = new THREE.Mesh(roundedBox(0.7, 0.05, 0.06, 0.02, 1), this.mat('cafeChrome', { color: 0xe0e4e8, metalness: 1.0, roughness: 0.15 })); pb.position.set(s * 0.48, 1.0, 0.07); door.add(pb); }
+    for (const s of [-1, 1]) { const pb = new THREE.Mesh(roundedBox(0.7, 0.05, 0.06, 0.02, 1), this.mat('cafeChrome', { color: 0xe4e8ec, metalness: 0.55, roughness: 0.22 })); pb.position.set(s * 0.48, 1.0, 0.07); door.add(pb); }
     door.position.set(-3.0, 0, FAR + 0.02); root.add(door);
     const exit = this.textSign('EXIT', { w: 0.42, h: 0.16, bg: '#1a0a0a', fg: '#ff3a2a', font: 'bold 80px sans-serif', emissive: 1.2 });
     exit.position.set(-3.0, 2.58, FAR + 0.04); root.add(exit);
     // the team banner above the windows, red accent panels, the clock above the doors
-    const ban = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 1.06), this.mat('cafeMustang', { map: mustangTex(), color: 0xffffff, roughness: 0.85 }));
-    ban.position.set(2.0, 3.15, FAR + 0.03); root.add(ban);
+    const ban = new THREE.Mesh(new THREE.PlaneGeometry(2.9, 0.9), this.mat('cafeMustang', { map: mustangTex(), color: 0xffffff, roughness: 0.85 }));
+    ban.position.set(2.0, 3.06, FAR + 0.03); root.add(ban);
     for (const x of [-4.6, -1.3]) this.box(0.55, 0.85, 0.02, this.redM, x, 3.15, FAR + 0.012);
     const clock = new THREE.Mesh(new THREE.CircleGeometry(0.2, 28), this.mat('cafeClock', { map: clockTex(), color: 0xffffff, roughness: 0.5 }));
     clock.position.set(-3.0, 3.0, FAR + 0.03); root.add(clock);
@@ -728,7 +730,7 @@ export class CafeteriaScene extends LocationBase {
       const N = 18, mats = [this.mat('cafePenA', { color: 0x8a1a1c, roughness: 0.8, side: THREE.DoubleSide }), this.mat('cafePenB', { color: 0xe8b838, roughness: 0.8, side: THREE.DoubleSide })];
       const pts = [];
       for (let i = 0; i <= N; i++) {
-        const t = i / N, x = HX0 + (HX1 - HX0) * t, y = 3.42 - Math.sin(t * Math.PI) * 0.32;
+        const t = i / N, x = HX0 + (HX1 - HX0) * t, y = 3.62 - Math.sin(t * Math.PI) * (col ? 0.12 : 0.3);
         pts.push(new THREE.Vector3(x, y, zz));
         if (i > 0 && i < N) { const p = new THREE.Mesh(penGeo, mats[(i + col) % 2]); p.position.set(x, y, zz); p.rotation.y = 0.15 * Math.sin(i * 1.7); root.add(p); }
       }
@@ -762,7 +764,7 @@ export class CafeteriaScene extends LocationBase {
     for (const [kind, x, col] of [['drink', -6.98, 0xffb8b0], ['snack', -6.08, 0xd8e4ff]]) {
       const body = this.mat(`cafeVend-${kind}`, { color: kind === 'drink' ? 0xa81a1a : 0x1e2a44, roughness: 0.4, metalness: 0.3 });
       const v = new THREE.Mesh(roundedBox(0.86, 1.84, 0.8, 0.03, 2), body); v.position.set(x, 0.92 + 0.02, BACK + 0.42); root.add(v);
-      const front = new THREE.Mesh(new THREE.PlaneGeometry(0.82, 1.64), new THREE.MeshStandardMaterial({ map: vendTex(kind, false), emissiveMap: vendTex(kind, true), emissive: 0xffffff, emissiveIntensity: 0.85, roughness: 0.25, metalness: 0.1 }));
+      const front = new THREE.Mesh(new THREE.PlaneGeometry(0.82, 1.64), new THREE.MeshStandardMaterial({ map: vendTex(kind, false), emissiveMap: vendTex(kind, true), emissive: 0xffffff, emissiveIntensity: kind === 'drink' ? 0.5 : 0.8, roughness: 0.25, metalness: 0.1 }));
       front.position.set(x, 1.0, BACK + 0.825); root.add(front);
       const gla = new THREE.Mesh(new THREE.PlaneGeometry(0.56, 1.3), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.07, blending: THREE.AdditiveBlending, depthWrite: false }));
       gla.position.set(x - 0.1, 1.08, BACK + 0.835); root.add(gla);
@@ -794,10 +796,10 @@ export class CafeteriaScene extends LocationBase {
     const root = this.root;
     const cz = BACK + 0.42;
     const steelM = this.mat('cafeSteel', { map: steelTex(), color: 0xffffff, metalness: 0.7, roughness: 0.32 });
-    const chrome = this.mat('cafeChrome', { color: 0xe0e4e8, metalness: 1.0, roughness: 0.15 });
+    const chrome = this.mat('cafeChrome', { color: 0xe4e8ec, metalness: 0.55, roughness: 0.22 });
     const frontM = this.mat('cafeCounterFront', { color: 0x8a2a22, roughness: 0.45 });
     // the kitchen behind the pass-through, warm; steel jambs to give the wall a thickness
-    const kit = new THREE.Mesh(new THREE.PlaneGeometry(3.8, 1.6), new THREE.MeshBasicMaterial({ map: kitchenTex(), color: 0xe8dccb, fog: false }));
+    const kit = new THREE.Mesh(new THREE.PlaneGeometry(3.8, 1.6), new THREE.MeshBasicMaterial({ map: kitchenTex(), color: 0xbcae98, fog: false }));
     kit.position.set(7.1, 1.6, BACK - 0.9); root.add(kit);
     for (const [w, h, d, x, y, z] of [[3.3, 0.04, 0.3, 7.1, 1.0, BACK - 0.1], [3.3, 0.04, 0.3, 7.1, 2.14, BACK - 0.1], [0.04, 1.14, 0.3, 5.48, 1.57, BACK - 0.1], [0.04, 1.14, 0.3, 8.72, 1.57, BACK - 0.1]]) {
       const m = new THREE.Mesh(roundedBox(w, h, d, 0.01, 1), steelM); m.position.set(x, y, z); root.add(m);
@@ -853,7 +855,7 @@ export class CafeteriaScene extends LocationBase {
     const reg = new THREE.Mesh(roundedBox(0.36, 0.12, 0.3, 0.02, 1), this.mats.cache.get('cafeSpeaker')); reg.position.set(9.2, 0.92, cz - 0.05); root.add(reg);
     const scr = new THREE.Mesh(roundedBox(0.26, 0.18, 0.03, 0.01, 1), this.mats.cache.get('cafeSpeaker')); scr.position.set(9.2, 1.08, cz - 0.08); scr.rotation.x = -0.35; root.add(scr);
     const scrL = new THREE.Mesh(new THREE.PlaneGeometry(0.22, 0.14), new THREE.MeshBasicMaterial({ color: 0x5ad08a })); scrL.position.set(9.2, 1.083, cz - 0.063); scrL.rotation.x = -0.35; root.add(scrL);
-    const pay = this.textSign('PAY HERE', { w: 0.5, h: 0.14, bg: '#7a1418', fg: '#f2c84a' }); pay.position.set(9.2, 2.35, BACK + 0.03); root.add(pay);
+    const pay = this.textSign('PAY HERE', { w: 0.78, h: 0.22, bg: '#7a1418', fg: '#f2c84a', font: 'bold 60px sans-serif' }); pay.position.set(9.2, 1.95, BACK + 0.03); root.add(pay);
     // the milk cooler: glass door, lit shelves
     const cool = new THREE.Mesh(roundedBox(0.8, 1.9, 0.7, 0.03, 2), this.mat('cafeCooler', { color: 0xd8dce0, roughness: 0.4, metalness: 0.3 })); cool.position.set(9.95, 0.95, BACK + 0.37); root.add(cool);
     const cf = new THREE.Mesh(new THREE.PlaneGeometry(0.72, 1.76), new THREE.MeshStandardMaterial({ map: coolerTex(false), emissiveMap: coolerTex(true), emissive: 0xffffff, emissiveIntensity: 0.9, roughness: 0.15 }));
@@ -979,11 +981,11 @@ export class CafeteriaScene extends LocationBase {
     const ball = new THREE.Mesh(new THREE.SphereGeometry(0.12, 18, 14), ballM); ball.position.set(-1.6, 0.12, -7.3); root.add(ball);
     const seam = new THREE.Mesh(new THREE.TorusGeometry(0.121, 0.004, 6, 28), strapM); seam.position.copy(ball.position); seam.rotation.y = 0.5; root.add(seam);
     // the Winter Formal banner hung on the bulkhead, slightly sagging cloth
-    const bg = new THREE.PlaneGeometry(3.4, 0.85, 24, 1);
-    const pos = bg.attributes.position; for (let i = 0; i < pos.count; i++) pos.setZ(i, Math.sin((pos.getX(i) / 3.4 + 0.5) * Math.PI) * 0.03 + Math.sin(pos.getX(i) * 5) * 0.006);
+    const bg = new THREE.PlaneGeometry(2.5, 0.62, 24, 1);
+    const pos = bg.attributes.position; for (let i = 0; i < pos.count; i++) pos.setZ(i, Math.sin((pos.getX(i) / 2.5 + 0.5) * Math.PI) * 0.03 + Math.sin(pos.getX(i) * 5) * 0.006);
     bg.computeVertexNormals();
     const banner = new THREE.Mesh(bg, this.mat('cafeFormal', { map: formalTex(), color: 0xffffff, roughness: 0.9, side: THREE.DoubleSide }));
-    banner.position.set(-0.4, 2.98, BACK + 0.11); root.add(banner);
+    banner.position.set(-0.4, 3.12, BACK + 0.11); root.add(banner);
   }
 
   // ------------------------------------------------------------------ light
@@ -992,7 +994,7 @@ export class CafeteriaScene extends LocationBase {
     const root = this.root;
     const hemi = new THREE.HemisphereLight(0xf6f4ee, 0xc8bca8, 1.0);
     const key = new THREE.DirectionalLight(0xfff0dc, 0.55); key.position.set(-3, 3, 7);
-    const sky = new THREE.DirectionalLight(0xe4ecf8, 0.45); sky.position.set(2, 3.5, -16);
+    const sky = new THREE.DirectionalLight(0xe4ecf8, 0.4); sky.position.set(2, 10, -6);   // steep: a low back light would glare in the polished floor
     root.add(hemi, key, sky);
     for (const [x, y, z, i, dist] of [[-6.5, 3.2, -0.6, 5, 9], [5.5, 3.2, -0.6, 5, 9], [-0.4, 3.3, -6.2, 6, 10], [-0.4, 3.3, -10.8, 6, 10]]) {
       const l = new THREE.PointLight(0xfff6ea, i, dist, 1.2); l.position.set(x, y, z); root.add(l);

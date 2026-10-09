@@ -123,6 +123,21 @@ const boardTex = () => TEX('board2', 192, 128, (ctx, w, h) => {
   ctx.fillStyle = '#1a2a4a'; ctx.fillRect(140, 88, 44, 32); ctx.fillStyle = '#f2d860'; ctx.font = 'bold 9px sans-serif'; ctx.fillText('WINTER', 146, 102); ctx.fillText('FORMAL', 146, 113);
 });
 
+/** The dining hall glimpsed through the cafeteria doors' glass: warm light, tables, a red panel. */
+const cafeGlimpseTex = () => TEX('cafeGlimpse', 48, 128, (ctx, w, h) => {
+  const r = rng(617);
+  ctx.fillStyle = '#efe6d2'; ctx.fillRect(0, 0, w, h);
+  ctx.fillStyle = '#f8f2e4'; ctx.fillRect(0, 0, w, 30);
+  ctx.fillStyle = '#fffaf0'; for (const y of [8, 20]) ctx.fillRect(4, y, w - 8, 3);
+  ctx.fillStyle = '#b02a22'; ctx.fillRect(28, 34, 12, 16);
+  ctx.fillStyle = '#d8ccb0'; ctx.fillRect(0, 60, w, 30);
+  ctx.fillStyle = '#c8b898'; for (let k = 0; k < 4; k++) ctx.fillRect(2 + k * 12, 78 + (k % 2) * 4, 10, 3);
+  ctx.fillStyle = '#9aa0a6'; for (let k = 0; k < 6; k++) ctx.fillRect(4 + k * 8, 82, 1, 10);
+  ctx.fillStyle = '#ddd4c2'; ctx.fillRect(0, 92, w, h - 92);
+  for (let i = 0; i < 60; i++) { ctx.fillStyle = 'rgba(120,100,80,0.3)'; ctx.fillRect(r() * w, 92 + r() * (h - 92), 1, 1); }
+  ctx.fillStyle = 'rgba(80,60,40,0.45)'; ctx.fillRect(14, 54, 6, 38); ctx.fillRect(13, 46, 8, 9);   // someone over there
+});
+
 const smearTex = () => TEX('smear', 32, 128, (ctx, w, h) => {
   const g = ctx.createLinearGradient(0, 0, 0, h); g.addColorStop(0, 'rgba(255,255,255,0.9)'); g.addColorStop(0.5, 'rgba(255,255,255,0.35)'); g.addColorStop(1, 'rgba(255,255,255,0)');
   ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
@@ -172,25 +187,25 @@ export class SchoolScene extends LocationBase {
     this.title = 'Школа';
     this.background = 0x1a1c20;
     this.camera = { distance: 7.0, height: 1.45, lookHeight: 1.45, lookZ: -1.1 };
-    this.bounds = { walk: { areas: [{ minX: -9.4, maxX: 9.6, minZ: -2.4, maxZ: 0.9 }] }, camera: { minX: -6.2, maxX: 6.4 } };
+    this.bounds = { walk: { areas: [{ minX: -9.4, maxX: 11.0, minZ: -2.4, maxZ: 0.9 }] }, camera: { minX: -6.2, maxX: 8.4 } };
   }
 
   build() {
     const root = this.root;
     // ---- the floor: polished terrazzo + a planar reflection
-    const ft = floorTex().clone(); ft.needsUpdate = true; ft.wrapS = ft.wrapT = THREE.RepeatWrapping; ft.repeat.set(24 / 1.2, 22 / 1.2);
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(24, 22), this.mat('schoolFloor3', { map: ft, color: 0xe2d8c6, roughness: 0.14, metalness: 0.0, forceStandard: true }));
-    floor.rotation.x = -Math.PI / 2; floor.position.set(0, 0, -8.4); root.add(floor);
+    const ft = floorTex().clone(); ft.needsUpdate = true; ft.wrapS = ft.wrapT = THREE.RepeatWrapping; ft.repeat.set(28 / 1.2, 22 / 1.2);
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(28, 22), this.mat('schoolFloor3', { map: ft, color: 0xe2d8c6, roughness: 0.14, metalness: 0.0, forceStandard: true }));
+    floor.rotation.x = -Math.PI / 2; floor.position.set(2, 0, -8.4); root.add(floor);
     if (!this.low) {
-      const refl = new Reflector(new THREE.PlaneGeometry(24, 22), {
+      const refl = new Reflector(new THREE.PlaneGeometry(28, 22), {
         textureWidth: Math.floor(window.innerWidth * 0.5), textureHeight: Math.floor(window.innerHeight * 0.5), shader: ReflShader, clipBias: 0.003,
       });
       refl.material.transparent = true; refl.material.blending = THREE.AdditiveBlending; refl.material.depthWrite = false;
-      refl.rotation.x = -Math.PI / 2; refl.position.set(0, 0.002, -8.4); refl.renderOrder = 1;
+      refl.rotation.x = -Math.PI / 2; refl.position.set(2, 0.002, -8.4); refl.renderOrder = 1;
       root.add(refl);
     } else {
       // low quality: a soft fake sheen of the ceiling panels on the floor
-      for (const x of [-7, -2.5, 2, 6.5]) { const s = glow(0xfff8e8, 2.2, 0.16); s.position.set(x, 0.01, -1.6); s.scale.set(1.4, 0.5, 1); root.add(s); }
+      for (const x of [-7, -2.5, 2, 6.5, 10.5]) { const s = glow(0xfff8e8, 2.2, 0.16); s.position.set(x, 0.01, -1.6); s.scale.set(1.4, 0.5, 1); root.add(s); }
     }
     // ---- reflections painted on the polish (red lockers, the doors, the light panels) and contact shadows
     const refl = (x, w, depth, color, op, z0 = BACK + 0.47) => {
@@ -198,27 +213,28 @@ export class SchoolScene extends LocationBase {
       m.rotation.x = -Math.PI / 2; m.position.set(x, 0.004, z0 + depth / 2); root.add(m); return m;
     };
     refl(-1.6, 3.6, 1.6, 0xb01818, this.low ? 0.5 : 0.25);
-    refl(8.85, 1.7, 1.6, 0xb01818, this.low ? 0.5 : 0.25);
+    refl(8.4, 1.3, 1.6, 0xb01818, this.low ? 0.5 : 0.25);
     refl(3.45, 1.0, 1.4, 0xb07a40, this.low ? 0.35 : 0.18, BACK + 0.05);
-    for (const x of [-7.5, -4.5, -1.5, 1.5, 4.5, 7.5]) refl(x, 0.5, 2.6, 0xfff4e0, this.low ? 0.35 : 0.15, -2.4);
+    for (const x of [-7.5, -4.5, -1.5, 1.5, 4.5, 7.5, 10.5]) refl(x, 0.5, 2.6, 0xfff4e0, this.low ? 0.35 : 0.15, -2.4);
     const shadow = (x, z, w, d, op = 0.45) => {
       const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshBasicMaterial({ map: shadowTex(), color: 0x000000, transparent: true, opacity: op, depthWrite: false }));
       m.rotation.x = -Math.PI / 2; m.position.set(x, 0.006, z); root.add(m);
     };
-    shadow(-1.6, BACK + 0.5, 3.9, 0.35); shadow(8.85, BACK + 0.5, 2.0, 0.35); shadow(4.6, BACK + 0.32, 0.7, 0.4, 0.35); shadow(6.4, BACK + 0.55, 2.5, 0.7, 0.4);
+    shadow(-1.6, BACK + 0.5, 3.9, 0.35); shadow(8.4, BACK + 0.5, 1.5, 0.35); shadow(4.6, BACK + 0.32, 0.7, 0.4, 0.35); shadow(6.4, BACK + 0.55, 2.5, 0.7, 0.4);
     // ---- the back wall: tile, a darker band, a dark base cove; holes for the window, the cross corridor, the doors
-    const tt = tileTex().clone(); tt.needsUpdate = true; tt.wrapS = tt.wrapT = THREE.RepeatWrapping; tt.repeat.set(24 / 1.2, H / 1.2);
+    const tt = tileTex().clone(); tt.needsUpdate = true; tt.wrapS = tt.wrapT = THREE.RepeatWrapping; tt.repeat.set(27 / 1.2, H / 1.2);
     const tileM = this.mat('schoolTile', { map: tt, color: 0xffffff, roughness: 0.25, metalness: 0.0 });
     const holes = [
       { x0: -5.7, x1: -3.5, y0: 1.15, y1: 2.65 },     // the window
       { x0: 0.4, x1: 2.6, y0: 0.0, y1: 2.85 },        // the cross corridor
       { x0: 2.95, x1: 3.95, y0: 0.0, y1: 2.2 },       // classroom door
       { x0: -10.0, x1: -8.4, y0: 0.0, y1: 2.3 },      // the exit
+      { x0: 9.3, x1: 11.1, y0: 0.0, y1: 2.4 },        // double doors to the cafeteria
     ];
-    this.wall(-12, 12, H, BACK, tileM, holes);
+    this.wall(-12, 15, H, BACK, tileM, holes);
     const band = this.mat('schoolBand', { map: bandTex(), color: 0xffffff, roughness: 0.3 });
     const cove = this.mat('schoolCove', { color: 0x4a3426, roughness: 0.5 });
-    for (const [a, b] of [[-12, -10.0], [-8.4, 0.4], [2.6, 2.95], [3.95, 12]]) {
+    for (const [a, b] of [[-12, -10.0], [-8.4, 0.4], [2.6, 2.95], [3.95, 9.3], [11.1, 12.8]]) {
       const w = b - a, cx = (a + b) / 2;
       const bt = band.map.clone(); bt.needsUpdate = true; bt.wrapS = THREE.RepeatWrapping; bt.repeat.set(w / 1.2, 1);
       const bm = new THREE.Mesh(new THREE.PlaneGeometry(w, 0.15), new THREE.MeshStandardMaterial({ map: bt, roughness: 0.3 }));
@@ -226,13 +242,13 @@ export class SchoolScene extends LocationBase {
       this.box(w, 0.14, 0.03, cove, cx, 0.07, BACK + 0.015);
     }
     // ---- the ceiling: acoustic tiles, recessed fluorescent panels (+ their light)
-    const ct = ceilTex().clone(); ct.needsUpdate = true; ct.wrapS = ct.wrapT = THREE.RepeatWrapping; ct.repeat.set(24 / 0.6, 6 / 1.2);
-    const ceil = new THREE.Mesh(new THREE.PlaneGeometry(24, 6), this.mat('schoolCeil4', { map: ct, color: 0xffffff, roughness: 1, emissive: 0x6c6a64 }));
-    ceil.rotation.x = Math.PI / 2; ceil.position.set(0, H, -0.2); root.add(ceil);
+    const ct = ceilTex().clone(); ct.needsUpdate = true; ct.wrapS = ct.wrapT = THREE.RepeatWrapping; ct.repeat.set(28 / 0.6, 6 / 1.2);
+    const ceil = new THREE.Mesh(new THREE.PlaneGeometry(28, 6), this.mat('schoolCeil4', { map: ct, color: 0xffffff, roughness: 1, emissive: 0x6c6a64 }));
+    ceil.rotation.x = Math.PI / 2; ceil.position.set(2, H, -0.2); root.add(ceil);
     const panelM = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xf8fbff, emissiveIntensity: 1.9, emissiveMap: trofferTex() });
-    for (const x of [-7.5, -4.5, -1.5, 1.5, 4.5, 7.5]) {
+    for (const x of [-7.5, -4.5, -1.5, 1.5, 4.5, 7.5, 10.5]) {
       const p = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 1.2), panelM); p.rotation.x = Math.PI / 2; p.position.set(x, H - 0.005, -1.2); root.add(p);
-      if (x === -4.5 || x === 4.5) continue;
+      if (x === -4.5 || x === 4.5 || x === 7.5) continue;
       const l = new THREE.PointLight(0xf6f8ff, 5, 8, 1.2); l.position.set(x, H - 0.7, -1.0); root.add(l);
     }
     // ---- the cross corridor, running away from the camera (the reference's perspective)
@@ -250,7 +266,9 @@ export class SchoolScene extends LocationBase {
     const radiator = this.radiator(-4.6, BACK + 0.12); void radiator;
     // ---- lockers
     this.lockers(-3.4, 0.2, BACK + 0.24, 1);
-    this.lockers(8.0, 9.7, BACK + 0.24, 1);
+    this.lockers(7.8, 9.0, BACK + 0.24, 1);
+    // ---- the right end: double doors to the cafeteria, the corridor's end wall
+    this.cafeDoor(10.2, BACK, tileM, band, cove);
     // ---- the classroom door: oak, a narrow window, a kick plate, a room number
     this.classDoor(3.45, BACK, '112');
     // ---- the exit on the left: glass doors, daylight; trophy case
@@ -296,6 +314,12 @@ export class SchoolScene extends LocationBase {
     this.anchors.window = new THREE.Vector3(-4.6, 1.9, BACK + 0.2);
     this.anchors.lockers = new THREE.Vector3(-1.6, 1.5, BACK + 0.5);
     this.anchors.trophy = new THREE.Vector3(-7.2, 1.5, BACK + 0.4);
+    this.anchors.cafeDoor = new THREE.Vector3(10.2, 1.7, BACK + 0.2);
+    this.doors = [{ id: 'cafeteria', label: 'Столовая', x: 10.2, z: -2.0, radius: 0.9, anchor: this.anchors.cafeDoor, to: 'cafeteria', spawn: { x: -8.0, z: -1.4, facing: 1 } }];
+    this.spots = {
+      runLanes: [{ z: -0.2, minX: -9, maxX: 10.5 }, { z: -1.9, minX: -9, maxX: 10.5 }],
+      crossCorridor: { x: 1.5, zFar: -14, zNear: -2.6 },   // students walk the cross corridor into the depth
+    };
     // ---- foreground: a tiled pillar (fades when it covers someone)
     const fg = new THREE.Group(); fg.name = 'fg-pillar'; root.add(fg); this.foregroundGroups.push(fg);
     const pt = tileTex().clone(); pt.needsUpdate = true; pt.wrapS = pt.wrapT = THREE.RepeatWrapping; pt.repeat.set(0.5, H / 1.2);
@@ -310,6 +334,7 @@ export class SchoolScene extends LocationBase {
     this.windowLights = [
       flareSource('PALE', new THREE.Vector3(-4.6, 2.1, BACK - 0.1), { triggerDistance: 2.6 }),
       flareSource('PALE', new THREE.Vector3(-9.2, 1.6, BACK), { triggerDistance: 2.0, intensity: 0.45, flareSize: 0.6 }),
+      flareSource('LAMP', new THREE.Vector3(10.2, 1.7, BACK - 0.2), { triggerDistance: 1.6, fadeDistance: 1.4, intensity: 0.35, flareSize: 0.5 }),
     ];
     return root;
   }
@@ -348,6 +373,45 @@ export class SchoolScene extends LocationBase {
     const lever = new THREE.Mesh(roundedBox(0.14, 0.025, 0.025, 0.01, 1), this.mats.cache.get('kick')); lever.position.set(x - 0.36, 1.0, z + 0.05); root.add(lever);
     for (const hy of [0.3, 1.1, 1.9]) { const hg = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.11, 12), this.mats.cache.get('kick')); hg.position.set(x + 0.5, hy, z + 0.03); root.add(hg); }
     const sign = this.textSign(num, { w: 0.22, h: 0.12, bg: '#2a2a2a', fg: '#f2f2f2', font: 'bold 60px sans-serif' }); sign.position.set(x + 0.68, 1.75, z + 0.02); this.root.add(sign);
+  }
+
+  /**
+   * Double doors to the cafeteria at x: oak leaves with tall wired-glass panes (warm light and the
+   * dining hall behind), push bars, kick plates, a sign over them; the corridor ends in a tiled wall.
+   */
+  cafeDoor(x, z, tileM, band, cove) {
+    const root = this.root;
+    const frame = this.mat('classFrame', { color: 0x6a6e74, roughness: 0.4, metalness: 0.5 });
+    for (const [w, h, dx, y] of [[1.96, 0.08, 0, 2.44], [0.08, 2.44, -0.94, 1.22], [0.08, 2.44, 0.94, 1.22]]) { const m = new THREE.Mesh(roundedBox(w, h, 0.18, 0.015, 1), frame); m.position.set(x + dx, y, z + 0.02); root.add(m); }
+    const oak = this.mat('oakDoor', { map: oakTex(), color: 0xffffff, roughness: 0.35 });
+    const kickM = this.mat('kick', { color: 0xb8bcc0, metalness: 0.8, roughness: 0.3 });
+    const glassM = new THREE.MeshBasicMaterial({ map: cafeGlimpseTex(), color: 0xf0e2c8 });
+    for (const s of [-1, 1]) {
+      const cx = x + s * 0.45;
+      const leaf = new THREE.Mesh(roundedBox(0.88, 2.38, 0.05, 0.01, 1), oak); leaf.position.set(cx, 1.19, z - 0.02); root.add(leaf);
+      const gf = new THREE.Mesh(roundedBox(0.46, 1.12, 0.02, 0.008, 1), frame); gf.position.set(cx, 1.6, z + 0.01); root.add(gf);
+      const gl = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 1.06), glassM); gl.position.set(cx, 1.6, z + 0.022); root.add(gl);
+      const kick = new THREE.Mesh(roundedBox(0.84, 0.22, 0.01, 0.004, 1), kickM); kick.position.set(cx, 0.13, z + 0.01); root.add(kick);
+      const bar = new THREE.Mesh(roundedBox(0.64, 0.05, 0.06, 0.02, 1), kickM); bar.position.set(cx, 1.0, z + 0.05); root.add(bar);
+    }
+    const sign = this.textSign('СТОЛОВАЯ · CAFETERIA', { w: 1.5, h: 0.22, bg: '#5a0e0e', fg: '#f2d860', font: 'bold 40px sans-serif' });
+    sign.position.set(x, 2.78, z + 0.03); root.add(sign);
+    const warm = glow(0xffc880, 1.6, 0.2); warm.position.set(x, 1.6, z + 0.3); root.add(warm);
+    const l = new THREE.PointLight(0xffd8a0, 1.6, 4, 1.6); l.position.set(x, 1.6, z + 0.6); root.add(l);
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 1.4), new THREE.MeshBasicMaterial({ map: smearTex(), color: 0xffb060, transparent: true, opacity: this.low ? 0.35 : 0.18, depthWrite: false, blending: THREE.AdditiveBlending }));
+    m.rotation.x = -Math.PI / 2; m.position.set(x, 0.004, z + 0.75); root.add(m);
+    // a fire extinguisher cabinet beside the doors
+    const cab = new THREE.Mesh(roundedBox(0.36, 0.7, 0.12, 0.02, 1), this.mat('extCab', { color: 0xd8d4cc, roughness: 0.4, metalness: 0.3 })); cab.position.set(11.75, 1.3, z + 0.06); root.add(cab);
+    const ext = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.5, 16), this.mat('extRed', { color: 0xc01818, roughness: 0.35 })); ext.position.set(11.75, 1.28, z + 0.1); root.add(ext);
+    // the corridor's end wall (tile, band, cove), seen side-on at the right edge
+    const D = 3.2 - z;
+    const et = tileM.map.clone(); et.needsUpdate = true; et.repeat.set(D / 1.2, H / 1.2);
+    const end = new THREE.Mesh(new THREE.PlaneGeometry(D, H), new THREE.MeshStandardMaterial({ map: et, roughness: 0.25 }));
+    end.position.set(12.8, H / 2, z + D / 2); end.rotation.y = -Math.PI / 2; root.add(end);
+    const bt = band.map.clone(); bt.needsUpdate = true; bt.repeat.set(D / 1.2, 1);
+    const bm = new THREE.Mesh(new THREE.PlaneGeometry(D, 0.15), new THREE.MeshStandardMaterial({ map: bt, roughness: 0.3 }));
+    bm.position.set(12.79, 2.35, z + D / 2); bm.rotation.y = -Math.PI / 2; root.add(bm);
+    this.box(0.03, 0.14, D, cove, 12.785, 0.07, z + D / 2);
   }
 
   radiator(x, z) {
