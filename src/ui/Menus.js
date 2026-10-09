@@ -23,6 +23,8 @@ const STAGE_LABEL = {
   forest: 'Долина Такхини',
   forest_night: 'Долина. Сумерки',
   lizzie_1: 'Лиззи · След',
+  home_1: 'Дом. Ночь',
+  home_2: 'Дом. Утро',
   lizzie_2: 'Лиззи · Лес',
   lizzie_3: 'Лиззи · Пещера',
   lizzie_4: 'Лиззи · Стая',
@@ -134,19 +136,38 @@ export class MainMenu {
   renderDossier(save) {
     const flags = save?.state?.flags || {};
     const seen = save?.state?.interacted?.length || 0;
-    this.dossier.innerHTML = `
+    const ch = CHAPTERS.find((c) => c.stages.includes(save?.state?.stage)) || CHAPTERS[0];
+    const stats = ch.n === '01' ? `
       <div class="stats">
         <div class="stat">${ICONS.eye}${seen}/14</div>
         <div class="stat">${ICONS.claw}${flags.read_news || flags.read_newspaper ? 1 : 0}/1</div>
         <div class="stat">${ICONS.glass}${flags.drank_cocktail ? 1 : 0}/1</div>
-      </div>
-      <h3>Пролог. Северная Роза</h3>
-      <div class="case">ДЕЛО № 1147 · ДОЛИНА ЮКОНА</div>
-      <p>«Двадцать три туши у реки. Следы когтей на высоте двух метров. Коллеги говорят — волки. Лиззи пропала там же двадцать три дня назад».</p>
-      <p style="margin:0">— из записей Дж. Рида</p>
-      <div class="stamp">НЕ ЗАКРЫТО</div>`;
+      </div>` : '';
+    this.dossier.innerHTML = `${stats}
+      <h3>Глава ${ch.n}. ${ch.title}</h3>
+      <div class="case">${ch.who}</div>
+      <p>«${ch.note}»</p>
+      <p style="margin:0">— ${ch.src}</p>
+      <div class="stamp">${ch.stamp || 'НЕ ЗАКРЫТО'}</div>`;
   }
 }
+
+// the paper on the title screen follows the autosave: the chapter the player is in
+const JUL = 'из записей Дж. Рида', LIZ = 'из дневника Лиззи Рид';
+const CHAPTERS = [
+  { n: '01', title: 'Кровавый вечер', who: 'ДЖУЛИАН · БАР «СЕВЕРНАЯ РОЗА»', stages: ['explore', 'talk1', 'talk2', 'escape', 'morning', 'police', 'car'], note: 'Двадцать три туши у реки. Следы когтей на высоте двух метров. Коллеги говорят — волки.', src: JUL },
+  { n: '02', title: 'След', who: 'ЛИЗЗИ · ЗА НЕСКОЛЬКО НЕДЕЛЬ ДО', stages: ['lizzie_1'], note: 'Юг, середина, север. Ровная линия вдоль реки. Следующая точка — ещё севернее.', src: LIZ },
+  { n: '03', title: 'Подозреваемый', who: 'ДЖУЛИАН · УЧАСТОК, БОЛЬНИЦА', stages: ['station', 'interrogation', 'medical', 'hospital_day', 'hospital_evening'], note: 'Я единственный, кто вышел из бара живым. Они смотрят на меня так, будто это я.', src: JUL },
+  { n: '04', title: 'Лес', who: 'ЛИЗЗИ · ДОЛИНА ТАКХИНИ', stages: ['lizzie_2'], note: 'Они не волки. Волки не бывают размером с лошадь.', src: LIZ },
+  { n: '05', title: 'Жажда', who: 'ДЖУЛИАН · НОЧЬ В БОЛЬНИЦЕ', stages: ['hospital_night', 'hospital_return', 'recovery', 'street', 'home_1'], note: 'Монитор показывает ноль. Медсестра думает, что он сломан.', src: JUL },
+  { n: '06', title: 'Улики', who: 'ДЖУЛИАН · УЧАСТОК, НЕДЕЛЮ СПУСТЯ', stages: ['station_return'], note: 'Одиннадцать имён на доске. И телефон Лиззи — вещдок № 11.', src: JUL },
+  { n: '07', title: 'Пещера', who: 'ЛИЗЗИ · В ТЕМНОТЕ', stages: ['lizzie_3'], note: 'Здесь пахнет мокрой шерстью и старой кровью. Пуриэль не отвечает.', src: LIZ },
+  { n: '08', title: 'Территория', who: 'ДЖУЛИАН · ДОЛИНА ТАКХИНИ', stages: ['home_2', 'forest'], note: 'Один зверь. Огромный. Встаёт на задние лапы.', src: JUL },
+  { n: '09', title: 'Стая', who: 'ЛИЗЗИ · ДЕНЬ ДВАДЦАТЫЙ', stages: ['lizzie_4'], note: 'Они разговаривают. Шутят. А потом уводят Викки.', src: LIZ },
+  { n: '10', title: 'Волк', who: 'ДЖУЛИАН · СУМЕРКИ У РЕКИ', stages: ['forest_night'], note: 'Он ел. А потом встал. И стал человеком.', src: JUL },
+  { n: '11', title: 'Побег', who: 'ЛИЗЗИ · 13 ДЕКАБРЯ, НОЧЬ', stages: ['lizzie_5'], note: 'Беги. Не оглядывайся.', src: LIZ },
+  { n: '12', title: 'Пересечение', who: 'ОБА · ЛЕС', stages: ['ended'], note: 'Продолжение следует.', src: JUL, stamp: 'ДЕМО ПРОЙДЕНО' },
+];
 
 function ringSVG() {
   // ornate ring + slowly rotating medallion + blade pointer (all procedural)

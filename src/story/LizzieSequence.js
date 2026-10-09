@@ -17,7 +17,7 @@ const V = (x, y, z) => new THREE.Vector3(x, y, z);
 // the game's chapter numbers (01 Julian … 12 the crossing) and the dates of Lizzie's line:
 // time between her chapters is uneven on purpose — hours, days, weeks
 const CARDS = {
-  1: ['След', 'The Trail', 'СРЕДА, 3 НОЯБРЯ · ВЕЧЕР', 'Глава 2 · Лиззи'],
+  1: ['След', 'The Trail', 'ЗА НЕСКОЛЬКО НЕДЕЛЬ ДО · СРЕДА, 3 НОЯБРЯ', 'Глава 2 · Лиззи'],
   2: ['Лес', 'The Forest', 'ЧЕТВЕРГ, 11 НОЯБРЯ · ВЕЧЕР', 'Глава 4 · Лиззи'],
   3: ['Пещера', 'The Cave', '13 НОЯБРЯ', 'Глава 7 · Лиззи'],
   4: ['Стая', 'The Pack', 'ДЕКАБРЬ · ДЕНЬ ДВАДЦАТЫЙ', 'Глава 9 · Лиззи'],

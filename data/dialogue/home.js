@@ -34,7 +34,7 @@ export const DIALOGUES = {
       i: { speaker: 'lizzy', text: 'И что ты будешь делать?' },
       j: { speaker: 'julianL', text: 'Ничего. Это не моё дело. И ты — тоже ничего. Слышишь? Химия, контрольная, спать.', expr: { julianL: 'serious' } },
       k: { speaker: 'lizzy', text: 'Да, сэр. Как скажете, сэр.', expr: { lizzy: 'smile' } },
-      l: { speaker: 'julianL', text: 'В пятницу задержусь. Кайден зовёт в «Северную розу». Не жди, ложись.', expr: { julianL: 'smile' } },
+      l: { speaker: 'julianL', text: 'В пятницу у меня ночное дежурство. Не жди, ложись.', expr: { julianL: 'smile' } },
       m: { speaker: 'lizzy', text: 'Передай Кайдену, что он мне должен двадцать баксов.', set: { lh_talked: true } },
     },
   },
