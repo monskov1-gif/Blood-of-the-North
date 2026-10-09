@@ -34,16 +34,16 @@ export const CHARACTERS = {
   // the arrest: two constables + Quinn
   officer: {
     id: 'officer', name: 'Полицейский', nameEn: 'OFFICER', color: '#3a4a7a',
-    poses: { idle: 'cop_blond_idle', aim: 'cop_blond_aim' }, speed: 1.6,
+    poses: { idle: 'cop_blond_idle', aim: 'cop_blond_aim' }, speed: 1.6, selfLight: 0xa49a92,
   },
   officer2: {
     id: 'officer2', name: 'Полицейский', nameEn: 'OFFICER', color: '#3a4a7a',
-    poses: { idle: 'cop_red_idle', aim: 'cop_red_aim' }, speed: 1.5,
+    poses: { idle: 'cop_red_idle', aim: 'cop_red_aim' }, speed: 1.5, selfLight: 0xa49a92,
   },
   // Quinn Nova Torres — constable, Julian's friend (arrest, the drive, the news at the end)
   quinn: {
     id: 'quinn', name: 'Куинн Торрес', nameEn: 'QUINN TORRES', portrait: 'quinn', color: '#5a4a6a',
-    poses: { idle: 'quinn_idle', talk: 'quinn_idle', aim: 'quinn_aim', drive: 'quinn_drive', side: 'quinn_side', walk: 'quinn_side' }, speed: 1.5,
+    poses: { idle: 'quinn_idle', talk: 'quinn_idle', aim: 'quinn_aim', drive: 'quinn_drive', side: 'quinn_side', walk: 'quinn_side' }, speed: 1.5, selfLight: 0xb0a69c,
   },
   radio: { id: 'radio', name: 'Рация', nameEn: 'RADIO', poses: { idle: 'officer_seat' } },
   // --- custody / station / hospital cast
@@ -79,10 +79,10 @@ export const CHARACTERS = {
   vikki: { id: 'vikki', name: 'Викки', nameEn: 'VICKY', portrait: 'vikki', color: '#3a3a44', poses: { idle: 'vikki_idle', talk: 'vikki_talk' }, speed: 1.35 },
   olivia: { id: 'olivia', name: 'Оливия', nameEn: 'OLIVIA', portrait: 'olivia', color: '#6a5a4a', poses: { idle: 'olivia_idle', talk: 'olivia_talk' }, speed: 1.35 },
   puriel: { id: 'puriel', name: 'Пуриэль', nameEn: 'PURIEL', portrait: 'puriel', color: '#c8b89a', poses: { idle: 'puriel_idle', talk: 'puriel_talk' }, speed: 1.3 },
-  wolf: { id: 'wolf', name: 'Волк', nameEn: 'WOLF', poses: { idle: 'wolf_dark', eat: 'wolf_dark_eat' }, speed: 1.6 },
-  wolfGrey: { id: 'wolfGrey', name: 'Волк', nameEn: 'WOLF', poses: { idle: 'wolf_grey', eat: 'wolf_grey_eat' }, speed: 1.7 },
-  wolfWhite: { id: 'wolfWhite', name: 'Волк', nameEn: 'WOLF', poses: { idle: 'wolf_white', eat: 'wolf_white_eat' }, speed: 1.7 },
-  wolfRed: { id: 'wolfRed', name: 'Волк', nameEn: 'WOLF', poses: { idle: 'wolf_red', eat: 'wolf_red_eat' }, speed: 1.7 },
+  wolf: { id: 'wolf', name: 'Волк', nameEn: 'WOLF', poses: { idle: 'wolf_dark', eat: 'wolf_dark_eat' }, speed: 1.6, selfLight: 0x7484a8 },
+  wolfGrey: { id: 'wolfGrey', name: 'Волк', nameEn: 'WOLF', poses: { idle: 'wolf_grey', eat: 'wolf_grey_eat' }, speed: 1.7, selfLight: 0x7484a8 },
+  wolfWhite: { id: 'wolfWhite', name: 'Волк', nameEn: 'WOLF', poses: { idle: 'wolf_white', eat: 'wolf_white_eat' }, speed: 1.7, selfLight: 0x7484a8 },
+  wolfRed: { id: 'wolfRed', name: 'Волк', nameEn: 'WOLF', poses: { idle: 'wolf_red', eat: 'wolf_red_eat' }, speed: 1.7, selfLight: 0x7484a8 },
   // the werewolf in human form (seen from far away in the forest)
-  stranger: { id: 'stranger', name: 'Человек', nameEn: 'MAN', poses: { idle: 'npc_bluecoat_side' }, speed: 1.2 },
+  stranger: { id: 'stranger', name: 'Человек', nameEn: 'MAN', poses: { idle: 'npc_bluecoat_side' }, speed: 1.2, selfLight: 0x5a6680 },
 };

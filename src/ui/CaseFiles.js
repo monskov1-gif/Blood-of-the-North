@@ -29,6 +29,8 @@ export class CaseFiles {
     w.style.setProperty('--cf-paper', `url(${paperTexture()})`);
     w.style.setProperty('--cf-card', `url(${paperTexture(1)})`);
     el('div', 'cf-desk', w);
+    // out-of-focus things on the desk at the edges of the frame (as the shell casings in the reference)
+    for (let i = 0; i < 4; i++) el('i', `cf-bokeh b${i}`, w);
     const back = el('button', 'cf-back', w, '<i>↩</i><span>Вернуться<small>RETURN TO THE PLOT</small></span>');
     back.addEventListener('click', () => this.close());
     this.esc = (e) => { if (e.code === 'Escape') { e.stopPropagation(); e.preventDefault(); this.close(); } };
@@ -53,6 +55,7 @@ export class CaseFiles {
 
   victims() {
     const w = this.shell('cf-victims');
+    el('div', 'cf-sheet under', w);
     const sheet = el('div', 'cf-sheet', w);
     el('div', 'cf-clip', sheet);
     el('div', 'cf-sheet-head', sheet, `<b>КОРОЛЕВСКАЯ КАНАДСКАЯ КОННАЯ ПОЛИЦИЯ · М-ОТДЕЛ</b>
@@ -103,9 +106,10 @@ export class CaseFiles {
 
   folder(board, c, cls, photos, stamp, scrawl) {
     const f = el('div', `cf-folder ${cls}`, board);
-    el('div', 'cf-ftab', f, c.tab.toUpperCase());
+    el('div', 'cf-ftab', f, c.no.replace('ДЕЛО ', '№ '));
     const body = el('div', 'cf-fbody', f);
     el('div', 'cf-fno', body, `${c.no}<br><small>${c.en}</small>`);
+    el('i', 'cf-clipm', body);
     el('div', 'cf-ftitle', body, c.title);
     el('div', `cf-fstamp ${cls}`, body, stamp);
     if (scrawl) el('div', 'cf-scrawl', body, scrawl);
@@ -162,6 +166,10 @@ export class CaseFiles {
     // right page
     el('div', 'cf-rhead', right, `<span>${c.no}</span><h3>${c.title}</h3><em>${c.status}</em>`);
     const body = el('div', 'cf-rbody', right);
+    el('div', 'cf-rmeta', right, id === 'WEREWOLF'
+      ? '<span>Место</span>долина р. Такхини, 40 км к С от Уайтхорса<span>Открыто</span>2 ноября<span>Пропавшая</span>Элизабет Рид, 26 л.'
+      : '<span>Место</span>бар «Северная роза», Эндрю-стрит<span>Дата</span>ночь с 4 на 5 декабря<span>Погибших</span>11');
+    el('div', 'cf-rstamp', right, preview ? 'RCMP' : 'В РАБОТЕ');
     const sections = preview ? [['case', 'Дело', 'FILE']] : [['case', 'Дело', 'FILE'], ['ev', 'Улики', 'EVIDENCE'], ['tasks', 'Задачи', 'TASKS'], ['victims', 'Жертвы', 'VICTIMS']];
     const tabEls = {};
     const show = (key) => {
@@ -213,7 +221,8 @@ export class CaseFiles {
   lizzyPhone(body) {
     body.innerHTML = '';
     const ph = el('div', 'cf-lphone', body);
-    el('div', 'crack', ph);
+    el('div', 'crack', ph, crackSVG());
+    el('i', 'glare', ph);
     el('div', 'time', ph, LIZZY_PHONE.time);
     el('div', 'date', ph, LIZZY_PHONE.date);
     const list = el('div', 'notes', ph);
@@ -274,6 +283,21 @@ function strings(holder, lines) {
 }
 
 /** Magnifier, envelope, blood drops: desk dressing around the board. */
+/** A spider-web crack from one impact point (lower left of the screen). */
+function crackSVG() {
+  const cx = 30, cy = 70, rays = [[-170, 40], [-120, 65], [-75, 80], [-35, 95], [5, 75], [40, 60], [80, 35], [120, 40], [160, 30]];
+  let d = '';
+  const pts = rays.map(([a, L]) => {
+    const r = (a * Math.PI) / 180;
+    const p = [[cx, cy]];
+    for (let k = 1; k <= 4; k++) p.push([cx + Math.cos(r + Math.sin(k * 2.3 + a) * 0.12) * L * k / 4, cy + Math.sin(r + Math.cos(k * 1.7 + a) * 0.12) * L * k / 4]);
+    d += 'M' + p.map(([x, y]) => `${x.toFixed(1)} ${y.toFixed(1)}`).join(' L');
+    return p;
+  });
+  for (const ring of [1, 2]) d += ' M' + pts.map((p) => `${p[ring][0].toFixed(1)} ${p[ring][1].toFixed(1)}`).join(' L');
+  return `<svg viewBox="0 0 100 160" preserveAspectRatio="none"><path d="${d}" /></svg>`;
+}
+
 function deco(w) {
   el('div', 'cf-magnifier', w, '<i class="lens"></i><i class="handle"></i>');
   el('div', 'cf-envelope', w);

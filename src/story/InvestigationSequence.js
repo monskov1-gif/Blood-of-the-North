@@ -199,7 +199,7 @@ const methods = {
     // the wolf at the river, eating; the man appears later
     const wolf = this.castIn(w, 'wolf', 'beast');
     wolf.placeAt(w.anchors.wolf.x, w.anchors.wolf.z, -1);
-    wolf.root.scale.setScalar(1.45);
+    wolf.root.scale.setScalar(1.9);
     wolf.setPose('eat');
     wolf.eatT = 0;
     const man = this.castIn(w, 'stranger', 'stranger');
@@ -247,8 +247,8 @@ const methods = {
     J.face(1);
     J.setPose('think');
     const wx = w.anchors.wolf.x, wz = w.anchors.wolf.z;
-    const wide = { x: 15.9, y: 1.55, z: 3.9, lookX: 21.0, lookY: 1.1, lookZ: -5.0, fov: 36 };
-    const close = { x: 21.6, y: 1.6, z: -1.6, lookX: wx, lookY: 1.1, lookZ: wz, fov: 30 };
+    const wide = { x: 16.0, y: 1.7, z: 3.4, lookX: 21.2, lookY: 1.2, lookZ: -7.0, fov: 38 };
+    const close = { x: 21.8, y: 1.6, z: -3.6, lookX: wx, lookY: 1.4, lookZ: wz, fov: 32 };
     g.cameraSys.setShot(wide, 2.4);
     await sleep(2.6);
     if (!(await this.lines(g.dialogue.dialogues.fn_watch))) return;
@@ -297,7 +297,7 @@ const methods = {
     g.hud.show(true);
     g.player.enabled = true;
     g.state.set('objective', 'follow');
-    this.followRoute = [{ x: 27.5, z: -4.8 }, { x: 31.5, z: -2.9 }, { x: 36.0, z: -2.7 }, { x: 40.6, z: -2.9 }, { x: 42.2, z: -4.6 }];
+    this.followRoute = [{ x: 26.5, z: -11.4 }, { x: 29.5, z: -6.0 }, { x: 31.5, z: -2.9 }, { x: 36.0, z: -2.7 }, { x: 40.6, z: -2.9 }, { x: 42.2, z: -4.6 }];
     this.followI = 0;
     this.nightPhase = 'follow';
   },
@@ -325,7 +325,7 @@ const methods = {
     await J.walkTo({ x: 41.0, z: -2.0 }, { speed: 0.7, direct: true });
     if (S !== this.session) return;
     J.face(1);
-    g.cameraSys.setShot({ x: 39.6, y: 1.8, z: 3.6, lookX: 42.0, lookY: 1.5, lookZ: -5.0, fov: 34 }, 2.5);
+    g.cameraSys.setShot({ x: 40.2, y: 1.8, z: 5.2, lookX: 41.8, lookY: 1.4, lookZ: -3.5, fov: 36 }, 2.5);
     g.audio.play('inner.drone', { volume: 0.4 });
     await sleep(2.0);
     if (!(await this.lines(g.dialogue.dialogues.fn_cave))) return;
@@ -368,7 +368,7 @@ const methods = {
       this.transformT += dt;
       const k = Math.min(1, this.transformT / 3.2);
       wolf.root.position.x = this.g.world.anchors.wolf.x + Math.sin(this.transformT * 38) * 0.04 * k;
-      wolf.root.scale.set(1.45 * (1 - 0.1 * k), 1.45 * (1 - 0.25 * k + Math.sin(this.transformT * 22) * 0.04 * k), 1.45);
+      wolf.root.scale.set(1.9 * (1 - 0.1 * k), 1.9 * (1 - 0.25 * k + Math.sin(this.transformT * 22) * 0.04 * k), 1.9);
     }
     if (this.puffs) {
       for (const s of this.puffs) {
