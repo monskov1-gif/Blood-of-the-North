@@ -136,6 +136,18 @@ const methods = {
       this.bx(w, old ? 1.25 : 1.0, 0.03, dado, cx, old ? 0.625 : 0.5, BACK + 0.015, { uv: [2, 1] });
       this.bx(w, 0.1, 0.04, skirt, cx, 0.05, BACK + 0.035);
       if (rail) this.cy(0.03, 0.03, w - 0.05, 8, railM, cx, old ? 1.27 : 0.9, BACK + 0.08, { rz: Math.PI / 2 });
+      if (rail) for (const ex of [a + 0.06, b - 0.06]) if (b - a > 0.3) {
+        // rail brackets
+        this.rod([ex, old ? 1.27 : 0.9, BACK + 0.012], [ex, old ? 1.27 : 0.9, BACK + 0.08], 0.008, this.mat('steel'));
+      }
+      if (old) {
+        // tongue-and-groove dado: a moulded cap, panel stiles, a plinth
+        this.rb(w, 0.045, 0.05, 0.015, railM, cx, 1.235, BACK + 0.03);
+        const np = Math.max(1, Math.round(w / 0.62));
+        for (let k = 0; k <= np; k++) this.rb(0.05, 1.08, 0.02, 0.008, dado, a + (w * k) / np, 0.66, BACK + 0.035, { uv: [2, 1] });
+        this.rb(w, 0.05, 0.02, 0.008, dado, cx, 1.17, BACK + 0.035, { uv: [2, 1] });
+        this.rb(w, 0.05, 0.02, 0.008, dado, cx, 0.15, BACK + 0.035, { uv: [2, 1] });
+      }
       if (!old) this.bx(w - 0.05, 0.12, 0.035, this.mat('hBumper', { color: 0x3c5a5e, roughness: 0.6 }), cx, 0.32, BACK + 0.045);
     }
   },
@@ -530,12 +542,15 @@ const methods = {
     fg(50.0, 2.9, 'fg-column', (g) => {
       // a plastered pier: dado, oak corner beads, a moulded cap under the ceiling
       const colTex = TXX.oldPaint().clone(); colTex.needsUpdate = true; colTex.repeat.set(0.5, 2);
-      this.box(0.5, H2, 0.5, this.mat('hxColumn', { map: colTex, color: 0xe8ecdc, roughness: 0.85 }), 0, H2 / 2, 0, g);
-      this.box(0.54, 1.25, 0.54, this.mat('hxOldDado'), 0, 0.625, 0, g);
-      this.box(0.58, 0.05, 0.58, this.mat('hxOldRail'), 0, 1.27, 0, g);
-      this.box(0.62, 0.14, 0.62, this.mat('hxCornice', { color: 0xd8d8cc, roughness: 0.7 }), 0, H2 - 0.07, 0, g);
-      this.box(0.58, 0.12, 0.58, this.mat('hSkirt'), 0, 0.06, 0, g);
-      for (const sx of [-1, 1]) for (const sz of [-1, 1]) this.box(0.035, H2 - 1.4, 0.035, this.mat('hxOldRail'), sx * 0.25, 1.3 + (H2 - 1.4) / 2, sz * 0.25, g);
+      this.inGroup(g, () => {
+        this.rb(0.5, H2, 0.5, 0.03, this.mat('hxColumn', { map: colTex, color: 0xe8ecdc, roughness: 0.85 }), 0, H2 / 2, 0);
+        this.rb(0.54, 1.25, 0.54, 0.02, this.mat('hxOldDado'), 0, 0.625, 0);
+        this.rb(0.58, 0.05, 0.58, 0.02, this.mat('hxOldRail'), 0, 1.27, 0);
+        this.rb(0.6, 0.06, 0.6, 0.025, this.mat('hxCornice', { color: 0xd8d8cc, roughness: 0.7 }), 0, H2 - 0.17, 0);
+        this.rb(0.66, 0.1, 0.66, 0.04, this.mat('hxCornice'), 0, H2 - 0.07, 0);
+        this.rb(0.58, 0.12, 0.58, 0.02, this.mat('hSkirt'), 0, 0.06, 0);
+        for (const sx of [-1, 1]) for (const sz of [-1, 1]) this.rod([sx * 0.25, 1.3, sz * 0.25], [sx * 0.25, H2 - 0.2, sz * 0.25], 0.018, this.mat('hxOldRail'));
+      });
     });
   },
 
@@ -720,9 +735,17 @@ const methods = {
     // sawhorse barrier + sign
     const stripe = this.mat('hxBarrier', { color: 0xe8e0d0, roughness: 0.6 });
     const red = this.mat('hFireRed');
-    this.bx(w + 0.1, 0.16, 0.05, stripe, cx, 1.0, BACK + 0.15);
-    for (let i = 0; i < 4; i++) this.bx(0.14, 0.16, 0.055, red, x0 + 0.2 + i * 0.32, 1.0, BACK + 0.15);
-    for (const s of [-1, 1]) this.bx(0.05, 1.0, 0.05, stripe, cx + s * (w / 2 - 0.05), 0.5, BACK + 0.15, { rz: s * 0.12 });
+    // a wooden sawhorse barrier: striped board on two A-frame trestles, and a plank leaning behind it
+    this.rb(w + 0.1, 0.16, 0.035, 0.012, stripe, cx, 1.0, BACK + 0.15);
+    for (let i = 0; i < 4; i++) this.rb(0.14, 0.162, 0.038, 0.01, red, x0 + 0.2 + i * 0.32, 1.0, BACK + 0.15, { rz: 0.0 });
+    const raw = this.mat('hxRawWood', { color: 0x9a7a52, roughness: 0.8 });
+    for (const s of [-1, 1]) {
+      const tx = cx + s * (w / 2 - 0.12);
+      this.rb(0.05, 0.06, 0.32, 0.012, raw, tx, 0.93, BACK + 0.15);
+      for (const sz of [-1, 1]) this.rb(0.045, 0.98, 0.035, 0.01, raw, tx, 0.47, BACK + 0.15 + sz * 0.11, { rx: sz * 0.2 });
+      this.rb(0.035, 0.03, 0.34, 0.01, raw, tx, 0.35, BACK + 0.15);
+    }
+    this.rb(0.22, 2.2, 0.03, 0.01, raw, x0 + 0.35, 1.1, BACK - 0.5, { rz: 0.12, rx: -0.05 });
     const sign = this.textSign('РЕМОНТ · ПРОХОДА НЕТ', { w: 1.1, h: 0.2, bg: '#e8c020', fg: '#141414' });
     sign.position.set(cx, 1.35, BACK + 0.16); root.add(sign);
   },
@@ -742,25 +765,55 @@ const methods = {
     // the table, the big lamp over it, trolleys, cabinets, a covered shape on a gurney
     const steel = this.mat('steel');
     const tx = 52.2, tz = BACK - 2.7;
-    this.bx(0.5, 0.7, 0.4, steel, tx, 0.35, tz);
-    this.bx(2.0, 0.1, 0.62, this.mat('hxOrPad', { color: 0x2a4a4a, roughness: 0.6 }), tx, 0.78, tz);
-    this.cy(0.03, 0.03, 1.1, 6, steel, tx, H2 - 0.55, tz);
+    // the table: a pedestal on a heavy base, a jointed padded top with a head section
+    this.rb(0.8, 0.08, 0.5, 0.03, steel, tx, 0.04, tz);
+    this.lathe([[0.16, 0.08], [0.14, 0.12], [0.11, 0.14], [0.1, 0.6], [0.14, 0.64], [0.14, 0.68], [0, 0.68]], steel, tx, 0, tz, { seg: 28 });
+    this.rb(1.6, 0.06, 0.56, 0.02, steel, tx + 0.1, 0.7, tz);
+    this.rb(1.56, 0.09, 0.56, 0.04, this.mat('hxOrPad', { color: 0x2a4a4a, roughness: 0.6 }), tx + 0.1, 0.775, tz, { seg: 3 });
+    this.rb(0.4, 0.08, 0.5, 0.035, this.mat('hxOrPad'), tx - 0.9, 0.79, tz, { rz: -0.12 });
+    for (const sz of [-1, 1]) this.rod([tx - 0.6, 0.73, tz + sz * 0.3], [tx + 0.8, 0.73, tz + sz * 0.3], 0.01, steel);
+    // ceiling-mounted surgical lamp: column, two-joint arm, a domed head with a lens and handle
+    this.lathe([[0, -0.05], [0.12, -0.05], [0.12, -0.02], [0.05, 0], [0, 0]], steel, tx, H2 - 0.02, tz);
+    this.rod([tx, H2 - 0.04, tz], [tx, H2 - 0.45, tz], 0.035, steel);
+    this.rod([tx, H2 - 0.45, tz], [tx + 0.35, H2 - 0.75, tz + 0.1], 0.028, steel);
+    this.rod([tx + 0.35, H2 - 0.75, tz + 0.1], [tx, 2.66, tz], 0.025, steel);
     const lampM = this.mat('hxOrLamp', { color: 0x202020, emissive: 0xfff8e8, emissiveIntensity: 1.6 });
-    const lamp = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.42, 0.18, 24), this.mat('hxOrLampBody', { color: 0xd8dcd8, metalness: 0.5, roughness: 0.3 }));
-    lamp.position.set(tx, 2.55, tz); root.add(lamp);
-    const lens = new THREE.Mesh(new THREE.CircleGeometry(0.4, 24), lampM); lens.rotation.x = Math.PI / 2; lens.position.set(tx, 2.45, tz); root.add(lens);
+    const body = this.mat('hxOrLampBody', { color: 0xd8dcd8, metalness: 0.5, roughness: 0.3 });
+    this.lathe([[0.55, 2.47], [0.57, 2.5], [0.55, 2.56], [0.42, 2.63], [0.2, 2.66], [0.05, 2.67], [0, 2.67]], body, tx, 0, tz, { seg: 40 });
+    this.lathe([[0, 2.43], [0.46, 2.45], [0.5, 2.47]], lampM, tx, 0, tz, { seg: 40 });
+    for (let k = 0; k < 6; k++) { const a = (k / 6) * Math.PI * 2; this.lathe([[0, 2.44], [0.07, 2.445], [0.08, 2.455]], this.mat('hxOrBulbRing', { color: 0x9aa2a6, metalness: 0.6, roughness: 0.3 }), tx + Math.cos(a) * 0.28, 0, tz + Math.sin(a) * 0.28, { seg: 20 }); }
+    this.rod([tx, 2.43, tz], [tx, 2.3, tz], 0.02, body);
+    this.lathe([[0, 2.24], [0.03, 2.25], [0.035, 2.3], [0, 2.31]], body, tx, 0, tz);
     const lampGlow = glow(0xfff4e0, 1.6, 0.45); lampGlow.position.set(tx, 2.3, tz); root.add(lampGlow);
     const pool = this.pool(0xfff4e0, tx, tz, 2.6, 1.6, 0.3);
+    // instrument trolleys: tubular frames, two trays with raised rims, instruments, castors
     for (const [ix, iz] of [[50.6, BACK - 1.6], [53.8, BACK - 3.8]]) {
-      this.bx(0.7, 0.04, 0.45, steel, ix, 0.9, iz); this.bx(0.7, 0.04, 0.45, steel, ix, 0.45, iz);
-      for (const dx of [-0.32, 0.32]) for (const dz of [-0.2, 0.2]) this.bx(0.02, 0.9, 0.02, steel, ix + dx, 0.45, iz + dz);
-      for (let i = 0; i < 5; i++) this.bx(0.14, 0.01, 0.02, steel, ix - 0.25 + i * 0.12, 0.925, iz);
+      for (const yy of [0.9, 0.45]) {
+        this.rb(0.7, 0.02, 0.45, 0.008, steel, ix, yy, iz);
+        for (const sz of [-1, 1]) this.rb(0.7, 0.03, 0.012, 0.005, steel, ix, yy + 0.02, iz + sz * 0.22);
+        for (const sx of [-1, 1]) this.rb(0.012, 0.03, 0.45, 0.005, steel, ix + sx * 0.35, yy + 0.02, iz);
+      }
+      for (const dx of [-0.32, 0.32]) for (const dz of [-0.2, 0.2]) { this.rod([ix + dx, 0.1, iz + dz], [ix + dx, 0.92, iz + dz], 0.011, steel); this.caster(ix + dx, 0.1, iz + dz, 0.03, 0); }
+      for (let i = 0; i < 5; i++) this.rb(0.15, 0.008, 0.014, 0.004, this.mat('hChrome', { color: 0xdfe4e8, metalness: 0.75, roughness: 0.22 }), ix - 0.24 + i * 0.12, 0.918, iz - 0.05 + (i % 2) * 0.06, { ry: 0.15 * (i - 2) });
+      this.lathe([[0, 0], [0.07, 0], [0.11, 0.05], [0.115, 0.055]], steel, ix + 0.18, 0.91, iz + 0.08, { seg: 28 });
     }
-    this.bx(1.6, 2.0, 0.4, this.mat('hxOrCabinet', { color: 0xdfe4e0, roughness: 0.5 }), 49.4, 1.0, zb + 0.25);
-    this.bx(1.4, 1.5, 0.02, this.mat('hGlass'), 49.4, 1.2, zb + 0.46);
-    this.bx(1.9, 0.06, 0.62, steel, 54.0, 0.72, BACK - 1.4);
-    const sheetShape = new THREE.Mesh(new THREE.CapsuleGeometry(0.22, 1.3, 4, 8), this.mat('sheet'));
-    sheetShape.rotation.z = Math.PI / 2; sheetShape.scale.set(1, 1, 0.8); sheetShape.position.set(54.0, 0.92, BACK - 1.4); root.add(sheetShape);
+    // glazed instrument cabinet against the back wall
+    const cab = this.mat('hxOrCabinet', { color: 0xdfe4e0, roughness: 0.5 });
+    this.rb(1.6, 0.06, 0.4, 0.02, cab, 49.4, 0.03, zb + 0.25);
+    for (const sx of [-1, 1]) this.rb(0.04, 2.0, 0.4, 0.015, cab, 49.4 + sx * 0.78, 1.0, zb + 0.25);
+    this.rb(1.64, 0.06, 0.44, 0.02, cab, 49.4, 2.02, zb + 0.26);
+    this.rb(1.52, 1.94, 0.02, 0.006, this.mat('hxCabInside', { color: 0xb4bcb6, roughness: 0.6 }), 49.4, 1.0, zb + 0.07);
+    for (const sy of [0.6, 1.05, 1.5]) this.rb(1.52, 0.015, 0.34, 0.005, this.mat('hxShelfGlass', { color: 0xc8d4d0, roughness: 0.2, metalness: 0.2 }), 49.4, sy, zb + 0.25);
+    for (const dx of [-0.39, 0.39]) {
+      for (const sx of [-1, 1]) this.rb(0.035, 1.6, 0.025, 0.01, cab, 49.4 + dx + sx * 0.37, 1.15, zb + 0.45);
+      for (const yy of [0.37, 1.93]) this.rb(0.76, 0.04, 0.025, 0.01, cab, 49.4 + dx, yy, zb + 0.45);
+      this.bx(0.7, 1.5, 0.006, this.mat('hGlass'), 49.4 + dx, 1.15, zb + 0.45);
+    }
+    this.rb(1.52, 0.3, 0.02, 0.01, cab, 49.4, 0.2, zb + 0.45);
+    // the covered shape on the gurney: a body-like form under a draped sheet
+    this.oldGurney(54.0, BACK - 1.4);
+    const form = new THREE.Mesh(new THREE.CapsuleGeometry(0.2, 1.25, 8, 20), this.mat('sheet'));
+    form.rotation.z = Math.PI / 2; form.scale.set(1, 1, 0.7); form.position.set(54.05, 0.83, BACK - 1.4); root.add(form);
     // observation window: glass + blinds half down; porthole double doors
     this.box(54.8 - 50.4, 2.35 - 1.0, 0.03, this.mat('hGlass'), 52.6, 1.675, BACK);
     this.pl(54.8 - 50.4, 0.6, this.texMat('hxBlindsOr', tiled(TX.blinds(), 8, 4), { transparent: true }), 52.6, 2.05, BACK + 0.03);

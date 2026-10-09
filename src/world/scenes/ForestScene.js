@@ -109,6 +109,14 @@ const undergrowthTex = () => canvasTexture('forest-undergrowth2', 128, 64, (ctx,
   for (let i = 0; i < 160; i++) { ctx.fillStyle = ['#1e2a1c', '#26341f', '#3a2a1c', '#5a3a20'][Math.floor(r() * 4)]; ctx.beginPath(); ctx.ellipse(w / 2 + (r() - 0.5) * w * 0.9, h - r() * 12, 2 + r() * 3, 1 + r() * 2, 0, 0, 7); ctx.fill(); }
 }, { aniso: 4 });
 
+/** The trodden path: packed snow, boot prints, a tyre rut at the trailhead. */
+const pathTex = () => PX('path', 64, 32, (ctx, w, h) => {
+  const r = rng(302);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const n = (r() - 0.5) * 12; ctx.fillStyle = rgb(176 + n, 180 + n, 186 + n); ctx.fillRect(x, y, 1, 1); }
+  for (let i = 0; i < 26; i++) { const x = r() * w, y = r() * h; ctx.fillStyle = 'rgba(110,104,96,0.55)'; ctx.fillRect(x, y, 3, 2); ctx.fillRect(x + 1, y + 2, 2, 1); }
+  for (let i = 0; i < 14; i++) { ctx.fillStyle = 'rgba(96,84,66,0.5)'; ctx.fillRect(r() * w, r() * h, 2 + r() * 4, 1); }
+});
+
 /** Spruce bark, aspen bark (pale with dark eyes), birch bark. */
 const barkTex = (kind) => PX(`bark${kind}`, 16, 64, (ctx, w, h) => {
   const r = rng(310 + kind);

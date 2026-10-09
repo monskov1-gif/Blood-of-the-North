@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { flareSource } from '../../fx/WindowLight.js';
-import { spruceStand, bareTree } from '../nature.js';
+import { spruceStand, bareTree, rockGeometry, roundedBox } from '../nature.js';
+import { chamferBox, thickPath, profileX, lathe } from './StationScene.js';
 import { LocationBase } from '../LocationBase.js';
 import { canvasTexture, rng, glowTexture } from '../../render/textures.js';
 import { glow, lightPool } from '../props.js';
@@ -134,6 +135,14 @@ export class StreetScene extends LocationBase {
     return m;
   }
 
+  /** Place a ready geometry. */
+  M(geo, mat, x, y, z, parent = this.root, rx = 0, ry = 0, rz = 0) {
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set(x, y, z); m.rotation.set(rx, ry, rz);
+    parent.add(m);
+    return m;
+  }
+
   build() {
     this.lumps = [];
     this.buildBackdrop();
@@ -205,23 +214,44 @@ export class StreetScene extends LocationBase {
     });
   }
 
-  /** Queue a low-poly snow lump (all merged into one InstancedMesh). */
+  /** Queue a snow drift (merged per shape variant into InstancedMeshes). */
   lump(x, y, z, sx, sy, sz, ry = 0) { this.lumps.push([x, y, z, sx, sy, sz, ry]); }
 
+  /**
+   * Drifts: a few noise-displaced domes (rockGeometry with a flat base, snow-white vertex
+   * colours, bluish hollows, a grey contact line) — irregular wind-cut tops, not pancakes.
+   */
   flushLumps(list = this.lumps, parent = this.root, name) {
     if (!list.length) return null;
-    const geo = new THREE.IcosahedronGeometry(1, 2);
-    const p = geo.attributes.position;
-    const r = rng(list.length + 7);
-    for (let i = 0; i < p.count; i++) { const k = 1 + (r() - 0.5) * 0.08; p.setXYZ(i, p.getX(i) * k, Math.max(-0.3, p.getY(i)) * k, p.getZ(i) * k); }
-    geo.computeVertexNormals();
-    const im = new THREE.InstancedMesh(geo, this.mat('snowLump', { color: 0xc4c8cc, roughness: 0.5 }), list.length);
+    const V = 5;
+    if (!this.driftGeos) {
+      this.driftGeos = [];
+      for (let k = 0; k < V; k++) {
+        const g = rockGeometry(310 + k * 13, { detail: 4, rough: 0.55, sharp: 0.5, flat: 0.0, colA: 0xe6eaf0, colB: k > 2 ? 0xa8a49c : 0xc4ccd8, dark: 0.5 });
+        g.computeBoundingBox();
+        g.translate(0, -g.boundingBox.min.y, 0);
+        g.scale(1.25, 1, 0.85); // longer along the curb / the wall
+        this.driftGeos.push(g);
+      }
+    }
+    const mat = this.mat('snowDrift', { vertexColors: true, color: 0xf2f4f6, roughness: 0.6 });
+    const grp = new THREE.Group();
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
-    // late autumn: what was a plowed bank is a low line of slush
-    list.forEach(([x, y, z, sx, sy, sz, ry], i) => { q.setFromEuler(e.set(0, ry, 0)); m.compose(new THREE.Vector3(x, y, z), q, new THREE.Vector3(sx * 0.7, sy * 0.25, sz * 0.7)); im.setMatrixAt(i, m); });
-    if (name) im.name = name;
-    parent.add(im);
-    return im;
+    // late autumn: what was a plowed bank is a low, broken line of old snow
+    for (let k = 0; k < V; k++) {
+      const sub = list.filter((_, i) => i % V === k);
+      if (!sub.length) continue;
+      const im = new THREE.InstancedMesh(this.driftGeos[k], mat, sub.length);
+      sub.forEach(([x, y, z, sx, sy, sz, ry], i) => {
+        q.setFromEuler(e.set(0, ((ry * 0.37) % 1 - 0.5) * 0.5, 0));
+        m.compose(new THREE.Vector3(x, y - 0.01, z), q, new THREE.Vector3(sx * 0.5, sy * 0.36, sz * 0.55));
+        im.setMatrixAt(i, m);
+      });
+      grp.add(im);
+    }
+    if (name) grp.name = name;
+    parent.add(grp);
+    return grp;
   }
 
   // ---------------------------------------------------------------- backdrop
@@ -353,7 +383,16 @@ export class StreetScene extends LocationBase {
     const wall = this.wall(-9.2, 4.6, MAIN_H, FZ, concrete, holes);
     void wall;
     // cedar feature cladding around the entrance bay, proud of the wall
-    for (const [x0, x1] of [[-3.4, -2.6], [0.6, 1.4]]) this.B(x1 - x0, 2.9, 0.12, cedar, (x0 + x1) / 2, 1.45, FZ + 0.06);
+    // (clad piers: a concrete base, cedar boards, anodised corner angles, a capping)
+    const trimM = this.mat('cladTrim', { color: 0x2a2e34, roughness: 0.4, metalness: 0.6 });
+    for (const [x0, x1] of [[-3.4, -2.6], [0.6, 1.4]]) {
+      const cx = (x0 + x1) / 2, w = x1 - x0;
+      this.B(w, 2.56, 0.22, cedar, cx, 0.32 + 1.28, FZ + 0.11);
+      this.M(chamferBox(w + 0.04, 0.32, 0.27, 0.015), this.mat('pierBase', { color: 0x7a7874, roughness: 0.92 }), cx, 0.16, FZ + 0.125);
+      this.M(chamferBox(w + 0.04, 0.035, 0.27, 0.01), trimM, cx, 2.89, FZ + 0.125);
+      for (const ex of [x0, x1]) this.M(chamferBox(0.03, 2.56, 0.03, 0.008), trimM, ex, 1.6, FZ + 0.215);
+      this.M(chamferBox(w, 0.02, 0.012, 0.005), trimM, cx, 0.33, FZ + 0.226);
+    }
     this.B(4.8, 0.12, 0.3, this.mat('parapet', { color: 0x6a6e74, roughness: 0.6, metalness: 0.3 }), -1.0, MAIN_H + 0.06, FZ + 0.05);
     // floor bands, plinth, parapet coping, downpipe
     const band = this.mat('band', { color: 0x8a8880, roughness: 0.8 });
@@ -457,23 +496,76 @@ export class StreetScene extends LocationBase {
     }
     const mat = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 1.0), this.mat('doorMat', { color: 0x26282a, roughness: 0.95 }));
     mat.rotation.x = -Math.PI / 2; mat.position.set(-1.0, 0.01, FZ + 0.6); root.add(mat);
-    // canopy: steel columns, thick slab, fascia sign, snow load, downlights, icicles
+    // canopy: a steel deck with a soffit of linear panels, a profiled fascia with a coping and
+    // drip edge, a half-round gutter on brackets, a downpipe down the left column, round clad
+    // columns on concrete piers with cast bases and flared caps, recessed downlights
     const canopy = new THREE.Group();
-    this.B(5.2, 0.28, 2.6, this.mat('canopy', { color: 0x2a3a4a, roughness: 0.5, metalness: 0.3 }), 0, 0, 0, canopy);
-    this.B(5.25, 0.18, 0.06, this.mat('canopyFascia', { color: 0x1c4a6a, roughness: 0.4, metalness: 0.3 }), 0, 0.02, 1.31, canopy);
-    this.B(5.1, 0.24, 2.5, this.mat('sillSnow', { color: 0xf4f8fa, roughness: 0.95 }), 0, 0.26, 0, canopy);
+    const cMat = this.mat('canopy', { color: 0x2a3a4a, roughness: 0.5, metalness: 0.3 });
+    const fasM = this.mat('canopyFascia', { color: 0x1c4a6a, roughness: 0.4, metalness: 0.3 });
+    const flashM = this.mat('canopyFlash', { color: 0x5a6068, roughness: 0.35, metalness: 0.6 });
+    const gutM = this.mat('gutter', { color: 0x4a5058, roughness: 0.4, metalness: 0.5, side: THREE.DoubleSide });
+    this.M(chamferBox(5.1, 0.2, 2.45, 0.02), cMat, 0, 0, -0.05, canopy);
+    const sofTex = PX('soffit', 16, 32, (ctx, w, h) => {
+      const rr = rng(71);
+      for (let y = 0; y < h; y++) { const g = y % 8; const v = g === 0 ? 120 : g === 1 ? 150 : 206 + (rr() - 0.5) * 6 - g * 1.5; ctx.fillStyle = rgb(v, v + 2, v + 4); ctx.fillRect(0, y, w, 1); }
+    }).clone();
+    sofTex.needsUpdate = true; sofTex.repeat.set(5.0 / 0.4, 2.4 / 0.8);
+    const sof = this.M(new THREE.PlaneGeometry(5.0, 2.4), this.mat('soffitPanels', { map: sofTex, color: 0xd8dade, roughness: 0.6, metalness: 0.2 }), 0, -0.101, -0.05, canopy, Math.PI / 2);
+    void sof;
+    const fas = new THREE.Shape([new THREE.Vector2(1.16, -0.21), new THREE.Vector2(1.31, -0.21), new THREE.Vector2(1.31, 0.22), new THREE.Vector2(1.16, 0.22)]);
+    this.M(profileX(fas, 5.3, 0.012), fasM, 0, 0, 0, canopy);
+    this.M(chamferBox(5.3, 0.025, 0.18, 0.008), flashM, 0, -0.205, 1.08, canopy);
+    this.M(chamferBox(5.36, 0.02, 0.24, 0.006), flashM, 0, 0.232, 1.25, canopy);
+    this.M(chamferBox(5.36, 0.06, 0.014, 0.005), flashM, 0, 0.205, 1.365, canopy);
+    // half-round gutter hung off the fascia, rolled bead, end caps, brackets
+    const gR = 0.065, gz = 1.39;
+    const gut = new THREE.CylinderGeometry(gR, gR, 5.2, 20, 1, true, Math.PI, Math.PI); gut.rotateZ(Math.PI / 2);
+    this.M(gut, gutM, 0, 0.19, gz, canopy);
+    const bead = new THREE.CylinderGeometry(0.009, 0.009, 5.2, 12); bead.rotateZ(Math.PI / 2);
+    this.M(bead, gutM, 0, 0.19, gz + gR, canopy);
+    const endCap = new THREE.CircleGeometry(gR, 20, Math.PI, Math.PI);
+    for (const sx of [-1, 1]) this.M(endCap, gutM, sx * 2.6, 0.19, gz, canopy, 0, Math.PI / 2, 0);
+    for (let x = -2.4; x <= 2.41; x += 0.8) {
+      const br = new THREE.TorusGeometry(gR + 0.006, 0.006, 6, 16, Math.PI); br.rotateY(Math.PI / 2); br.rotateX(Math.PI);
+      this.M(br, flashM, x, 0.19, gz, canopy);
+    }
     canopy.position.set(-1.0, 2.95, FZ + 1.3); root.add(canopy);
-    for (let i = 0; i < 9; i++) this.lump(-3.4 + i * 0.6, 3.3, FZ + 1.3 + (i % 3 - 1) * 0.5, 0.45, 0.09, 0.5, i);
+    this.B(5.1, 0.24, 2.4, this.mat('sillSnow', { color: 0xf4f8fa, roughness: 0.95 }), 0, 0.22, -0.05, canopy);
     const fs = this.textSign('MAIN ENTRANCE', { w: 1.6, h: 0.16, bg: '#1c4a6a', fg: '#f4f8fa', emissive: 0.5 });
     fs.position.set(-1.0, 2.97, FZ + 2.64); root.add(fs);
+    const colM = this.mat('colSteel', { color: 0x2e343a, roughness: 0.45, metalness: 0.55 });
+    const pier = this.mat('plinthC', { color: 0x8a8884, roughness: 0.9 });
+    const shaft = new THREE.CylinderGeometry(0.085, 0.085, 2.62, 24);
     for (const x of [-3.3, 1.3]) {
-      this.B(0.14, 2.82, 0.14, steel, x, 1.41, FZ + 2.4);
-      this.B(0.3, 0.12, 0.3, this.mat('plinth', { color: 0x6c6a66, roughness: 0.95 }), x, 0.06, FZ + 2.4);
-      this.lump(x, 0.02, FZ + 2.4, 0.3, 0.12, 0.3);
+      const z = FZ + 2.4;
+      this.M(lathe('pier', [[0, 0], [0.2, 0], [0.2, 0.1], [0.185, 0.13], [0, 0.13]], 28), pier, x, 0, z);
+      this.M(chamferBox(0.32, 0.022, 0.32, 0.006), colM, x, 0.141, z);
+      for (const [ox, oz] of [[-0.12, -0.12], [0.12, -0.12], [-0.12, 0.12], [0.12, 0.12]]) this.M(lathe('nut', [[0, 0.152], [0.016, 0.152], [0.016, 0.168], [0.008, 0.176], [0, 0.176]], 6), colM, x + ox, 0, z + oz);
+      this.M(lathe('colBase', [[0.14, 0.152], [0.14, 0.17], [0.12, 0.2], [0.1, 0.25], [0.088, 0.33], [0, 0.33]], 28), colM, x, 0, z);
+      this.M(shaft, colM, x, 0.15 + 1.31, z);
+      this.M(lathe('colCap', [[0.086, 2.62], [0.095, 2.7], [0.12, 2.76], [0.15, 2.79], [0.15, 2.815], [0, 2.815]], 28), colM, x, 0, z);
+      this.M(chamferBox(0.34, 0.025, 0.34, 0.006), colM, x, 2.83, z);
+    }
+    // downpipe from the gutter: down the face of the fascia, back beside the left column,
+    // strapped to it, a shoe at the foot
+    {
+      const px = -3.3 - 0.16, pz = FZ + 2.4;
+      const pipeM = this.mat('downpipe', { color: 0x4a5058, roughness: 0.4, metalness: 0.5 });
+      const dp = new THREE.TubeGeometry(new THREE.CatmullRomCurve3([
+        new THREE.Vector3(px, 3.13, FZ + 2.69), new THREE.Vector3(px, 2.9, FZ + 2.69), new THREE.Vector3(px, 2.7, FZ + 2.64),
+        new THREE.Vector3(px, 2.52, pz + 0.04), new THREE.Vector3(px, 2.3, pz), new THREE.Vector3(px, 0.3, pz), new THREE.Vector3(px, 0.2, pz), new THREE.Vector3(px - 0.1, 0.13, pz)]), 64, 0.038, 14);
+      this.M(dp, pipeM, 0, 0, 0);
+      for (const y of [0.8, 1.6, 2.2]) {
+        this.M(chamferBox(0.1, 0.025, 0.025, 0.008), colM, px + 0.06, y, pz);
+        this.M(new THREE.TorusGeometry(0.042, 0.007, 6, 18), colM, px, y, pz, root, Math.PI / 2);
+      }
     }
     const dl = this.mat('downlight', { color: 0x000000, emissive: 0xfff0d8, emissiveIntensity: 2.5 });
+    const trim = this.mat('dlTrim', { color: 0xc8ccd0, roughness: 0.3, metalness: 0.7 });
+    const ring = new THREE.TorusGeometry(0.078, 0.012, 8, 28);
     for (const x of [-2.8, -1.0, 0.8]) for (const z of [FZ + 0.8, FZ + 1.9]) {
-      const d = new THREE.Mesh(new THREE.CircleGeometry(0.07, 10), dl); d.rotation.x = Math.PI / 2; d.position.set(x, 2.8, z); root.add(d);
+      const d = new THREE.Mesh(new THREE.CircleGeometry(0.068, 28), dl); d.rotation.x = Math.PI / 2; d.position.set(x, 2.836, z); root.add(d);
+      this.M(ring, trim, x, 2.842, z, root, Math.PI / 2);
     }
     const ice = this.mat('ice', { color: 0xdfeefa, roughness: 0.1, transparent: true, opacity: 0.85 });
     const r = rng(63);
@@ -572,20 +664,61 @@ export class StreetScene extends LocationBase {
     const root = this.root;
     const steel = this.mat('steelDark', { color: 0x3a3e44, metalness: 0.6, roughness: 0.5 });
     const snow = this.mat('sillSnow', { color: 0xf4f8fa, roughness: 0.95 });
-    // bench under snow
-    this.bench(4.0, -2.55, 1.8, 0x4a3a2a);
-    this.B(1.85, 0.12, 0.45, snow, 4.0, 0.53, -2.55);
-    this.B(1.85, 0.06, 0.08, snow, 4.0, 0.96, -2.78);
-    // bins: garbage + recycling, with snow caps
-    for (const [x, c, label] of [[2.0, 0x2a3a2a, 'WASTE'], [2.55, 0x1c4a8a, 'RECYCLE']]) {
-      this.B(0.5, 0.95, 0.5, this.mat(`bin-${c}`, { color: c, roughness: 0.6, metalness: 0.2 }), x, 0.475, -2.6);
-      this.B(0.54, 0.06, 0.54, steel, x, 0.98, -2.6);
-      this.lump(x, 1.0, -2.6, 0.26, 0.08, 0.26);
-      const s = this.textSign(label, { w: 0.4, h: 0.1, bg: '#e8e8e0', fg: '#1a1a1a' }); s.position.set(x, 0.75, -2.345); root.add(s);
+    // slatted park bench: cast-iron side frames, oak seat and back slats on bolts
+    {
+      const bench = new THREE.Group();
+      const iron = this.mat('castIron', { color: 0x1e2226, roughness: 0.55, metalness: 0.45 });
+      const oak = this.mat('benchOak', { map: cedarTex(), color: 0xa88a6a, roughness: 0.75 });
+      const frame = [
+        profileX(thickPath([[0.25, 0.0], [0.245, 0.2], [0.235, 0.44], [0.24, 0.56], [0.2, 0.63], [0.06, 0.645], [-0.12, 0.64], [-0.2, 0.66]], 0.05), 0.05, 0.01),
+        profileX(thickPath([[-0.23, 0.0], [-0.2, 0.22], [-0.21, 0.43], [-0.25, 0.62], [-0.3, 0.84], [-0.32, 0.9]], 0.055), 0.05, 0.01),
+        profileX(thickPath([[0.25, 0.41], [0.0, 0.405], [-0.22, 0.39]], 0.045), 0.045, 0.008),
+        profileX(thickPath([[0.12, 0.0], [0.0, 0.18], [-0.16, 0.32]], 0.03), 0.03, 0.006),
+      ];
+      for (const sx of [-0.78, 0.78]) {
+        for (const g of frame) this.M(g, iron, sx, 0, 0, bench);
+        for (const fz of [0.25, -0.23]) this.M(chamferBox(0.09, 0.02, 0.1, 0.006), iron, sx, 0.01, fz, bench);
+      }
+      for (let i = 0; i < 5; i++) {
+        const z = 0.23 - i * 0.1;
+        this.M(chamferBox(1.8, 0.035, 0.078, 0.012), oak, 0, 0.445 - i * 0.004, z, bench);
+      }
+      for (let i = 0; i < 3; i++) this.M(chamferBox(1.8, 0.08, 0.03, 0.01), oak, 0, 0.57 + i * 0.11, -0.212 - i * 0.024, bench, -0.22);
+      for (const sx of [-0.78, 0.78]) for (let i = 0; i < 5; i++) this.M(new THREE.CylinderGeometry(0.008, 0.008, 0.006, 12), iron, sx, 0.464 - i * 0.004, 0.23 - i * 0.1, bench);
+      bench.position.set(4.0, 0, -2.55); root.add(bench);
+      this.lump(4.0 - 0.95, 0.0, -2.42, 0.4, 0.14, 0.25, 0.2);
+      this.lump(4.0 + 0.9, 0.0, -2.62, 0.35, 0.12, 0.3, 0.8);
     }
-    // smoking post + sign
-    this.B(0.12, 1.0, 0.12, steel, -4.0, 0.5, -2.6);
-    this.B(0.18, 0.12, 0.18, steel, -4.0, 1.04, -2.6);
+    // outdoor bins: rounded-square tapered bodies with moulded ribs, a plinth, a domed hood
+    // with a dark mouth, the label plates
+    const binBody = (() => {
+      const sh = new THREE.Shape(), W = 0.22, R = 0.08;
+      sh.moveTo(-W + R, -W); sh.lineTo(W - R, -W); sh.quadraticCurveTo(W, -W, W, -W + R); sh.lineTo(W, W - R); sh.quadraticCurveTo(W, W, W - R, W); sh.lineTo(-W + R, W); sh.quadraticCurveTo(-W, W, -W, W - R); sh.lineTo(-W, -W + R); sh.quadraticCurveTo(-W, -W, -W + R, -W);
+      const mk = (depth, bev) => { const g = new THREE.ExtrudeGeometry(sh, { depth, bevelEnabled: true, bevelThickness: bev, bevelSize: bev, bevelSegments: 3, curveSegments: 10 }); g.rotateX(-Math.PI / 2); g.translate(0, bev, 0); return g; };
+      const body = mk(0.82, 0.012);
+      const p = body.attributes.position;
+      for (let i = 0; i < p.count; i++) { const f = 0.93 + 0.07 * Math.min(1, p.getY(i) / 0.84); p.setX(i, p.getX(i) * f); p.setZ(i, p.getZ(i) * f); }
+      body.computeVertexNormals();
+      const plinth = mk(0.05, 0.01); plinth.scale(1.04, 1, 1.04);
+      const lid = mk(0.04, 0.014); lid.scale(1.1, 1, 1.1);
+      const dome = new THREE.SphereGeometry(1, 28, 10, 0, Math.PI * 2, 0, Math.PI / 2); dome.scale(0.235, 0.12, 0.235);
+      return { body, plinth, lid, dome };
+    })();
+    for (const [x, c, label] of [[2.0, 0x2a3a2a, 'WASTE'], [2.55, 0x1c4a8a, 'RECYCLE']]) {
+      const z = -2.6, bm = this.mat(`bin-${c}`, { color: c, roughness: 0.5, metalness: 0.15 });
+      const dk = this.mat(`binDk-${c}`, { color: new THREE.Color(c).multiplyScalar(0.6).getHex(), roughness: 0.6, metalness: 0.15 });
+      this.M(binBody.plinth, steel, x, 0, z);
+      this.M(binBody.body, bm, x, 0.04, z);
+      for (const ox of [-0.13, 0.13]) this.M(chamferBox(0.035, 0.56, 0.02, 0.008), bm, x + ox, 0.42, z + 0.236, root, 0.02);
+      this.M(binBody.lid, dk, x, 0.875, z);
+      this.M(binBody.dome, bm, x, 0.92, z);
+      this.M(chamferBox(0.26, 0.08, 0.03, 0.012), this.mat('binMouth', { color: 0x0c0d0e, roughness: 0.9 }), x, 0.955, z + 0.19, root, -0.75);
+      const s = this.textSign(label, { w: 0.34, h: 0.1, bg: '#e8e8e0', fg: '#1a1a1a' }); s.position.set(x, 0.68, z + 0.252); root.add(s);
+    }
+    // smoking post: a round ash receptacle on a pedestal
+    this.M(lathe('ashBase', [[0, 0], [0.16, 0], [0.16, 0.03], [0.07, 0.06], [0.05, 0.1], [0, 0.1]], 24), steel, -4.0, 0, -2.6);
+    this.M(new THREE.CylinderGeometry(0.045, 0.05, 0.75, 20), steel, -4.0, 0.47, -2.6);
+    this.M(lathe('ashTop', [[0.05, 0.84], [0.11, 0.86], [0.11, 1.04], [0.095, 1.07], [0.06, 1.08], [0.05, 1.11], [0.03, 1.11], [0.03, 1.06], [0, 1.06]], 24), steel, -4.0, 0, -2.6);
     const ns = this.textSign('NO SMOKING WITHIN 9 M', { w: 0.6, h: 0.16, bg: '#f0f0ea', fg: '#a01818' });
     ns.position.set(-3.85, 1.6, FZ + 0.03); root.add(ns);
     // bike rack (hoops) with one bike frozen to it
@@ -624,14 +757,15 @@ export class StreetScene extends LocationBase {
     const bank = fgGroup('fg-snowbank');
     const r = rng(66);
     const lumps = [];
-    for (let x = -20; x < 22; x += 0.55) {
+    for (let x = -20; x < 22; x += 0.8) {
       if (x > -0.4 && x < 4.6) continue;
-      const hgt = 0.35 + r() * 0.3;
-      lumps.push([x + r() * 0.3, 0.02, 2.25 + r() * 0.2, 0.55 + r() * 0.35, hgt, 0.45 + r() * 0.2, r() * 3]);
-      if (r() < 0.4) lumps.push([x + r() * 0.3, hgt * 0.6, 2.3, 0.35, hgt * 0.6, 0.3, r() * 3]);
+      if (r() < 0.25) continue; // gaps where the slush has gone
+      const hgt = 0.3 + r() * 0.35;
+      lumps.push([x + r() * 0.4, 0.0, 2.25 + r() * 0.2, 0.75 + r() * 0.45, hgt, 0.45 + r() * 0.2, r() * 3]);
+      if (r() < 0.3) lumps.push([x + 0.3 + r() * 0.3, 0.0, 2.38, 0.45, hgt * 0.7, 0.3, r() * 3]);
     }
     // low dirty ridges either side of the crossing
-    lumps.push([-0.2, 0.0, 2.3, 0.4, 0.18, 0.35, 0], [4.4, 0.0, 2.3, 0.4, 0.15, 0.35, 1]);
+    lumps.push([-0.35, 0.0, 2.32, 0.4, 0.18, 0.3, 0], [4.5, 0.0, 2.32, 0.4, 0.15, 0.3, 1]);
     this.flushLumps(lumps, bank);
     const grit = new THREE.Mesh(new THREE.PlaneGeometry(42, 0.5), new THREE.MeshBasicMaterial({ color: 0x8a8478, transparent: true, opacity: 0.35, depthWrite: false }));
     grit.rotation.x = -Math.PI / 2; grit.position.set(1, 0.015, 2.5); bank.add(grit);
@@ -640,16 +774,40 @@ export class StreetScene extends LocationBase {
     for (let x = -8.4; x <= -3.0; x += 0.18) this.B(0.025, 1.0, 0.025, steel, x, 0.5, 2.05, fence);
     for (const y of [0.18, 0.88]) { this.B(5.5, 0.04, 0.04, steel, -5.7, y, 2.05, fence); this.B(5.5, 0.04, 0.07, this.mat('sillSnow', { color: 0xf4f8fa, roughness: 0.95 }), -5.7, y + 0.04, 2.05, fence); }
     for (const x of [-8.5, -5.7, -2.9]) this.B(0.08, 1.15, 0.08, steel, x, 0.57, 2.05, fence);
-    // lamp posts at the sidewalk edge
+    // lamp posts at the sidewalk edge: base plate with anchor nuts, a cast base shroud, a
+    // tapered round pole, a curved davit arm, a cobra-head luminaire, banner brackets
+    const poleM = this.mat('lampPole', { color: 0x2e3338, roughness: 0.45, metalness: 0.55 });
+    const pole = new THREE.CylinderGeometry(0.05, 0.085, 4.9, 24);
+    const arm = new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(0, 4.95, 0), new THREE.Vector3(-0.05, 5.25, 0), new THREE.Vector3(-0.3, 5.42, 0), new THREE.Vector3(-0.72, 5.45, 0), new THREE.Vector3(-0.8, 5.44, 0)]), 32, 0.03, 12);
+    const housing = new THREE.SphereGeometry(1, 28, 12, 0, Math.PI * 2, 0, Math.PI / 2); housing.scale(0.3, 0.1, 0.15);
+    const lens = new THREE.SphereGeometry(1, 28, 6, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2); lens.scale(0.24, 0.035, 0.115);
+    const lensM = this.mat('lampLens', { color: 0x2a2620, emissive: 0xffe0b0, emissiveIntensity: 0.9, roughness: 0.3 });
+    const bannerTex = PX('banner', 16, 24, (ctx, w, h) => {
+      ctx.fillStyle = '#1c4a6a'; ctx.fillRect(0, 0, w, h);
+      ctx.fillStyle = '#e8eef2'; ctx.fillRect(6, 5, 4, 12); ctx.fillRect(2, 9, 12, 4);
+      ctx.fillStyle = '#c8a040'; ctx.fillRect(0, h - 4, w, 2);
+      ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(0, 0, 1, h); ctx.fillRect(w - 1, 0, 1, h);
+    });
+    const bannerGeo = new THREE.PlaneGeometry(0.42, 0.56, 8, 1);
+    { const bp = bannerGeo.attributes.position; for (let i = 0; i < bp.count; i++) bp.setZ(i, Math.sin((bp.getX(i) + 0.21) * 9) * 0.018); bannerGeo.computeVertexNormals(); }
+    const bannerM = this.mat('bannerCloth', { map: bannerTex, roughness: 0.85, side: THREE.DoubleSide });
     for (const x of [-3.0, 8.5, -13.0, 15.5]) {
-      const lp = fgGroup(`fg-lamp-${x}`);
-      this.B(0.14, 5.4, 0.14, steel, x, 2.7, 2.35, lp);
-      this.B(0.28, 0.4, 0.28, steel, x, 0.2, 2.35, lp);
-      this.B(0.9, 0.08, 0.08, steel, x - 0.4, 5.35, 2.35, lp);
-      this.B(0.45, 0.14, 0.26, steel, x - 0.8, 5.3, 2.35, lp);
-      this.B(0.46, 0.06, 0.28, this.mat('sillSnow', { color: 0xf4f8fa, roughness: 0.95 }), x - 0.8, 5.4, 2.35, lp);
-      const g = glow(0xffe0b0, 0.7, 0.4); g.position.set(x - 0.8, 5.2, 2.4); lp.add(g);
-      this.B(0.4, 0.5, 0.02, this.mat('banner', { color: 0x1c4a6a, roughness: 0.7 }), x + 0.25, 3.9, 2.35, lp);
+      const lp = fgGroup(`fg-lamp-${x}`), z = 2.35;
+      this.M(chamferBox(0.34, 0.025, 0.34, 0.008), poleM, x, 0.0125, z, lp);
+      for (const [ox, oz] of [[-0.12, -0.12], [0.12, -0.12], [-0.12, 0.12], [0.12, 0.12]]) this.M(lathe('nut', [[0, 0.152], [0.016, 0.152], [0.016, 0.168], [0.008, 0.176], [0, 0.176]], 6), poleM, x + ox, -0.127, z + oz, lp);
+      this.M(lathe('lampBase', [[0.16, 0.025], [0.16, 0.06], [0.14, 0.09], [0.13, 0.3], [0.12, 0.34], [0.105, 0.36], [0.1, 0.42], [0.09, 0.47], [0.082, 0.5], [0, 0.5]], 28), poleM, x, 0, z, lp);
+      this.M(pole, poleM, x, 0.45 + 2.45, z, lp);
+      this.M(lathe('poleTop', [[0.05, 5.33], [0.058, 5.36], [0.05, 5.4], [0.02, 5.44], [0, 5.45]], 20), poleM, x, 0, z, lp);
+      this.M(arm, poleM, x, 0, z, lp);
+      this.M(housing, poleM, x - 0.98, 5.4, z, lp);
+      this.M(lens, lensM, x - 1.0, 5.4, z, lp);
+      this.M(chamferBox(0.1, 0.06, 0.08, 0.02), poleM, x - 0.74, 5.43, z, lp);
+      const g = glow(0xffe0b0, 0.7, 0.4); g.position.set(x - 1.0, 5.3, z + 0.05); lp.add(g);
+      for (const by of [4.2, 3.62]) {
+        this.M(new THREE.CylinderGeometry(0.012, 0.012, 0.5, 12), poleM, x + 0.27, by, z, lp, 0, 0, Math.PI / 2);
+        this.M(new THREE.SphereGeometry(0.018, 14, 10), poleM, x + 0.52, by, z, lp);
+      }
+      this.M(bannerGeo, bannerM, x + 0.29, 3.9, z, lp);
     }
     // parked cars along the curb (seen at the edges of the frame)
     const c1 = fgGroup('fg-car-sedan');

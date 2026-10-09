@@ -86,14 +86,12 @@ const archMask = () => canvasTexture('cave-arch', 64, 64, (ctx, w, h) => {
 function wallHeight(x, y, fine = false) {
   let d = (fbm3(x * 0.32, y * 0.32, 0, 23, 4) - 0.5) * 1.5;
   d -= Math.max(0, fbm3(x * 0.7, y * 0.7, 5, 25, 3) - 0.5) * 3.6;                   // scallops
-  const cell = Math.abs(fbm3(x * 1.3, y * 1.6, 6, 29, 3) - 0.5);
-  d -= Math.max(0, 0.13 - cell) * 2.6;                                               // sharp-rimmed pockets
+  d -= Math.pow(Math.max(0, fbm3(x * 1.1, y * 1.4, 6, 29, 3) - 0.52), 1.5) * 4.0;      // smaller wind-carved cups
   const fr = (y * 1.25 + fbm3(x * 0.22, y * 0.3, 4, 22, 3) * 2.6) % 1;              // layers: a long slope, then a softer drop
   const lay = fr < 0.75 ? fr / 0.75 : (1 - fr) / 0.25;
   d += lay * lay * (3 - 2 * lay) * 0.15;
   if (fine) {
     d += (fbm3(x * 4, y * 4, 2, 35, 3) - 0.5) * 0.1;
-    d -= Math.max(0, 0.04 - Math.abs(fbm3(x * 2.4, y * 5, 7, 39, 2) - 0.5)) * 1.2;   // hairline cracks along the layers
   }
   d += Math.max(0, 0.9 - y) * 0.7;
   d += Math.max(0, y - 3.4) * 0.9;
@@ -119,7 +117,7 @@ const wallBakedTex = (W, Hh) => canvasTexture(`cave-wallbake-${W}`, W, Hh, (ctx,
       const band = (y * 1.25 + fbm3(x * 0.22, y * 0.3, 4, 22, 3) * 2.6) % 1;
       const k = Math.max(0, Math.min(1, t * 1.8 - 0.4));
       const shade = (0.3 + 1.0 * lit) * (0.8 + 0.28 * band);
-      const hollow = Math.max(0, Math.min(1, -hc * 0.9 - 0.05));
+      const hollow = Math.max(0, Math.min(0.8, -hc * 0.55 - 0.2));
       const o = (j * w + i) * 4;
       for (let c = 0; c < 3; c++) img.data[o + c] = ((A[c] + (B[c] - A[c]) * k) * shade) * (1 - hollow) + D[c] * hollow;
       img.data[o + 3] = 255;

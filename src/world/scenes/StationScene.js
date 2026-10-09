@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { flareSource } from '../../fx/WindowLight.js';
-import { bevelBox } from '../nature.js';
+import { bevelBox, smoothNormals, roundedBox } from '../nature.js';
 import { LocationBase } from '../LocationBase.js';
 import { streetTexture, canvasTexture, rng, beamTexture } from '../../render/textures.js';
 import { glow, lightCone, pixTex } from '../props.js';
@@ -72,9 +72,10 @@ class Batch {
     if (!this.map.has(mat)) this.map.set(mat, []);
     this.map.get(mat).push([geo, m]);
   }
-  box(w, h, d, mat, x, y, z, ry = 0, rx = 0, rz = 0) { this.add(UNIT.box, mat, x, y, z, w, h, d, rx, ry, rz); }
+  /** Box with a real chamfered edge (radius r, ~1/5 of the thinnest side, ≤ 1.4 cm). */
+  box(w, h, d, mat, x, y, z, ry = 0, rx = 0, rz = 0, r) { this.add(chamferBox(w, h, d, r), mat, x, y, z, 1, 1, 1, rx, ry, rz); }
   plane(w, h, mat, x, y, z, ry = 0, rx = 0, rz = 0) { this.add(UNIT.plane, mat, x, y, z, w, h, 1, rx, ry, rz); }
-  cyl(r, h, mat, x, y, z, { seg = 8, taper = 1, rx = 0, rz = 0, ry = 0 } = {}) { this.add(unitCyl(seg, taper), mat, x, y, z, r, h, r, rx, ry, rz); }
+  cyl(r, h, mat, x, y, z, { seg = 8, taper = 1, rx = 0, rz = 0, ry = 0 } = {}) { this.add(unitCyl(Math.max(16, seg), taper), mat, x, y, z, r, h, r, rx, ry, rz); }
   flush(parent) {
     for (const [mat, list] of this.map) parent.add(new THREE.Mesh(mergeList(list), mat));
     this.map.clear();
@@ -93,6 +94,122 @@ function uvBox(w, h, d, ox, oz, uS = 4, vS = H) {
     else uv.setXY(i, x / uS, y / vS);
   }
   return g;
+}
+
+// ------------------------------------------------------------------ detailed geometry
+
+const chamCache = new Map();
+/**
+ * A box whose edges are rounded inside a narrow band (radius r) — flat faces stay flat,
+ * only the edges catch the light. Indexed, cached, never mutate.
+ */
+export function chamferBox(w, h, d, r) {
+  if (r == null) r = Math.min(0.014, 0.2 * Math.min(w, h, d));
+  const key = `${w.toFixed(4)}|${h.toFixed(4)}|${d.toFixed(4)}|${r.toFixed(4)}`;
+  let g = chamCache.get(key);
+  if (g) return g;
+  if (r < 0.0025) { g = new THREE.BoxGeometry(w, h, d); chamCache.set(key, g); return g; }
+  g = new THREE.BoxGeometry(w, h, d, 3, 3, 3);
+  const p = g.attributes.position, uv = g.attributes.uv;
+  const half = [w / 2, h / 2, d / 2], inner = half.map((v) => v - r);
+  const v = [0, 0, 0];
+  for (let i = 0; i < p.count; i++) {
+    v[0] = p.getX(i); v[1] = p.getY(i); v[2] = p.getZ(i);
+    for (let a = 0; a < 3; a++) if (Math.abs(Math.abs(v[a]) - half[a] / 3) < 1e-5) v[a] = Math.sign(v[a]) * inner[a];
+    const c = v.map((t, a) => Math.max(-inner[a], Math.min(inner[a], t)));
+    const o = v.map((t, a) => t - c[a]);
+    const L = Math.hypot(o[0], o[1], o[2]);
+    if (L > 1e-9) for (let a = 0; a < 3; a++) v[a] = c[a] + o[a] / L * r;
+    p.setXYZ(i, v[0], v[1], v[2]);
+  }
+  // keep the texture spread over the whole face (grid lines moved from 1/3 to the bevel)
+  const su = [d, d, w, w, w, w], sv = [h, h, d, d, h, h];
+  for (let i = 0; i < uv.count; i++) {
+    const f = Math.floor(i / 16), m = (t, s) => (Math.abs(t - 1 / 3) < 1e-4 ? r / s : Math.abs(t - 2 / 3) < 1e-4 ? 1 - r / s : t);
+    uv.setXY(i, m(uv.getX(i), su[f]), m(uv.getY(i), sv[f]));
+  }
+  smoothNormals(g);
+  chamCache.set(key, g);
+  return g;
+}
+
+/** Closed outline from a centre-line (2-D points) offset by ±t/2 — for moulded shells, brackets. */
+export function thickPath(pts, t) {
+  const out = [], inn = [];
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)];
+    let tx = b[0] - a[0], ty = b[1] - a[1];
+    const l = Math.hypot(tx, ty) || 1; tx /= l; ty /= l;
+    out.push(new THREE.Vector2(pts[i][0] - ty * t / 2, pts[i][1] + tx * t / 2));
+    inn.push(new THREE.Vector2(pts[i][0] + ty * t / 2, pts[i][1] - tx * t / 2));
+  }
+  return new THREE.Shape([...out, ...inn.reverse()]);
+}
+
+/** Extrude a (z, y) side profile across x (width w, centred), soft rounded edges. */
+export function profileX(shape, w, bevel = 0.006) {
+  const g = new THREE.ExtrudeGeometry(shape, { depth: Math.max(0.001, w - bevel * 2), bevelEnabled: bevel > 0, bevelThickness: bevel, bevelSize: bevel * 0.8, bevelSegments: 2, curveSegments: 6 });
+  g.rotateY(-Math.PI / 2);
+  g.translate(w / 2 - bevel, 0, 0);
+  smoothNormals(g);
+  return g;
+}
+
+const geoCache = new Map();
+const cached = (key, make) => { if (!geoCache.has(key)) geoCache.set(key, make()); return geoCache.get(key); };
+
+/**
+ * Moulded polypropylene seat shell (one piece: lip, dished pan, curved back), back towards +z.
+ * Centre-line sampled from a spline, 2.2 cm wall, rounded side edges.
+ */
+function shellGeo(w) {
+  return cached(`shell-${w.toFixed(3)}`, () => {
+    const ctrl = [[-0.24, 0.425], [-0.222, 0.458], [-0.16, 0.468], [-0.03, 0.458], [0.09, 0.462], [0.165, 0.488], [0.2, 0.56], [0.214, 0.68], [0.232, 0.8], [0.244, 0.872], [0.236, 0.9]];
+    const curve = new THREE.CatmullRomCurve3(ctrl.map(([z, y]) => new THREE.Vector3(z, y, 0)));
+    const pts = curve.getSpacedPoints(36).map((v) => [v.x, v.y]);
+    const g = profileX(thickPath(pts, 0.012), w, 0.007);
+    // sculpt the outline: pinched waist at the bend, arched back top, rounded front corners
+    const p = g.attributes.position, hw = w / 2;
+    for (let i = 0; i < p.count; i++) {
+      const x = p.getX(i), y = p.getY(i), z = p.getZ(i), u = Math.min(1, Math.abs(x) / hw);
+      let f = 1 - 0.1 * Math.exp(-(((y - 0.6) / 0.07) ** 2));
+      if (y > 0.7) f *= 1 - 0.07 * (y - 0.7) / 0.2;
+      if (z < -0.12) f *= 1 - 0.12 * ((-0.12 - z) / 0.12) ** 2;
+      const ny = y > 0.68 ? y - (y - 0.68) * 0.4 * u ** 3 : y;
+      p.setXYZ(i, x * f, ny, z);
+    }
+    return smoothNormals(g);
+  });
+}
+
+/** Lathe from [r, y] pairs. */
+export function lathe(key, pts, seg = 24) {
+  return cached(`lathe-${key}`, () => {
+    const g = new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), seg);
+    smoothNormals(g);
+    return g;
+  });
+}
+
+/** Open-top bin with a rolled rim: [rBottom, rTop, height]. */
+function binGeo(rb, rt, h) {
+  return lathe(`bin-${rb}-${rt}-${h}`, [[0, 0.004], [rb - 0.012, 0], [rb, 0.012], [rb + (rt - rb) * 0.5, h * 0.5], [rt, h - 0.02], [rt + 0.012, h - 0.012], [rt + 0.014, h], [rt + 0.004, h + 0.008], [rt - 0.01, h - 0.004], [rt - 0.014, h - 0.03], [rb - 0.012, 0.03], [0, 0.03]], 28);
+}
+
+/** A sheet-like leaf (pointed oval, folded along the midrib), 1 m long along +x. */
+function leafGeo() {
+  return cached('leaf', () => {
+    const s = new THREE.Shape();
+    s.moveTo(0, 0);
+    s.bezierCurveTo(0.25, 0.26, 0.7, 0.24, 1, 0);
+    s.bezierCurveTo(0.7, -0.24, 0.25, -0.26, 0, 0);
+    const g = new THREE.ShapeGeometry(s, 8);
+    g.rotateX(-Math.PI / 2);
+    const p = g.attributes.position;
+    for (let i = 0; i < p.count; i++) { const x = p.getX(i), z = p.getZ(i); p.setY(i, Math.abs(z) * 0.35 - x * x * 0.18); }
+    g.computeVertexNormals();
+    return g;
+  });
 }
 
 // ------------------------------------------------------------------ pixel textures
@@ -819,13 +936,20 @@ export class StationScene extends LocationBase {
     const panel = this.cm(0x3a4a58, 0.55);
     // high counter: laminate front, kick plate, top
     S.box(3.0, 1.06, 0.6, panel, -9.5, 0.55, -2.55);
-    for (let i = 0; i < 5; i++) S.box(0.56, 0.86, 0.02, wood, -10.7 + i * 0.6, 0.6, -2.24);
-    S.box(3.0, 0.12, 0.03, this.cm(0x16181a, 0.8), -9.5, 0.06, -2.24);
-    S.box(3.15, 0.05, 0.42, this.cm(0x7a7064, 0.4), -9.5, 1.11, -2.28);
+    // laminate panels in an aluminium grid, recessed kick plate, a ledge with a rounded nosing on brackets
+    const trim = this.cm(0x5a6068, 0.35, 0.6);
+    for (let i = 0; i < 5; i++) S.box(0.56, 0.82, 0.02, wood, -10.7 + i * 0.6, 0.6, -2.24, 0, 0, 0, 0.006);
+    for (let i = 0; i <= 5; i++) S.box(0.035, 0.9, 0.03, trim, -11.0 + i * 0.6, 0.6, -2.235, 0, 0, 0, 0.008);
+    for (const y of [0.17, 1.03]) S.box(3.04, 0.035, 0.03, trim, -9.5, y, -2.235, 0, 0, 0, 0.008);
+    S.box(3.0, 0.12, 0.03, this.cm(0x16181a, 0.8), -9.5, 0.06, -2.28);
+    S.box(3.15, 0.045, 0.4, this.cm(0x7a7064, 0.4), -9.5, 1.112, -2.29, 0, 0, 0, 0.01);
+    S.cyl(0.026, 3.15, this.cm(0x6a6258, 0.4), -9.5, 1.112, -2.085, { rz: Math.PI / 2, seg: 16 });
+    const gus = cached('gusset', () => profileX(new THREE.Shape([new THREE.Vector2(0, 0), new THREE.Vector2(0.16, 0), new THREE.Vector2(0, -0.14)]), 0.014, 0.003));
+    for (const x of [-10.7, -9.5, -8.3]) S.add(gus, this.mStee, x, 1.088, -2.245);
     S.box(3.05, 0.04, 0.5, this.cm(0x5a5a58, 0.6), -9.5, 0.9, -2.95);
     // flyers taped to the counter front
-    S.plane(0.21, 0.28, this.pm('wanted0', wantedTex(0)), -10.35, 0.72, -2.225, 0, 0, 0.03);
-    S.plane(0.21, 0.28, this.pm('wanted2', wantedTex(2)), -8.7, 0.68, -2.225, 0, 0, -0.04);
+    S.plane(0.21, 0.28, this.pm('wanted0', wantedTex(0)), -10.1, 0.72, -2.222, 0, 0, 0.03);
+    S.plane(0.21, 0.28, this.pm('wanted2', wantedTex(2)), -8.9, 0.68, -2.222, 0, 0, -0.04);
     // bullet-proof glass with frames, speak grille and a pass tray
     const glassMat = this.mat('stGlass', { color: 0xbfd2e0, transparent: true, opacity: 0.16, roughness: 0.05, metalness: 0.2, depthWrite: false });
     S.box(3.0, 1.0, 0.025, glassMat, -9.5, 1.64, -2.45);
@@ -918,22 +1042,8 @@ export class StationScene extends LocationBase {
     S.box(1.2, 0.55, 0.1, this.pm('rad', radTex, { roughness: 0.6, metalness: 0.2 }), -6.4, 0.42, BACK + 0.08);
     S.cyl(0.02, 0.3, this.cm(0x8a8676, 0.5, 0.4), -5.75, 0.15, BACK + 0.08, { seg: 5 });
 
-    // seat rows (benchA/B/C anchors on them)
-    const seatMat = this.mat('stSeat', { map: pixTex('cloth'), color: 0x5a7a90, roughness: 0.6 });
-    const seatRow = (x, len) => {
-      const n = Math.max(2, Math.round(len / 0.58));
-      S.box(len, 0.06, 0.06, this.mStee, x, 0.38, -3.3);
-      for (const s of [-1, 1]) {
-        S.box(0.05, 0.38, 0.05, this.mStee, x + s * (len / 2 - 0.2), 0.19, -3.3);
-        S.box(0.06, 0.03, 0.5, this.mStee, x + s * (len / 2 - 0.2), 0.015, -3.3);
-      }
-      for (let i = 0; i < n; i++) {
-        const cx = x - len / 2 + (i + 0.5) * (len / n);
-        S.box(len / n - 0.06, 0.06, 0.44, seatMat, cx, 0.45, -3.28);
-        S.box(len / n - 0.06, 0.44, 0.05, seatMat, cx, 0.72, -3.5, 0, -0.12);
-        if (i < n - 1) S.box(0.04, 0.16, 0.36, this.mDark, cx + len / n / 2, 0.58, -3.3);
-      }
-    };
+    // seat rows (benchA/B/C anchors on them): moulded shells with a fabric pad on a steel beam
+    const seatRow = (x, len) => this.beamSeats(S, x, -3.3, len, Math.max(2, Math.round(len / 0.58)), { facing: 1, pad: true });
     seatRow(-6.4, 2.4);
     seatRow(-3.2, 2.0);
     this.colliders.push({ box: { minX: -7.7, maxX: -2.1, minZ: -3.7, maxZ: -2.95 } });
@@ -958,12 +1068,12 @@ export class StationScene extends LocationBase {
     // dead plant between the rows
     S.cyl(0.16, 0.36, this.cm(0x5a4030, 0.8), -4.7, 0.18, -3.75, { taper: 1.2, seg: 10 });
     S.cyl(0.17, 0.02, this.cm(0x2a2018, 1), -4.7, 0.355, -3.75, { seg: 10 });
-    const dry = this.mat('stDry', { color: 0x6a5a30, roughness: 1, flatShading: true });
-    const leafG = new THREE.IcosahedronGeometry(1, 0);
+    const dry = this.mat('stDry2', { color: 0x6a5a30, roughness: 1, side: THREE.DoubleSide });
+    const live = this.mat('stLive2', { color: 0x3a4a28, roughness: 0.9, side: THREE.DoubleSide });
     const r = rng(41);
-    S.cyl(0.012, 0.9, this.cm(0x4a3a24), -4.7, 0.8, -3.75, { seg: 4, rz: 0.06 });
-    for (let i = 0; i < 9; i++) S.add(leafG, i < 3 ? this.cm(0x3a4a28, 1, 0, { flatShading: true }) : dry, -4.7 + (r() - 0.5) * 0.4, 0.75 + r() * 0.55, -3.75 + (r() - 0.5) * 0.2, 0.08, 0.03, 0.05, r(), r() * 3, 0.6 + r());
-    for (let i = 0; i < 3; i++) S.add(leafG, dry, -4.6 + r() * 0.3, 0.02, -3.5 + r() * 0.2, 0.06, 0.01, 0.04, 0, r() * 3, 0);
+    S.cyl(0.012, 0.9, this.cm(0x4a3a24), -4.7, 0.8, -3.75, { seg: 16, rz: 0.06 });
+    for (let i = 0; i < 9; i++) { const s = 0.09 + r() * 0.05; S.add(leafGeo(), i < 3 ? live : dry, -4.7 + (r() - 0.5) * 0.06, 0.75 + r() * 0.55, -3.75 + (r() - 0.5) * 0.06, s, s, s, 0, r() * 6.3, -0.6 - r() * 0.6); }
+    for (let i = 0; i < 3; i++) S.add(leafGeo(), dry, -4.6 + r() * 0.3, 0.012, -3.5 + r() * 0.2, 0.08, 0.08, 0.08, 0, r() * 3, 0);
 
     // notice board with flyers + the MISSING poster of Elizabeth Reed
     const board = new THREE.Group();
@@ -1095,14 +1205,47 @@ export class StationScene extends LocationBase {
     this.anchors.offices = new THREE.Vector3(2.2, 1.7, BACK + 0.1);
 
     // corridor-side: copier with an "out of order" note, recycling bin
-    S.box(0.8, 0.95, 0.6, this.cm(0x8a8c88, 0.5), 3.5, 0.475, -3.62);
-    S.box(0.82, 0.08, 0.62, this.cm(0x5a5e62, 0.4), 3.5, 0.99, -3.62);
-    S.box(0.3, 0.02, 0.22, this.mPaper, 3.25, 1.04, -3.6);
-    S.box(0.2, 0.08, 0.02, this.cm(0x2a2e34), 3.75, 1.0, -3.31);
-    S.box(0.12, 0.012, 0.01, this.em(0xffa020, 2), 3.75, 1.0, -3.3);
-    S.plane(0.12, 0.12, this.cm(0xf0e060, 0.8), 3.4, 0.8, -3.315, 0, 0, 0.1);
-    S.box(0.34, 0.5, 0.3, this.cm(0x1a4a8a, 0.6), 0.9, 0.25, -3.8);
-    S.box(0.3, 0.06, 0.26, this.mPaper, 0.9, 0.52, -3.8, 0.2);
+    {
+      const cx = 3.5, cz = -3.62, fz = cz + 0.3; // front face
+      const body = this.cm(0xb4b6b0, 0.45), panel = this.cm(0x8e918c, 0.5), dk = this.cm(0x2a2e34, 0.5), gap = this.cm(0x141618, 0.8);
+      {
+        const S2 = S;
+        S2.box(0.74, 0.07, 0.54, gap, cx, 0.035, cz, 0, 0, 0, 0.01);
+        for (const [ox, oz] of [[-0.32, -0.22], [0.32, -0.22], [-0.32, 0.22], [0.32, 0.22]]) S2.cyl(0.025, 0.04, dk, cx + ox, 0.03, cz + oz, { rx: Math.PI / 2, seg: 16 });
+        // paper cabinet with two cassettes
+        S2.box(0.8, 0.5, 0.58, body, cx, 0.33, cz - 0.01);
+        for (const [y, h] of [[0.2, 0.2], [0.44, 0.2]]) {
+          S2.box(0.76, h, 0.025, panel, cx, y, fz, 0, 0, 0, 0.008);
+          S2.box(0.28, 0.03, 0.02, gap, cx, y + h / 2 - 0.035, fz + 0.012, 0, 0, 0, 0.008);
+          S2.box(0.04, 0.05, 0.004, this.cm(0x6a8aa0, 0.3), cx + 0.3, y, fz + 0.014);
+          S2.box(0.022, 0.03, 0.004, this.cm(0xd8d4c8, 0.6), cx + 0.3, y - 0.004, fz + 0.016);
+        }
+        // print engine with a front door, a side output tray, the scanner and document feeder
+        S2.box(0.78, 0.3, 0.58, body, cx, 0.73, cz - 0.01);
+        S2.box(0.7, 0.24, 0.02, panel, cx - 0.02, 0.73, fz - 0.001, 0, 0, 0, 0.008);
+        S2.box(0.12, 0.018, 0.02, gap, cx - 0.02, 0.83, fz + 0.012, 0, 0, 0, 0.007);
+        S2.box(0.3, 0.012, 0.36, this.cm(0x9a9c98, 0.5), cx - 0.52, 0.72, cz, 0, 0, -0.12, 0.004);
+        this.paperStack(S2, cx - 0.52, 0.728, cz, 3, 0, 21);
+        S2.box(0.76, 0.07, 0.56, this.cm(0x3e4246, 0.5), cx, 0.915, cz - 0.01, 0, 0, 0, 0.012);
+        S2.box(0.62, 0.025, 0.4, this.cm(0x34383c, 0.5), cx - 0.04, 0.962, cz - 0.03, 0, 0, 0, 0.008);
+        S2.box(0.3, 0.008, 0.26, this.cm(0x2a2e32, 0.5), cx - 0.1, 0.99, cz - 0.03, 0, 0, -0.14);
+        S2.box(0.3, 0.002, 0.22, this.mPaper, cx - 0.06, 1.0, cz - 0.02, 0.05, 0, -0.14);
+        // control panel, tilted towards the user: display, keypad, start button
+        S2.box(0.3, 0.035, 0.14, this.cm(0x5a5e62, 0.45), cx + 0.2, 0.93, fz + 0.03, 0, 0.45, 0, 0.01);
+        S2.box(0.11, 0.004, 0.06, this.em(0x6ab0d8, 0.6), cx + 0.13, 0.95, fz + 0.025, 0, 0.45, 0);
+        for (let i = 0; i < 9; i++) S2.box(0.016, 0.006, 0.014, this.cm(0xd8d8d0, 0.6), cx + 0.23 + (i % 3) * 0.024, 0.95 - Math.floor(i / 3) * 0.008, fz + 0.01 + Math.floor(i / 3) * 0.02, 0, 0.45, 0);
+        S2.cyl(0.013, 0.008, this.cm(0x30a050, 0.4), cx + 0.32, 0.944, fz + 0.035, { seg: 16, rx: 0.45 });
+        S2.box(0.05, 0.012, 0.008, this.em(0xffa020, 2), cx + 0.32, 0.918, fz + 0.1, 0, 0.45, 0);
+      }
+      // the "out of order" sticky, a curl at the corner
+      S.plane(0.12, 0.12, this.pm('sticky', ptex('sticky', 12, 12, (ctx, w, h) => { ctx.fillStyle = '#f0e060'; ctx.fillRect(0, 0, w, h); ctx.fillStyle = '#d8c840'; ctx.fillRect(0, 0, w, 2); ctx.fillStyle = '#3a3020'; ctx.fillRect(2, 4, 8, 1); ctx.fillRect(2, 6, 6, 1); ctx.fillRect(2, 8, 7, 1); }), { roughness: 0.9 }), cx - 0.1, 0.76, fz + 0.012, 0, 0, 0.1);
+    }
+    // blue recycling bin with a slotted lid
+    S.add(binGeo(0.15, 0.18, 0.5), this.cm(0x1a4a8a, 0.45), 0.9, 0, -3.78);
+    S.add(lathe('recLid', [[0, 0], [0.184, -0.005], [0.184, -0.03], [0.196, -0.03], [0.196, 0], [0.18, 0.012], [0.12, 0.03], [0, 0.03]], 28), this.cm(0x16407a, 0.45), 0.9, 0.51, -3.78);
+    S.box(0.2, 0.006, 0.03, this.cm(0x081a30, 0.8), 0.9, 0.541, -3.78);
+    S.plane(0.16, 0.06, this.signMat('RECYCLE', 0.16, 0.06, '#e8ecf0', '#1a4a8a'), 0.9, 0.32, -3.78 + 0.17, 0, 0.06);
+    this.paperStack(S, 0.92, 0.545, -3.8, 3, 0.25, 22);
     // wall sign pointing to the cells
     S.plane(0.62, 0.14, this.signMat('CELLS ►', 0.62, 0.14, '#2a2a20', '#e8d890'), 4.08, 2.5, BACK + 0.03);
   }
@@ -1137,19 +1280,49 @@ export class StationScene extends LocationBase {
       root.add(shaft);
       this.pool(0xb8d0ff, 6.2, -4.9, 1.0, 0.7, 0.14);
     }
-    // steel bunk with a thin mattress and a folded blanket
-    S.box(2.6, 0.06, 0.55, this.mStee, 6.1, 0.42, -6.15);
-    S.box(2.6, 0.36, 0.04, this.cm(0x7a7e80, 0.6, 0.6), 6.1, 0.2, -5.9);
-    S.box(1.8, 0.05, 0.52, this.cm(0x2a3a5a, 0.5), 5.8, 0.475, -6.15);
-    S.box(0.44, 0.1, 0.36, this.mat('stBlanket', { map: pixTex('cloth'), color: 0x6a6a5a, roughness: 1 }), 7.0, 0.5, -6.18);
-    S.box(0.28, 0.035, 0.24, this.cm(0xb8b4a8, 0.9), 4.95, 0.5, -6.2, 0.1);
-    // stainless toilet/sink combo
-    const st = this.mStee;
-    const toilet = this.box(0.42, 0.42, 0.5, st, 7.38, 0.21, -6.1); toilet.name = 'toilet';
-    S.box(0.42, 0.72, 0.18, st, 7.38, 0.78, -6.36);
-    S.box(0.3, 0.04, 0.16, this.cm(0x5a6068, 0.3, 0.7), 7.38, 1.14, -6.3);
-    S.box(0.04, 0.04, 0.06, this.mDark, 7.38, 1.08, -6.24);
-    S.box(0.22, 0.03, 0.3, this.cm(0x1a1c1e, 0.3, 0.3), 7.38, 0.43, -6.08);
+    // steel bunk: a folded plate cantilevered off the back wall on welded gussets, bolt plates,
+    // a thin vinyl mattress, a folded blanket, a paperback
+    const bx = 5.65, bw = 2.0;
+    S.box(bw, 0.035, 0.56, this.mStee, bx, 0.43, -6.17, 0, 0, 0, 0.01);
+    S.box(bw, 0.075, 0.02, this.cm(0x8a9096, 0.4, 0.75), bx, 0.405, -5.9, 0, 0, 0, 0.008);
+    S.box(bw, 0.02, 0.035, this.cm(0x8a9096, 0.4, 0.75), bx, 0.372, -5.92, 0, 0, 0, 0.008);
+    const gusset = cached('bunkGusset', () => profileX(new THREE.Shape([new THREE.Vector2(0, 0), new THREE.Vector2(0.5, 0), new THREE.Vector2(0.5, -0.03), new THREE.Vector2(0, -0.3)]), 0.012, 0.003));
+    for (const gx of [bx - 0.8, bx, bx + 0.8]) {
+      S.add(gusset, this.cm(0x7a7e80, 0.5, 0.6), gx, 0.412, -6.44);
+      S.box(0.12, 0.34, 0.012, this.cm(0x6a6e70, 0.5, 0.6), gx, 0.27, -6.444, 0, 0, 0, 0.004);
+      for (const by of [0.15, 0.39]) S.cyl(0.012, 0.012, this.mDark, gx + 0.035, by, -6.436, { rx: Math.PI / 2, seg: 16 }), S.cyl(0.012, 0.012, this.mDark, gx - 0.035, by, -6.436, { rx: Math.PI / 2, seg: 16 });
+    }
+    S.add(cached('mattress', () => roundedBox(1.8, 0.06, 0.5, 0.028, 3)), this.cm(0x2a3a5a, 0.45), bx - 0.05, 0.477, -6.17);
+    S.box(1.75, 0.006, 0.006, this.cm(0x1a2840, 0.6), bx - 0.05, 0.477, -5.92);
+    const blanket = this.mat('stBlanket', { map: pixTex('cloth'), color: 0x6a6a5a, roughness: 1 });
+    for (let i = 0; i < 3; i++) S.add(cached(`blanket${i}`, () => roundedBox(0.46 - i * 0.02, 0.035, 0.36 - i * 0.01, 0.016, 2)), blanket, bx + 0.62 + i * 0.006, 0.525 + i * 0.033, -6.18, 1, 1, 1, 0, i * 0.04, 0);
+    S.box(0.13, 0.025, 0.2, this.cm(0x8a2a20, 0.7), bx - 0.7, 0.522, -6.12, 0.3, 0, 0, 0.005);
+    S.box(0.12, 0.02, 0.19, this.cm(0xe8e0c8, 0.9), bx - 0.695, 0.522, -6.12, 0.3, 0, 0, 0.003);
+    // stainless toilet/sink combo: rear chase with rounded corners, a basin in the deck, a
+    // bubbler and push-buttons, a seatless bowl with a rolled rim
+    const st = this.mStee, stD = this.cm(0x6a7078, 0.3, 0.8);
+    const tx = 7.3;
+    S.box(0.5, 0.96, 0.22, st, tx, 0.48, -6.33, 0, 0, 0, 0.03);
+    const deck = cached('sinkDeck', () => {
+      const sh = new THREE.Shape();
+      const W = 0.25, D = 0.17, R = 0.04;
+      sh.moveTo(-W + R, -D); sh.lineTo(W - R, -D); sh.quadraticCurveTo(W, -D, W, -D + R); sh.lineTo(W, D - R); sh.quadraticCurveTo(W, D, W - R, D); sh.lineTo(-W + R, D); sh.quadraticCurveTo(-W, D, -W, D - R); sh.lineTo(-W, -D + R); sh.quadraticCurveTo(-W, -D, -W + R, -D);
+      const hole = new THREE.Path(); hole.absellipse(0, -0.02, 0.15, 0.1, 0, Math.PI * 2, true);
+      sh.holes.push(hole);
+      const g = new THREE.ExtrudeGeometry(sh, { depth: 0.03, bevelEnabled: true, bevelThickness: 0.008, bevelSize: 0.008, bevelSegments: 2, curveSegments: 20 });
+      g.rotateX(-Math.PI / 2);
+      return g;
+    });
+    S.add(deck, st, tx, 0.95, -6.27);
+    S.add(lathe('basin', [[0.15, 0.0], [0.145, -0.03], [0.12, -0.07], [0.06, -0.09], [0, -0.092]], 24), stD, tx, 0.98, -6.25, 1, 1, 0.68);
+    S.add(lathe('bubbler', [[0, 0], [0.022, 0], [0.018, 0.04], [0.012, 0.06], [0.016, 0.075], [0, 0.08]], 16), st, tx + 0.15, 0.995, -6.38);
+    for (const ox of [-0.12, 0.12]) S.cyl(0.018, 0.012, this.cm(0x9aa0a8, 0.3, 0.8), tx + ox, 0.8, -6.217, { rx: Math.PI / 2, seg: 16 });
+    S.box(0.36, 0.1, 0.006, this.cm(0x8a9096, 0.4, 0.7), tx, 0.62, -6.218, 0, 0, 0, 0.002);
+    const bowl = new THREE.Mesh(lathe('wcBowl', [[0.13, 0], [0.13, 0.05], [0.15, 0.18], [0.18, 0.33], [0.195, 0.39], [0.19, 0.41], [0.17, 0.418], [0.15, 0.4], [0.14, 0.37], [0.1, 0.28], [0.05, 0.215], [0, 0.21]], 28), st);
+    bowl.scale.set(0.95, 1, 1.25);
+    bowl.position.set(tx, 0, -6.05);
+    bowl.name = 'toilet';
+    root.add(bowl);
     // stains below the bunk
     S.plane(0.8, 0.5, new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.25, depthWrite: false }), 6.4, 0.017, -5.75, 0, -Math.PI / 2);
     // caged light on the cell ceiling + camera
@@ -1202,17 +1375,37 @@ export class StationScene extends LocationBase {
 
   buildRight() {
     const S = this.S, root = this.root;
-    // coffee corner: cabinet, drip machine, cups, a box of doughnuts, duty roster, clock
-    S.box(0.86, 0.86, 0.45, this.cm(0x5a4a3c, 0.6), 8.45, 0.43, -3.75);
-    S.box(0.9, 0.04, 0.48, this.cm(0x9a9488, 0.5), 8.45, 0.88, -3.74);
-    S.box(0.24, 0.36, 0.24, this.cm(0x16181a, 0.5), 8.2, 1.08, -3.8);
-    S.cyl(0.08, 0.14, this.mat('stPot', { color: 0x3a1a08, roughness: 0.1, transparent: true, opacity: 0.85 }), 8.2, 0.97, -3.72, { seg: 10 });
-    S.box(0.02, 0.02, 0.01, this.em(0xff2010, 3), 8.28, 1.0, -3.675);
-    for (let i = 0; i < 4; i++) S.cyl(0.04, 0.1, this.cm(0xece8e0, 0.6), 8.42, 0.95 + i * 0.07, -3.82, { taper: 1.2, seg: 8 });
-    S.cyl(0.04, 0.1, this.cm(0x1a3a6a, 0.4), 8.55, 0.95, -3.62, { seg: 8 });
-    S.cyl(0.04, 0.1, this.cm(0x8a1a1a, 0.4), 8.66, 0.95, -3.76, { seg: 8 });
-    S.box(0.36, 0.08, 0.3, this.cm(0xe8a0b0, 0.8), 8.7, 0.94, -3.78, -0.1);
-    S.box(0.36, 0.01, 0.3, this.cm(0xf0d8e0, 0.8), 8.7, 0.99, -3.66, -0.1, -0.8);
+    // coffee corner: base cabinet with two doors, laminate top, drip machine, cups, doughnuts
+    {
+      const cx = 8.45, cz = -3.75, fz = cz + 0.225;
+      const carc = this.cm(0x5a4a3c, 0.6), door = this.mat('stCabDoor', { map: pixTex('wood'), color: 0x6a5644, roughness: 0.55 });
+      S.box(0.8, 0.08, 0.4, this.cm(0x16181a, 0.8), cx, 0.04, cz - 0.02, 0, 0, 0, 0.01);
+      S.box(0.86, 0.78, 0.45, carc, cx, 0.47, cz, 0, 0, 0, 0.01);
+      for (const s of [-1, 1]) {
+        S.box(0.415, 0.74, 0.02, door, cx + s * 0.215, 0.47, fz + 0.005, 0, 0, 0, 0.007);
+        S.box(0.016, 0.14, 0.016, this.mStee, cx + s * 0.03, 0.72, fz + 0.035, 0, 0, 0, 0.007);
+        for (const dy of [-0.06, 0.06]) S.box(0.01, 0.01, 0.02, this.mStee, cx + s * 0.03, 0.72 + dy, fz + 0.022);
+      }
+      S.box(0.9, 0.035, 0.48, this.cm(0x9a9488, 0.45), cx, 0.878, cz + 0.01, 0, 0, 0, 0.008);
+      S.box(0.9, 0.012, 0.012, this.cm(0x5a5650, 0.5), cx, 0.866, cz + 0.252, 0, 0, 0, 0.005);
+      // drip machine: foot plate, tower, brew head, glass carafe with a handle
+      const blk = this.cm(0x16181a, 0.4);
+      S.box(0.24, 0.025, 0.26, blk, 8.2, 0.908, -3.76, 0, 0, 0, 0.01);
+      S.box(0.2, 0.36, 0.1, blk, 8.2, 1.075, -3.85, 0, 0, 0, 0.02);
+      S.box(0.24, 0.08, 0.22, blk, 8.2, 1.215, -3.78, 0, 0, 0, 0.02);
+      S.box(0.12, 0.14, 0.002, this.mat('stTank', { color: 0x8aa0b0, roughness: 0.1, transparent: true, opacity: 0.4 }), 8.2, 1.1, -3.799);
+      S.add(lathe('carafe', [[0, 0], [0.06, 0], [0.075, 0.03], [0.078, 0.07], [0.06, 0.12], [0.055, 0.15], [0.05, 0.15], [0.052, 0.12], [0.07, 0.07], [0, 0.01]], 24), this.mat('stPot', { color: 0x3a1a08, roughness: 0.1, transparent: true, opacity: 0.85 }), 8.2, 0.92, -3.72);
+      S.box(0.12, 0.012, 0.12, blk, 8.2, 1.075, -3.72, 0, 0, 0, 0.004);
+      S.add(cached('carafeH', () => new THREE.TorusGeometry(0.04, 0.008, 8, 16, Math.PI)), blk, 8.27, 1.0, -3.72, 1, 1, 1, 0, 0, -Math.PI / 2);
+      S.box(0.02, 0.02, 0.01, this.em(0xff2010, 3), 8.28, 0.94, -3.635);
+      for (let i = 0; i < 4; i++) S.add(lathe('cup', [[0, 0], [0.028, 0], [0.04, 0.1], [0.036, 0.1], [0.025, 0.006], [0, 0.006]], 20), this.cm(0xece8e0, 0.6), 8.42, 0.896 + i * 0.012, -3.82);
+      this.mug(S, 8.55, 0.896, -3.62, 0x1a3a6a, 0.4);
+      this.mug(S, 8.66, 0.896, -3.76, 0x8a1a1a, -1.2);
+      S.box(0.36, 0.07, 0.3, this.cm(0xe8a0b0, 0.8), 8.72, 0.932, -3.8, -0.1, 0, 0, 0.006);
+      S.box(0.36, 0.006, 0.3, this.cm(0xf0d8e0, 0.8), 8.72, 0.99, -3.67, -0.1, -0.9);
+      const rd = rng(17);
+      for (let i = 0; i < 4; i++) S.add(cached('donut', () => new THREE.TorusGeometry(0.035, 0.018, 10, 18)), this.cm([0xc89050, 0x6a3a20, 0xe8b0c0, 0xc89050][i], 0.7), 8.62 + (i % 2) * 0.12 + (rd() - 0.5) * 0.02, 0.958, -3.85 + Math.floor(i / 2) * 0.11, 1, 1, 1, Math.PI / 2, rd(), 0);
+    }
     S.plane(0.56, 0.38, this.pm('roster', rosterTex()), 8.45, 1.62, BACK + 0.02);
     const clock = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.42), this.mat('stClock', { map: clockTex(), transparent: true, alphaTest: 0.5, roughness: 0.4 }));
     clock.position.set(8.4, 2.4, BACK + 0.04); clock.name = 'clock'; root.add(clock);
@@ -1372,25 +1565,94 @@ export class StationScene extends LocationBase {
 
   // ---------------------------------------------------------------- foreground
 
+  /**
+   * Beam seating: an oval-section steel beam on two T-legs with glides, one-piece moulded
+   * shells on brackets, arm-rests between the seats. facing 1 = the seats face +z (camera),
+   * -1 = backs to the camera. Origin = beam centre on the floor.
+   */
+  beamSeats(b, cx, cz, len, n, { facing = 1, pad = false, shellCol = 0x3e5c78 } = {}) {
+    const steel = this.mStee, dark = this.mDark;
+    const shellM = this.cm(shellCol, 0.3, 0.05);
+    const padM = this.mat('stSeatPad', { map: pixTex('cloth'), color: 0x4a6a80, roughness: 0.9 });
+    const pitch = len / n, sw = Math.min(0.5, pitch - 0.1);
+    const ry = facing > 0 ? Math.PI : 0; // shellGeo has its back towards +z
+    b.box(len - 0.06, 0.06, 0.08, steel, cx, 0.37, cz, 0, 0, 0, 0.022);
+    for (const s of [-1, 1]) {
+      const lx = cx + s * (len / 2 - 0.22);
+      b.cyl(0.024, 0.33, steel, lx, 0.185, cz, { seg: 16 });
+      b.box(0.06, 0.035, 0.56, steel, lx, 0.02, cz, 0, 0, 0, 0.012);
+      for (const gz of [-0.25, 0.25]) b.cyl(0.022, 0.012, dark, lx, 0.006, cz + gz, { seg: 16 });
+      b.box(0.09, 0.03, 0.1, steel, lx, 0.33, cz, 0, 0, 0, 0.008);
+    }
+    for (let i = 0; i < n; i++) {
+      const x = cx - len / 2 + (i + 0.5) * pitch;
+      b.add(shellGeo(sw), shellM, x, 0, cz - facing * 0.02, 1, 1, 1, 0, ry, 0);
+      b.box(0.05, 0.05, 0.3, steel, x, 0.425, cz, 0, 0, 0, 0.01);
+      if (pad) b.box(sw - 0.06, 0.035, 0.36, padM, x, 0.485, cz + facing * 0.03, 0, 0, 0, 0.016);
+      if (i < n - 1) {
+        const ax = x + pitch / 2;
+        b.box(0.028, 0.24, 0.04, steel, ax, 0.52, cz - facing * 0.06, 0, 0, 0, 0.01);
+        b.box(0.05, 0.03, 0.34, dark, ax, 0.645, cz + facing * 0.0, 0, 0, 0, 0.013);
+      }
+    }
+  }
+
+  /** A stack of loose sheets (individually offset) — x, y = bottom, z. */
+  paperStack(b, x, y, z, n, ry = 0, seed = 1, w = 0.21, d = 0.297) {
+    const r = rng(seed), cols = [0xe8e6de, 0xdcdad0, 0xf0eee6, 0xe4e0d0];
+    for (let i = 0; i < n; i++) {
+      const m = this.cm(cols[Math.floor(r() * cols.length)], 0.95);
+      b.box(w, 0.0035, d, m, x + (r() - 0.5) * 0.012, y + 0.002 + i * 0.0042, z + (r() - 0.5) * 0.012, ry + (r() - 0.5) * 0.06);
+    }
+    return y + n * 0.0042;
+  }
+
+  /** Manila/coloured file folders with papers sticking out, stacked. Returns the top y. */
+  folderStack(b, x, y, z, n, ry = 0, seed = 2) {
+    const r = rng(seed), cols = [0xc8a860, 0xa8b8c8, 0xc8a860, 0x8a4a40, 0xb8a070, 0x6a8a5a];
+    for (let i = 0; i < n; i++) {
+      const fm = this.mat(`stFold-${cols[i % cols.length]}`, { color: cols[i % cols.length], roughness: 0.85 });
+      const a = ry + (r() - 0.5) * 0.18, ox = (r() - 0.5) * 0.03, oz = (r() - 0.5) * 0.03;
+      b.box(0.245, 0.003, 0.315, fm, x + ox, y + 0.0015, z + oz, a);
+      const k = 2 + Math.floor(r() * 3);
+      for (let j = 0; j < k; j++) b.box(0.21, 0.0025, 0.297, this.mPaper, x + ox + (r() - 0.5) * 0.03, y + 0.004 + j * 0.003, z + oz + (r() - 0.5) * 0.02 + 0.01, a + (r() - 0.5) * 0.08);
+      y += 0.004 + k * 0.003;
+      b.box(0.245, 0.003, 0.315, fm, x + ox, y + 0.0015, z + oz, a + (r() - 0.5) * 0.03);
+      b.box(0.07, 0.003, 0.02, fm, x + ox - 0.06 + r() * 0.12, y + 0.0015, z + oz - 0.165, a);
+      y += 0.003;
+    }
+    return y;
+  }
+
+  /** Mug with a handle. */
+  mug(b, x, y, z, color, ry = 0) {
+    const m = this.cm(color, 0.35);
+    b.add(lathe('mug', [[0, 0], [0.036, 0], [0.04, 0.008], [0.041, 0.1], [0.036, 0.1], [0.035, 0.012], [0, 0.012]], 24), m, x, y, z);
+    b.add(cached('mugH', () => new THREE.TorusGeometry(0.026, 0.006, 8, 16, Math.PI)), m, x + Math.cos(ry) * 0.04, y + 0.05, z - Math.sin(ry) * 0.04, 1, 1, 1, 0, ry, -Math.PI / 2);
+  }
+
+
   buildForeground() {
     const steel = this.mStee;
-    const plastic = this.mat('stPlastic', { map: pixTex('cloth'), color: 0x4a6a88, roughness: 0.6 });
     const chairs = (b, n, extra) => {
-      b.box(n * 0.58, 0.05, 0.05, steel, (n - 1) * 0.29, 0.4, 0);
-      for (let i = 0; i < n; i++) {
-        b.box(0.5, 0.05, 0.46, plastic, i * 0.58, 0.46, 0);
-        b.box(0.5, 0.45, 0.05, plastic, i * 0.58, 0.72, 0.22, 0, 0.1);
-        for (const s of [-1, 1]) b.box(0.03, 0.42, 0.03, steel, i * 0.58 + s * 0.22, 0.21, 0);
-      }
+      this.beamSeats(b, (n - 1) * 0.29, 0, n * 0.58, n, { facing: -1, shellCol: 0x5a7c9e });
       extra?.(b);
     };
     this.fg(-9.6, 3.0, 'fg-chairs-1', (b) => chairs(b, 3, (bb) => {
-      bb.box(0.48, 0.5, 0.14, this.mat('stParka-6953492', { map: pixTex('cloth'), color: 0x6a1a14, roughness: 0.95 }), 0.58, 0.74, 0.28, 0, 0.15);
-      bb.box(0.3, 0.02, 0.22, this.mPaper, 1.16, 0.5, 0, 0.4);
+      // a parka thrown over the middle back (folded over the top, a sleeve hanging), a newspaper
+      const parka = this.mat('stParka-8a2418', { map: pixTex('cloth'), color: 0x8a2418, roughness: 0.95 });
+      bb.add(cached('parkaBody', () => roundedBox(0.44, 0.34, 0.06, 0.028, 3)), parka, 0.58, 0.7, 0.29, 1, 1, 1, -0.1, 0.03, 0.03);
+      bb.add(cached('parkaFold', () => roundedBox(0.46, 0.06, 0.14, 0.028, 3)), parka, 0.58, 0.885, 0.24, 1, 1, 1, 0, 0.03, 0.02);
+      bb.add(cached('parkaSleeve', () => roundedBox(0.09, 0.4, 0.08, 0.038, 3)), parka, 0.82, 0.62, 0.3, 1, 1, 1, -0.12, 0, -0.12);
+      bb.add(cached('parkaFur', () => roundedBox(0.36, 0.045, 0.07, 0.02, 2)), this.mat('stFur', { map: pixTex('cloth'), color: 0x9a8a70, roughness: 1 }), 0.56, 0.915, 0.2, 1, 1, 1, 0.2, 0.03, 0.02);
+      this.paperStack(bb, 1.16, 0.47, 0, 4, 0.4, 31, 0.3, 0.22);
     }));
     this.fg(3.0, 3.0, 'fg-chairs-2', (b) => chairs(b, 3, (bb) => {
-      bb.cyl(0.035, 0.1, this.cm(0xece8e0, 0.6), 0.0, 0.53, 0.0, { taper: 1.25, seg: 8 });
-      bb.box(0.36, 0.3, 0.2, this.cm(0x2a2a2a, 0.9), 1.25, 0.15, -0.3, 0.3);
+      bb.cyl(0.035, 0.1, this.cm(0xece8e0, 0.6), 0.0, 0.53, 0.0, { taper: 1.25, seg: 16 });
+      bb.cyl(0.039, 0.008, this.cm(0x2a2a2a, 0.5), 0.0, 0.584, 0.0, { seg: 16 });
+      // a duffel bag under the end seat
+      bb.add(cached('duffel', () => roundedBox(0.46, 0.24, 0.26, 0.1, 3)), this.cm(0x2a2a2a, 0.9), 1.25, 0.12, -0.3, 1, 1, 1, 0, 0.3, 0);
+      bb.cyl(0.012, 0.3, this.cm(0x1a1a1a, 0.6), 1.25, 0.25, -0.3, { rz: Math.PI / 2, ry: 0.3, seg: 16 });
     }));
     // square concrete pillars, painted like the walls
     for (const [x, name] of [[-6.6, 'fg-pillar-1'], [10.9, 'fg-pillar-2']]) {
@@ -1407,23 +1669,24 @@ export class StationScene extends LocationBase {
       b.cyl(0.22, 0.46, this.cm(0x3a3430, 0.8), 0, 0.23, 0, { taper: 1.15, seg: 10 });
       b.cyl(0.24, 0.03, this.cm(0x1a1410, 1), 0, 0.45, 0, { seg: 10 });
       b.cyl(0.025, 1.3, this.cm(0x4a3a2a), 0, 1.0, 0, { seg: 5 });
-      const green = this.mat('stLeaf', { color: 0x2a4a2a, roughness: 0.8, flatShading: true });
-      const brown = this.mat('stLeafB', { color: 0x6a5a2a, roughness: 0.9, flatShading: true });
-      const lg = new THREE.IcosahedronGeometry(1, 0);
+      const green = this.mat('stLeaf2', { color: 0x2a4a2a, roughness: 0.45, side: THREE.DoubleSide });
+      const brown = this.mat('stLeafB2', { color: 0x6a5a2a, roughness: 0.9, side: THREE.DoubleSide });
       const r = rng(5);
       for (let i = 0; i < 34; i++) {
-        const a = r() * Math.PI * 2, rr = 0.1 + r() * 0.35, y = 0.75 + r() * 1.15;
-        b.add(lg, i % 9 === 0 ? brown : green, Math.cos(a) * rr, y, Math.sin(a) * rr * 0.6, 0.16, 0.03, 0.08, r() * 0.6, a, (r() - 0.5));
+        const a = r() * Math.PI * 2, rr = 0.04 + r() * 0.12, y = 0.75 + r() * 1.15, s = 0.2 + r() * 0.09;
+        b.add(leafGeo(), i % 9 === 0 ? brown : green, Math.cos(a) * rr, y, Math.sin(a) * rr * 0.6, s, s, s * 1.1, 0, -a, 0.15 + r() * 0.5);
       }
     });
-    // overflowing bin
+    // overflowing bin: spun-steel body with a rolled rim, crumpled paper and cups on top
     this.fg(-1.4, 2.7, 'fg-bin', (b) => {
-      b.cyl(0.2, 0.62, this.cm(0x3a3e44, 0.5, 0.4), 0, 0.31, 0, { taper: 1.15, seg: 12 });
-      b.cyl(0.235, 0.03, this.cm(0x2a2e34, 0.5, 0.4), 0, 0.62, 0, { seg: 12 });
+      b.add(binGeo(0.19, 0.225, 0.62), this.cm(0x3a3e44, 0.45, 0.6), 0, 0, 0);
+      b.add(lathe('binBand', [[0.2, 0], [0.212, 0.0], [0.214, 0.04], [0.202, 0.04]], 28), this.cm(0x22262a, 0.5, 0.5), 0, 0.08, 0);
       const r = rng(11);
-      for (let i = 0; i < 6; i++) b.cyl(0.035, 0.1, this.cm(0xece8e0, 0.6), (r() - 0.5) * 0.24, 0.66 + r() * 0.06, (r() - 0.5) * 0.2, { taper: 1.25, seg: 6, rz: (r() - 0.5) * 1.4 });
-      b.box(0.2, 0.02, 0.15, this.mPaper, 0.05, 0.69, 0.02, 0.5, 0.3);
-      b.cyl(0.035, 0.1, this.cm(0xece8e0, 0.6), 0.32, 0.035, 0.1, { taper: 1.25, seg: 6, rz: Math.PI / 2 });
+      const crumple = cached('crumple', () => { const g = new THREE.IcosahedronGeometry(1, 1); const p = g.attributes.position; const rr = rng(4); for (let i = 0; i < p.count; i++) { const k = 0.75 + rr() * 0.4; p.setXYZ(i, p.getX(i) * k, p.getY(i) * k, p.getZ(i) * k); } g.computeVertexNormals(); return g; });
+      for (let i = 0; i < 7; i++) b.add(crumple, this.mPaper, (r() - 0.5) * 0.26, 0.6 + r() * 0.05, (r() - 0.5) * 0.22, 0.06 + r() * 0.03, 0.05 + r() * 0.02, 0.06 + r() * 0.03, r() * 3, r() * 3, r() * 3);
+      for (let i = 0; i < 4; i++) b.cyl(0.035, 0.1, this.cm(0xece8e0, 0.6), (r() - 0.5) * 0.24, 0.68 + r() * 0.05, (r() - 0.5) * 0.2, { taper: 1.25, seg: 16, rz: (r() - 0.5) * 1.4 });
+      b.box(0.2, 0.002, 0.15, this.mPaper, 0.05, 0.7, 0.02, 0.5, 0.3);
+      b.cyl(0.035, 0.1, this.cm(0xece8e0, 0.6), 0.32, 0.035, 0.1, { taper: 1.25, seg: 16, rz: Math.PI / 2 });
     });
     // wet-floor sign
     this.fg(-11.6, 2.5, 'fg-wetsign', (b) => {
@@ -1432,20 +1695,53 @@ export class StationScene extends LocationBase {
       b.box(0.32, 0.62, 0.02, y, 0, 0.31, -0.09, 0, -0.28);
       b.plane(0.26, 0.26, this.signMat('⚠ WET FLOOR', 0.26, 0.26, '#f0c010', '#1a1a1a'), 0, 0.36, 0.103, 0, 0.28);
     });
-    // a detective's desk at the right edge
-    this.fg(8.2, 3.2, 'fg-desk', (b, g) => {
-      b.box(1.6, 0.04, 0.8, this.mat('stDeskTop', { map: pixTex('wood'), color: 0x8a7a68, roughness: 0.5 }), 0, 0.76, 0);
-      for (const sx of [-1, 1]) b.box(0.04, 0.74, 0.7, steel, sx * 0.75, 0.37, 0);
-      b.box(0.42, 0.7, 0.7, this.cm(0x4a4e52, 0.6, 0.3), 0.52, 0.37, 0);
-      for (let i = 0; i < 5; i++) b.box(0.32, 0.04, 0.24, this.mat(`stFold-${[0xc8a860, 0xa8b8c8, 0xc8c0b0, 0x8a4a40, 0xc8a860][i]}`, { color: [0xc8a860, 0xa8b8c8, 0xc8c0b0, 0x8a4a40, 0xc8a860][i], roughness: 0.85 }), -0.45 + (i % 2) * 0.04, 0.8 + i * 0.04, 0.05, (i - 2) * 0.06);
-      b.box(0.36, 0.26, 0.04, this.cm(0x1a1c20, 0.5), 0.35, 0.98, -0.2);
-      b.box(0.33, 0.23, 0.01, this.pm('scrA', screenTex('a'), { emissive: 0xffffff, emissiveMap: screenTex('a'), emissiveIntensity: 0.9 }), 0.35, 0.98, -0.225);
-      b.cyl(0.04, 0.1, this.cm(0x1a3a6a, 0.4), -0.1, 0.83, 0.2, { seg: 8 });
-      b.box(0.2, 0.06, 0.12, this.cm(0x202224), 0.0, 0.8, -0.15);
-      b.cyl(0.05, 0.03, this.cm(0x1a1a1a), 0.7, 0.795, 0.1, { seg: 8 });
-      b.cyl(0.01, 0.34, this.cm(0x1a1a1a), 0.66, 0.95, 0.1, { seg: 4, rz: 0.3 });
-      b.cyl(0.08, 0.1, this.cm(0x2a2a2a, 0.4, 0.4), 0.58, 1.1, 0.1, { taper: 0.4, seg: 8 });
-      b.cyl(0.06, 0.01, this.em(0xffd090, 3), 0.58, 1.05, 0.1, { seg: 8 });
+    // a detective's desk at the right edge: laminate top with a rubber edge band, tubular
+    // C-leg on the left, a three-drawer pedestal on the right, folders, a ream, a mug, a lamp
+    this.fg(8.2, 3.2, 'fg-desk', (b) => {
+      const top = this.mat('stDeskTop', { map: pixTex('wood'), color: 0x8a7a68, roughness: 0.5 });
+      const edge = this.cm(0x2a2622, 0.6);
+      const grey = this.cm(0x4a4e52, 0.55, 0.35), seam = this.cm(0x16181a, 0.8);
+      b.box(1.6, 0.03, 0.8, top, 0, 0.765, 0, 0, 0, 0, 0.006);
+      b.box(1.612, 0.034, 0.012, edge, 0, 0.765, 0.401, 0, 0, 0, 0.005);
+      b.box(1.612, 0.034, 0.012, edge, 0, 0.765, -0.401, 0, 0, 0, 0.005);
+      for (const sx of [-1, 1]) b.box(0.012, 0.034, 0.8, edge, sx * 0.801, 0.765, 0, 0, 0, 0, 0.005);
+      b.box(1.5, 0.05, 0.04, steel, 0, 0.725, -0.33, 0, 0, 0, 0.01);
+      b.box(1.0, 0.36, 0.012, this.cm(0x3a3e42, 0.6, 0.3), -0.2, 0.52, -0.34);
+      // C-leg: two round uprights, a top rail and a foot with glides
+      for (const sz of [-0.3, 0.3]) b.cyl(0.022, 0.7, steel, -0.72, 0.385, sz, { seg: 16 });
+      b.box(0.05, 0.04, 0.7, steel, -0.72, 0.725, 0, 0, 0, 0, 0.012);
+      b.box(0.06, 0.035, 0.74, steel, -0.72, 0.03, 0, 0, 0, 0, 0.013);
+      for (const sz of [-0.34, 0.34]) b.cyl(0.02, 0.012, this.mDark, -0.72, 0.006, sz, { seg: 16 });
+      // pedestal: carcass, plinth, three drawer fronts with pulls and a lock
+      b.box(0.42, 0.66, 0.7, grey, 0.52, 0.4, 0, 0, 0, 0, 0.01);
+      b.box(0.4, 0.06, 0.66, seam, 0.52, 0.03, -0.01, 0, 0, 0, 0.008);
+      let y = 0.72;
+      for (const hh of [0.13, 0.2, 0.3]) {
+        y -= hh + 0.008;
+        b.box(0.4, hh, 0.02, grey, 0.52, y + hh / 2, 0.356, 0, 0, 0, 0.006);
+        b.box(0.16, 0.016, 0.022, this.mStee, 0.52, y + hh - 0.035, 0.372, 0, 0, 0, 0.007);
+        for (const px of [-0.075, 0.075]) b.box(0.012, 0.012, 0.02, this.mStee, 0.52 + px, y + hh - 0.035, 0.364);
+        b.plane(0.06, 0.03, this.cm(0xe8e4d4, 0.9), 0.52, y + hh - 0.075, 0.367);
+      }
+      b.cyl(0.011, 0.012, this.mStee, 0.68, 0.69, 0.368, { rx: Math.PI / 2, seg: 16 });
+      // on the top
+      const y0 = 0.78;
+      this.folderStack(b, -0.48, y0, 0.06, 5, -0.12, 7);
+      this.paperStack(b, -0.14, y0, 0.12, 14, 0.22, 8);
+      this.mug(b, 0.12, y0, 0.26, 0x1a3a6a, -0.6);
+      b.box(0.42, 0.02, 0.14, this.cm(0x202224, 0.5), 0.26, y0 + 0.012, 0.04, -0.05, 0.06, 0, 0.007);
+      b.plane(0.4, 0.12, this.pm('keys', ptex('keys', 40, 12, (ctx, w, h) => { ctx.fillStyle = '#1c1e20'; ctx.fillRect(0, 0, w, h); for (let yy = 1; yy < h - 1; yy += 3) for (let xx = 1; xx < w - 1; xx += 3) { ctx.fillStyle = '#3a3e42'; ctx.fillRect(xx, yy, 2, 2); } })), 0.26, y0 + 0.0225, 0.04, -0.05, -Math.PI / 2 + 0.06);
+      // monitor: bezel, panel, neck and an oval foot
+      b.box(0.4, 0.27, 0.035, this.cm(0x1a1c20, 0.45), 0.35, 1.0, -0.2, 0, 0, 0, 0.01);
+      b.box(0.37, 0.24, 0.01, this.pm('scrA', screenTex('a'), { emissive: 0xffffff, emissiveMap: screenTex('a'), emissiveIntensity: 0.9 }), 0.35, 1.005, -0.222);
+      b.box(0.05, 0.16, 0.025, this.cm(0x1a1c20, 0.45), 0.35, 0.86, -0.17, 0, 0, 0, 0.008);
+      b.cyl(0.09, 0.012, this.cm(0x1a1c20, 0.45), 0.35, y0 + 0.006, -0.16, { seg: 24 });
+      // gooseneck lamp
+      b.add(lathe('lampBase', [[0, 0], [0.055, 0], [0.058, 0.01], [0.04, 0.03], [0, 0.034]], 24), this.cm(0x1a1a1a, 0.4, 0.4), 0.7, y0, 0.1);
+      const neck = cached('lampNeck', () => new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(0, 0, 0), new THREE.Vector3(-0.02, 0.18, 0), new THREE.Vector3(-0.08, 0.3, 0), new THREE.Vector3(-0.12, 0.31, 0)]), 16, 0.008, 8));
+      b.add(neck, this.cm(0x1a1a1a, 0.4, 0.4), 0.7, y0 + 0.03, 0.1);
+      b.add(lathe('lampShade', [[0.008, 0.085], [0.026, 0.075], [0.072, 0], [0.078, 0], [0.07, 0.02], [0.03, 0.085], [0.012, 0.09]], 24), this.cm(0x2a2a2a, 0.4, 0.4), 0.58, y0 + 0.25, 0.1);
+      b.cyl(0.062, 0.005, this.em(0xffd090, 3), 0.58, y0 + 0.255, 0.1, { seg: 24 });
     });
   }
 
