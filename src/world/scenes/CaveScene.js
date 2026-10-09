@@ -94,11 +94,18 @@ const archMask = () => canvasTexture('cave-arch', 64, 64, (ctx, w, h) => {
  * pockets, stepped layers that overhang the next one, and fine grain. Used twice: coarse for the
  * geometry, per pixel for the baked wall texture (so the relief stays crisp).
  */
+function strata(x, y) {
+  const dip = (fbm3(x * 0.07, 0, 1, 81, 2) - 0.5) * 1.6;                              // the dip changes from bed to bed
+  const thick = 0.8 + fbm3(x * 0.05, y * 0.1, 2, 82, 2) * 1.4;                         // thin and thick layers
+  const v = (y * Math.cos(dip) + x * Math.sin(dip) * 0.35) * thick + fbm3(x * 0.15, y * 0.25, 4, 22, 3) * 3.0;
+  return ((v % 1) + 1) % 1;
+}
+
 function wallHeight(x, y, fine = false) {
   let d = (fbm3(x * 0.32, y * 0.32, 0, 23, 4) - 0.5) * 1.5;
   d -= Math.max(0, fbm3(x * 0.7, y * 0.7, 5, 25, 3) - 0.5) * 3.6;                   // scallops
   d -= Math.pow(Math.max(0, fbm3(x * 1.1, y * 1.4, 6, 29, 3) - 0.52), 1.5) * 4.0;      // smaller wind-carved cups
-  const fr = (((y * 1.25 + x * 0.07 + Math.sin(x * 0.21) * 0.5 + fbm3(x * 0.12, y * 0.2, 4, 22, 3) * 4.2) % 1) + 1) % 1;   // layers bend and dip
+  const fr = strata(x, y);                                                           // cross-bedded layers
   const lay = fr < 0.75 ? fr / 0.75 : (1 - fr) / 0.25;
   d += lay * lay * (3 - 2 * lay) * 0.15;
   if (fine) {
@@ -125,12 +132,14 @@ const wallBakedTex = (W, Hh) => canvasTexture(`cave-wallbake-${W}`, W, Hh, (ctx,
       const nl = Math.hypot(nx, ny, nz); nx /= nl; ny /= nl; nz /= nl;
       const lit = Math.max(0, nx * L[0] + ny * L[1] + nz * L[2]);
       const t = fbm3(x * 0.5, y * 0.5, 3, 21, 3);
-      const band = (((y * 1.25 + x * 0.07 + Math.sin(x * 0.21) * 0.5 + fbm3(x * 0.12, y * 0.2, 4, 22, 3) * 4.2) % 1) + 1) % 1;
+      const band = strata(x, y);
       const k = Math.max(0, Math.min(1, t * 1.8 - 0.4));
       const shade = (0.3 + 1.0 * lit) * (0.8 + 0.28 * band);
-      const hollow = Math.max(0, Math.min(0.8, -hc * 0.55 - 0.2));
+      const hollow = Math.max(0, Math.min(0.8, -hc * 0.55 - 0.2)) * Math.min(1, y * 1.5);
       const o = (j * w + i) * 4;
-      for (let c = 0; c < 3; c++) img.data[o + c] = ((A[c] + (B[c] - A[c]) * k) * shade) * (1 - hollow) + D[c] * hollow;
+      const sand = Math.max(0, Math.min(1, (0.55 - y + (fbm3(x * 0.8, 0, 5, 83, 2) - 0.5) * 0.5) * 2.2));   // sand drifted up the wall
+      const S = [0xb4, 0x92, 0x6c];
+      for (let c = 0; c < 3; c++) img.data[o + c] = (((A[c] + (B[c] - A[c]) * k) * shade) * (1 - hollow) + D[c] * hollow) * (1 - sand) + S[c] * (0.7 + 0.35 * lit) * sand;
       img.data[o + 3] = 255;
     }
   }
@@ -258,7 +267,12 @@ export class CaveScene extends LocationBase {
     // sand drifted against the foot of the wall (no hard seam)
     const drift = new THREE.InstancedMesh(rockGeometry(880, { detail: 3, rough: 0.2, flat: -0.05, colA: 0xb89470, colB: 0x9a7a5a, dark: 0.25 }), this.sandMat, 46);
     { const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
-      for (let i = 0; i < 46; i++) { const x = -20 + i * 0.95 + r() * 0.5; q.setFromEuler(e.set(0, r() * 6, 0)); m.compose(new THREE.Vector3(x, -0.02, BACK + 0.3 + r() * 0.5), q, new THREE.Vector3(0.9 + r() * 0.8, 0.12 + r() * 0.14, 0.5 + r() * 0.3)); drift.setMatrixAt(i, m); } }
+      for (let i = 0; i < 46; i++) { const x = -20 + i * 0.95 + r() * 0.5; q.setFromEuler(e.set(0, r() * 6, 0)); m.compose(new THREE.Vector3(x, -0.04, BACK + 0.15 + r() * 0.5), q, new THREE.Vector3(1.0 + r() * 0.9, 0.22 + r() * 0.3, 0.6 + r() * 0.4)); drift.setMatrixAt(i, m); } }
+    // talus: broken rock fallen from the layers, piled along the base
+    { const tal = new THREE.InstancedMesh(rockGeometry(885, { detail: 2, rough: 0.4, sharp: 0.8, flat: -0.3, strata: 1, colA: 0x9a7654, colB: 0x6e5038, dark: 0.5 }), this.sandMat, 220);
+      const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
+      for (let i = 0; i < 220; i++) { const x = -20 + r() * 44, sc = 0.06 + r() * r() * 0.3; q.setFromEuler(e.set(r() * 3, r() * 6, r() * 3)); m.compose(new THREE.Vector3(x, sc * 0.3, BACK + 0.35 + r() * 0.9), q, new THREE.Vector3(sc * (1 + r()), sc, sc)); tal.setMatrixAt(i, m); }
+      root.add(tal); }
     root.add(drift);
     // a few flat, half-buried slabs and clustered small boulders between the big ones
     for (let i = 0; i < 9; i++) {
