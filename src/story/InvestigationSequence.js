@@ -246,8 +246,9 @@ const methods = {
     if (S !== this.session) return;
     J.face(1);
     J.setPose('think');
+    J.root.position.y = -0.62;   // crouched behind the rocks: head and shoulders above them
     const wx = w.anchors.wolf.x, wz = w.anchors.wolf.z;
-    const wide = { x: 16.0, y: 1.7, z: 3.4, lookX: 21.2, lookY: 1.2, lookZ: -7.0, fov: 38 };
+    const wide = { x: 16.2, y: 1.45, z: 3.4, lookX: 21.2, lookY: 1.1, lookZ: -7.0, fov: 38 };
     const close = { x: 21.8, y: 1.6, z: -3.6, lookX: wx, lookY: 1.4, lookZ: wz, fov: 32 };
     g.cameraSys.setShot(wide, 2.4);
     await sleep(2.6);
@@ -293,6 +294,7 @@ const methods = {
     g.letterbox.set(false, 1200);
     g.cameraSys.setShot(null, 1.6);
     J.setPose('idle');
+    J.root.position.y = 0;
     g.keyScene = false;
     g.hud.show(true);
     g.player.enabled = true;
@@ -322,7 +324,7 @@ const methods = {
     g.hud.show(false);
     g.letterbox.set(true, 1200);
     const J = this.julian;
-    await J.walkTo({ x: 41.0, z: -2.0 }, { speed: 0.7, direct: true });
+    await J.walkTo({ x: 39.7, z: -1.8 }, { speed: 0.7, direct: true });
     if (S !== this.session) return;
     J.face(1);
     g.cameraSys.setShot({ x: 40.2, y: 1.8, z: 5.2, lookX: 41.8, lookY: 1.4, lookZ: -3.5, fov: 36 }, 2.5);
