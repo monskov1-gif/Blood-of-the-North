@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { flareSource } from '../../fx/WindowLight.js';
 import { bevelBox } from '../nature.js';
 import { Reflector } from 'three/addons/objects/Reflector.js';
 import {
@@ -114,6 +115,11 @@ export class BarScene {
     this.buildLighting();
     this.buildAtmosphere();
     buildMorningProps(this);
+    // lens flares: the chandeliers (warm stars) and the street lamp outside the window
+    this.windowLights = [
+      ...[-9.3, 0.6, 9.6].map((x) => flareSource('LAMP', new THREE.Vector3(x, 3.45, -0.9), { triggerDistance: 1.6, fadeDistance: 1.6, intensity: 0.55, flareSize: 0.6, enabled: () => !this.morning })),
+      flareSource('LAMP', new THREE.Vector3(WIN.x + 0.5, WIN.sill + WIN.h * 0.8, BACK - 0.6), { triggerDistance: 2.4, colorTint: [1.0, 0.7, 0.4], enabled: () => !this.morning }),
+    ];
     r.traverse((o) => { if (o.isMesh) o.matrixAutoUpdate = true; });
     return r;
   }

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { flareSource } from '../../fx/WindowLight.js';
 import { bevelBox } from '../nature.js';
 import { LocationBase } from '../LocationBase.js';
 import { streetTexture, canvasTexture, rng, beamTexture } from '../../render/textures.js';
@@ -698,6 +699,7 @@ export class StationScene extends LocationBase {
     S.flush(root);
     this.dust(new THREE.Box3(new THREE.Vector3(-13, 0.3, -3.6), new THREE.Vector3(13, 2.8, 2)), 300);
     this.anchors.spawn = { x: 6.1, z: -5.2 };
+    this.windowLights = [flareSource('PALE', new THREE.Vector3(-6.4, 2.0, BACK - 0.1), { triggerDistance: 2.4 })];
     return root;
   }
 

@@ -459,10 +459,13 @@ const methods = {
     const ol = this.lzCastIn('olivia', 'lz_olivia', 0.6, -1.4, 1);
     const vi = this.lzCastIn('vikki', 'lz_vikki', 2.8, -1.5, -1);
     const seats = w.anchors.hallSeats;
-    const pack = ['packA', 'packB', 'packC', 'packD', 'packE'].map((k, i) => this.lzCastIn(k, `lz_${k}`, seats[i % 4].x + (i === 4 ? 1.4 : 0), seats[i % 4].z + (i === 4 ? 0.5 : 0), i % 2 ? 1 : -1));
+    // spread through the hall: two by the fires, one lying at the wall, two closer to the niche
+    const spots = [[-8.9, -1.9, 1], [-6.6, -0.3, -1], [-4.7, -2.3, 1], [-3.0, -0.9, -1], [-1.1, -1.9, -1]];
+    const pack = ['packA', 'packB', 'packC', 'packD', 'packE'].map((k, i) => this.lzCastIn(k, `lz_${k}`, spots[i][0], spots[i][1], spots[i][2]));
+    void seats;
     pack[2].setPose('eat');                         // the grey one gnaws the same bone for weeks
     pack[0].setPose('eat');
-    const bob = this.lzCastIn('bob', 'lz_bob', -1.6, -1.9, 1);
+    const bob = this.lzCastIn('bob', 'lz_bob', -9.4, -0.6, 1);
     this.lzCast = { ol, vi, pack, bob };
     this.setAmbience(['amb.oldwing']);
     g.hud.show(false);

@@ -86,12 +86,12 @@ export const CHARACTERS = {
   wolfWhite: { id: 'wolfWhite', name: 'Волк', nameEn: 'WOLF', poses: { idle: 'wolf_white', eat: 'wolf_white_eat' }, speed: 1.7, selfLight: 0x7484a8 },
   wolfRed: { id: 'wolfRed', name: 'Волк', nameEn: 'WOLF', poses: { idle: 'wolf_red', eat: 'wolf_red_eat' }, speed: 1.7, selfLight: 0x7484a8 },
   // the pack (L3–L5): in the cave they are always wolves — they speak, but never take a human face there
-  bob: { id: 'bob', name: 'Стинко Боб', nameEn: 'STINKO BOB', poses: { idle: 'wolf_dark', eat: 'wolf_dark_eat' }, speed: 1.2, scale: 1.3, tint: 0xb4a490, selfLight: 0x6a5a4a },
-  packA: { id: 'packA', name: 'Хриплый', nameEn: 'THE HOARSE ONE', poses: { idle: 'wolf_dark', eat: 'wolf_dark_eat' }, speed: 1.6, scale: 1.5, selfLight: 0x5a4c40 },
-  packB: { id: 'packB', name: 'Молодой', nameEn: 'THE YOUNG ONE', poses: { idle: 'wolf_grey', eat: 'wolf_grey_eat' }, speed: 1.8, scale: 1.05, selfLight: 0x6a5a4a },
-  packC: { id: 'packC', name: 'Седой', nameEn: 'GREY MUZZLE', poses: { idle: 'wolf_white', eat: 'wolf_white_eat' }, speed: 1.3, scale: 1.25, tint: 0xc8beb0, selfLight: 0x6a5a4a },
-  packD: { id: 'packD', name: 'Марта', nameEn: 'MARTHA', poses: { idle: 'wolf_grey', eat: 'wolf_grey_eat' }, speed: 1.6, scale: 1.25, tint: 0xd0b49a, selfLight: 0x6a5a4a },
-  packE: { id: 'packE', name: 'Рыжая', nameEn: 'THE RED ONE', poses: { idle: 'wolf_red', eat: 'wolf_red_eat' }, speed: 1.7, scale: 1.3, selfLight: 0x6a5a4a },
+  bob: { id: 'bob', name: 'Стинко Боб', nameEn: 'STINKO BOB', poses: { idle: 'wolf_dark', eat: 'wolf_dark_eat' }, speed: 1.2, scale: 1.1, tint: 0xb4a490, selfLight: 0x6a5a4a },
+  packA: { id: 'packA', name: 'Хриплый', nameEn: 'THE HOARSE ONE', poses: { idle: 'wolf_dark', eat: 'wolf_dark_eat' }, speed: 1.6, scale: 1.2, selfLight: 0x5a4c40 },
+  packB: { id: 'packB', name: 'Молодой', nameEn: 'THE YOUNG ONE', poses: { idle: 'wolf_grey', eat: 'wolf_grey_eat' }, speed: 1.8, scale: 0.85, selfLight: 0x6a5a4a },
+  packC: { id: 'packC', name: 'Седой', nameEn: 'GREY MUZZLE', poses: { idle: 'wolf_white', eat: 'wolf_white_eat' }, speed: 1.3, scale: 1.0, tint: 0xc8beb0, selfLight: 0x6a5a4a },
+  packD: { id: 'packD', name: 'Марта', nameEn: 'MARTHA', poses: { idle: 'wolf_grey', eat: 'wolf_grey_eat' }, speed: 1.6, scale: 1.0, tint: 0xd0b49a, selfLight: 0x6a5a4a },
+  packE: { id: 'packE', name: 'Рыжая', nameEn: 'THE RED ONE', poses: { idle: 'wolf_red', eat: 'wolf_red_eat' }, speed: 1.7, scale: 1.05, selfLight: 0x6a5a4a },
   // Julian as a separate cast member inside Lizzie's chapters (route WEREWOLF)
   julianL: { id: 'julianL', name: 'Джулиан Рид', nameEn: 'JULIAN REED', poses: { idle: 'jul_idle', talk: 'jul_talk' }, speed: 1.55 },
   // the werewolf in human form (seen from far away in the forest)

@@ -252,13 +252,22 @@ export function spruceCardTexture(variant = 0, snow = 1) {
     if (snow > 0) {
       const rs = rng(2000 + variant);
       for (const b of branches) {
-        for (let t = 0.08; t < 0.97; t += 0.03) {
-          if (rs() > 0.5 + snow * 0.45) continue;
-          const [x, y] = pt(b, t);
-          const rad = (2.2 + rs() * 3.8) * (0.6 + snow * 0.6) * (1 - t * 0.3);
-          ctx.fillStyle = '#93a4b8'; ctx.beginPath(); ctx.ellipse(x, y + rad * 0.3, rad * 1.7, rad * 0.7, 0, 0, 7); ctx.fill();
-          ctx.fillStyle = '#e4ebf2'; ctx.beginPath(); ctx.ellipse(x, y - rad * 0.15, rad * 1.55, rad * 0.6, 0, 0, 7); ctx.fill();
-          ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.ellipse(x - rad * 0.3, y - rad * 0.4, rad * 0.8, rad * 0.28, 0, 0, 7); ctx.fill();
+        const load = rs();                                  // some branches carry a lot, some almost none
+        if (load < 0.25) continue;
+        let t = 0.15 + rs() * 0.2;
+        while (t < 0.95) {
+          const run = 0.08 + rs() * 0.22 * load;            // a clump spans a stretch of the branch
+          const [x0, y0] = pt(b, t), [x1, y1] = pt(b, Math.min(0.97, t + run));
+          const th = (1.6 + rs() * 3.2) * (0.5 + snow * 0.6) * (0.6 + load * 0.6) * (1 - t * 0.3);
+          const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, L = Math.hypot(x1 - x0, y1 - y0) / 2 + th, ang = Math.atan2(y1 - y0, x1 - x0);
+          ctx.save(); ctx.translate(cx, cy); ctx.rotate(ang);
+          ctx.fillStyle = '#8fa0b4'; ctx.beginPath(); ctx.ellipse(0, th * 0.35, L, th * 0.75, 0, 0, 7); ctx.fill();
+          ctx.fillStyle = '#e2e9f0'; ctx.beginPath(); ctx.ellipse(0, -th * 0.1, L * 0.95, th * 0.62, 0, 0, 7); ctx.fill();
+          ctx.fillStyle = '#fbfdff'; ctx.beginPath(); ctx.ellipse(-L * 0.2, -th * 0.4, L * 0.5, th * 0.25, 0, 0, 7); ctx.fill();
+          // a few drips of green showing through
+          for (let k = 0; k < 3; k++) { ctx.fillStyle = greens[Math.floor(rs() * greens.length)]; ctx.fillRect((rs() - 0.5) * L * 1.6, th * 0.3, 2, 3 + rs() * 4); }
+          ctx.restore();
+          t += run + 0.06 + rs() * 0.22;
         }
       }
     }

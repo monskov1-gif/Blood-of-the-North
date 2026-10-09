@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { flareSource } from '../../fx/WindowLight.js';
 import { LocationBase } from '../LocationBase.js';
 import { canvasTexture, rng, glowTexture } from '../../render/textures.js';
 import { glow } from '../props.js';
@@ -185,6 +186,7 @@ export class CaveScene extends LocationBase {
     this.anchors.exit = { x: 21.4, z: -0.6 };
     this.anchors.slab = { x: -14.0, z: -1.0 };
     this.anchors.peek = { x: -9.2, z: 0.4 };
+    this.windowLights = [flareSource('MOON', new THREE.Vector3(22.0, 1.5, -1.0), { triggerDistance: 4.0, fadeDistance: 3.0, dir: new THREE.Vector3(-0.6, 0, 0.8) })];
     this.setState('L3');
     return root;
   }

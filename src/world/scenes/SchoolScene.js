@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { flareSource } from '../../fx/WindowLight.js';
 import { Reflector } from 'three/addons/objects/Reflector.js';
 import { LocationBase } from '../LocationBase.js';
 import { canvasTexture, rng, streetTexture } from '../../render/textures.js';
@@ -266,6 +267,10 @@ export class SchoolScene extends LocationBase {
     const sun = new THREE.DirectionalLight(0xeef2ff, 0.6); sun.position.set(-4, 4, -6);
     root.add(hemi, sun);
     this.lights = { hemi, sun };
+    this.windowLights = [
+      flareSource('PALE', new THREE.Vector3(-4.6, 2.1, BACK - 0.1), { triggerDistance: 2.6 }),
+      flareSource('PALE', new THREE.Vector3(-9.2, 1.6, BACK), { triggerDistance: 2.0, intensity: 0.45, flareSize: 0.6 }),
+    ];
     return root;
   }
 

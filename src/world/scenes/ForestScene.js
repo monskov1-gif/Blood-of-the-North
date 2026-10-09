@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { flareSource } from '../../fx/WindowLight.js';
 import { LocationBase } from '../LocationBase.js';
 import { canvasTexture, rng, glowTexture } from '../../render/textures.js';
 import { glow } from '../props.js';
@@ -313,6 +314,10 @@ export class ForestScene extends LocationBase {
     };
     this.allStands = []; this.snowGeos = [];
     this.root.traverse((o) => { if (o.userData?.cardMat) this.allStands.push(o); if (o.geometry?.userData?.snowCols) this.snowGeos.push(o.geometry); });
+    this.windowLights = [
+      flareSource('MIST', new THREE.Vector3(8, 12, -70), { always: true, enabled: () => this.state === 'day' }),
+      flareSource('MOON', new THREE.Vector3(30, 22, -95), { always: true, enabled: () => this.state === 'night' || this.state === 'l2' }),
+    ];
     this.setState('day');
     return this.root;
   }

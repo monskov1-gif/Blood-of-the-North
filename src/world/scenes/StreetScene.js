@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { flareSource } from '../../fx/WindowLight.js';
 import { spruceStand, bareTree } from '../nature.js';
 import { LocationBase } from '../LocationBase.js';
 import { canvasTexture, rng, glowTexture } from '../../render/textures.js';
@@ -146,6 +147,7 @@ export class StreetScene extends LocationBase {
     this.buildAutumn();
     this.buildAtmosphere();
     this.anchors.door = { x: -1.0, z: -2.4 };
+    this.windowLights = [flareSource('LOWSUN', new THREE.Vector3(-16, 7.5, -40), { always: true })];
     return this.root;
   }
 

@@ -19,6 +19,14 @@ import * as THREE from 'three';
  *    window reseeds the ghost layout a little, so it never repeats exactly.
  *    Nothing is ever drawn full white, and whatever overlaps Julian is dimmed —
  *    when he stands in front of the window he shadows the flare itself.
+ *
+ * Flare styles (`z.style`), so not every light flares the same way:
+ *   'zoom'       (default) the hospital zoom lens: starburst, hexes, sparkle, rainbow arcs.
+ *   'star'       a point source (lamp, sun through mist, moon): a hot core with a few long spikes,
+ *                then along the axis small orange discs, a green disc and one big thin hollow ring.
+ *   'anamorphic' a low sun / headlights: a fan of rays, one long horizontal streak across the frame,
+ *                octagonal amber ghosts, a dotted red arc and small rainbow slivers.
+ * `always: true` lights it regardless of distance (sun, moon); `enabled()` still gates it.
  */
 export class WindowLight {
   constructor({ renderer, settings, canvas }) {
@@ -50,6 +58,32 @@ export class WindowLight {
    */
   reseed(z, s) {
     const R = Math.random, j = (v, k = 0.12) => v * (1 + (R() - 0.5) * 2 * k);
+    if (z.style === 'star') {
+      s.rot = R() * Math.PI; s.spin = (R() - 0.5) * 0.3;
+      s.ghosts = [
+        { type: 'disc', t: j(0.32), r: j(0.03), tint: [1.0, 0.55, 0.35], a: 0.55 },
+        { type: 'disc', t: j(0.5), r: j(0.07), tint: [1.0, 0.62, 0.3], a: 0.45 },
+        { type: 'dot', t: j(0.58), r: 0.006, tint: [0.6, 1.0, 0.7], a: 0.8 },
+        { type: 'disc', t: j(0.66), off: 0.01, r: j(0.045), tint: [0.55, 0.9, 1.0], a: 0.3 },
+        { type: 'disc', t: j(0.82), r: j(0.12), tint: [0.45, 0.85, 0.35], a: 0.4 },
+        { type: 'hollow', t: j(1.02, 0.05), r: j(0.2, 0.06), tint: [0.95, 0.85, 0.55], a: 0.55 },
+        { type: 'dot', t: j(1.2), r: 0.004, tint: [1, 0.9, 0.7], a: 0.6 },
+      ].slice(0, this.low ? 5 : 7);
+      return;
+    }
+    if (z.style === 'anamorphic') {
+      s.rot = R() * Math.PI; s.spin = (R() - 0.5) * 0.2;
+      s.ghosts = [
+        { type: 'oct', t: j(0.42), r: j(0.03), tint: [1.0, 0.7, 0.25], a: 0.7 },
+        { type: 'oct', t: j(0.55), r: j(0.05), tint: [1.0, 0.45, 0.2], a: 0.45 },
+        { type: 'oct', t: j(0.68), r: j(0.032), tint: [1.0, 0.72, 0.3], a: 0.65 },
+        { type: 'oct', t: j(0.8), r: j(0.03), tint: [1.0, 0.68, 0.3], a: 0.6 },
+        { type: 'oct', t: j(0.93), r: j(0.035), tint: [1.0, 0.7, 0.32], a: 0.55 },
+        { type: 'redarc', t: j(0.75, 0.05), r: j(0.62, 0.05), a: 0.5 },
+        ...Array.from({ length: this.low ? 3 : 6 }, () => ({ type: 'sliver', t: 0.2 + R() * 1.2, off: (R() - 0.5) * 0.5, r: 0.03 + R() * 0.04, ang: R() * Math.PI, a: 0.35 + R() * 0.3 })),
+      ];
+      return;
+    }
     const T = z.ghostTints;
     const tint = (i) => T[i % T.length];
     s.rot = R() * Math.PI;
@@ -102,7 +136,8 @@ export class WindowLight {
     for (const z of zones) {
       const s = this.zoneState(z);
       let target = 0;
-      if (julian && (!z.enabled || z.enabled())) {
+      if (z.always && (!z.enabled || z.enabled())) target = 1;
+      else if (julian && (!z.enabled || z.enabled())) {
         const dx = julian.position.x - z.position.x, dz = julian.position.z - (z.position.z + z.dir.z * 2.0);
         const d = z.dir.x ? Math.abs(dx) * 0.7 + Math.abs(julian.position.z - z.position.z) * 0.15 : Math.hypot(dx, dz * 0.35);
         target = 1 - smooth(z.triggerDistance, z.triggerDistance + z.fadeDistance, d);
@@ -182,6 +217,7 @@ export class WindowLight {
       };
       // --- source: halo + core + starburst
       const ct = z.colorTint;
+      if (z.style === 'star' || z.style === 'anamorphic') { this.drawStyled(z, s, S, A, U, W, Hh, put, nearJ, minor); continue; }
       put(this.halo(ct), S.x, S.y, U * 0.26 * z.flareSize, A * 0.5);
       if (z.starburstIntensity > 0) put(this.burst(z.id, ct), S.x, S.y, U * 0.4 * z.flareSize, A * Math.min(1, 0.6 * z.starburstIntensity), s.rot + S.nx * s.spin);
       put(this.core(ct), S.x, S.y, U * 0.1 * z.flareSize, A * 0.8);
@@ -231,7 +267,157 @@ export class WindowLight {
     g.globalCompositeOperation = 'source-over';
   }
 
+  /** The 'star' and 'anamorphic' flares (see the header). */
+  drawStyled(z, s, S, A, U, W, Hh, put, nearJ, minor) {
+    const g = this.ctx, ct = z.colorTint, F = z.flareSize;
+    const vx = W / 2 - S.x, vy = Hh / 2 - S.y;
+    const len = Math.hypot(vx, vy) || 1, px = -vy / len, py = vx / len;
+    if (z.style === 'star') {
+      put(this.halo(ct), S.x, S.y, U * 0.3 * F, A * 0.55);
+      put(this.spikes(ct), S.x, S.y, U * 0.22 * F, A * 0.85, s.rot * 0.15 + S.nx * s.spin);
+      put(this.core(ct), S.x, S.y, U * 0.06 * F, A);
+    } else {
+      put(this.halo(ct), S.x, S.y, U * 0.42 * F, A * 0.7);
+      put(this.fan(ct), S.x, S.y, U * 0.5 * F, A * 0.75, s.rot * 0.1 + S.nx * s.spin);
+      put(this.core(ct), S.x, S.y, U * 0.09 * F, A);
+      // the long horizontal streak right through the source, and a fainter wide one
+      const lw = W * 0.9 * F;
+      g.globalAlpha = Math.min(1, A * 0.55); g.drawImage(this.hstreak(ct), S.x - lw, S.y - U * 0.012, lw * 2, U * 0.024);
+      g.globalAlpha = Math.min(1, A * 0.22); g.drawImage(this.hstreak(ct), S.x - lw * 0.6, S.y - U * 0.05, lw * 1.2, U * 0.1);
+    }
+    if (minor) return;
+    g.globalAlpha = 1; g.fillStyle = rgba(ct, 0.03 * A); g.fillRect(0, 0, W, Hh);   // veiling glare
+    const gi = z.ghostIntensity;
+    for (const gh of s.ghosts) {
+      const x = S.x + vx * gh.t + px * (gh.off || 0) * U, y = S.y + vy * gh.t + py * (gh.off || 0) * U;
+      const r = U * gh.r * F;
+      const a = A * gi * gh.a * nearJ(x, y, r);
+      switch (gh.type) {
+        case 'disc': put(this.disc(gh.tint), x, y, r, a); break;
+        case 'hollow': put(this.hollow(gh.tint), x, y, r, a); break;
+        case 'dot': put(this.core(gh.tint), x, y, Math.max(1.5, r), a); break;
+        case 'oct': put(this.oct(gh.tint), x, y, r, a, 0.2); break;
+        case 'sliver': put(this.sliver(), x, y, r, a, gh.ang); break;
+        case 'redarc': put(this.redarc(), S.x + vx * gh.t, S.y + vy * gh.t, r, a, Math.atan2(vy, vx)); break;
+      }
+    }
+  }
+
   // ---------------------------------------------------------------- sprites
+
+  /** A few long thin spikes (6 + 2 faint), a point-source star. */
+  spikes(t) {
+    return this.sprite(`spikes-${t}`, 256, (g, n) => {
+      const h = n / 2;
+      g.filter = 'blur(1px)';
+      for (let i = 0; i < 8; i++) {
+        const ang = (i / 8) * Math.PI * 2 + 0.2, L = h * (i % 2 ? 0.45 : 0.98), w = i % 2 ? 1.2 : 2.2;
+        const dx = Math.cos(ang), dy = Math.sin(ang);
+        const lg = g.createLinearGradient(h, h, h + dx * L, h + dy * L);
+        lg.addColorStop(0, rgba(t, 0.95)); lg.addColorStop(0.3, rgba(t, 0.35)); lg.addColorStop(1, rgba(t, 0));
+        g.fillStyle = lg; g.beginPath(); g.moveTo(h - dy * w, h + dx * w); g.lineTo(h + dx * L, h + dy * L); g.lineTo(h + dy * w, h - dx * w); g.closePath(); g.fill();
+      }
+      g.filter = 'none';
+    });
+  }
+
+  /** A dense fan of rays (low sun): many fine rays of uneven length, warm. */
+  fan(t) {
+    return this.sprite(`fan-${t}`, 512, (g, n) => {
+      const h = n / 2;
+      let seed = 4242;
+      const R = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+      g.filter = 'blur(1.5px)';
+      for (let i = 0; i < 140; i++) {
+        const ang = R() * Math.PI * 2, L = h * (0.25 + R() * 0.75), w = 0.6 + R() * 1.8;
+        const dx = Math.cos(ang), dy = Math.sin(ang);
+        const lg = g.createLinearGradient(h, h, h + dx * L, h + dy * L);
+        lg.addColorStop(0, rgba(t, 0.5)); lg.addColorStop(0.4, rgba(t, 0.14)); lg.addColorStop(1, rgba(t, 0));
+        g.fillStyle = lg; g.beginPath(); g.moveTo(h - dy * w, h + dx * w); g.lineTo(h + dx * L, h + dy * L); g.lineTo(h + dy * w, h - dx * w); g.closePath(); g.fill();
+      }
+      g.filter = 'none';
+    });
+  }
+
+  /** A filled ghost disc with a slightly brighter rim. */
+  disc(t) {
+    return this.sprite(`disc-${t}`, 128, (g, n) => {
+      const h = n / 2;
+      g.filter = 'blur(2px)';
+      const gr = g.createRadialGradient(h, h, 0, h, h, h * 0.86);
+      gr.addColorStop(0, rgba(t, 0.25)); gr.addColorStop(0.8, rgba(t, 0.38)); gr.addColorStop(0.95, rgba(t, 0.6)); gr.addColorStop(1, rgba(t, 0));
+      g.fillStyle = gr; g.beginPath(); g.arc(h, h, h * 0.88, 0, Math.PI * 2); g.fill();
+      g.filter = 'none';
+    });
+  }
+
+  /** A big thin hollow ring. */
+  hollow(t) {
+    return this.sprite(`hollow-${t}`, 512, (g, n) => {
+      const h = n / 2;
+      g.filter = 'blur(2px)';
+      g.strokeStyle = rgba(t, 0.55); g.lineWidth = 4; g.beginPath(); g.arc(h, h, h * 0.9, 0, Math.PI * 2); g.stroke();
+      g.strokeStyle = rgba(t, 0.18); g.lineWidth = 12; g.beginPath(); g.arc(h, h, h * 0.86, 0, Math.PI * 2); g.stroke();
+      g.filter = 'none';
+    });
+  }
+
+  /** Octagonal aperture ghost (amber, soft edge, brighter rim). */
+  oct(t) {
+    return this.sprite(`oct-${t}`, 128, (g, n) => {
+      const h = n / 2, r = h * 0.84;
+      const path = () => { g.beginPath(); for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2 + Math.PI / 8; const x = h + Math.cos(a) * r, y = h + Math.sin(a) * r; if (i) g.lineTo(x, y); else g.moveTo(x, y); } g.closePath(); };
+      g.filter = 'blur(2px)';
+      const gr = g.createRadialGradient(h, h, 0, h, h, r);
+      gr.addColorStop(0, rgba(t, 0.45)); gr.addColorStop(0.85, rgba(t, 0.55)); gr.addColorStop(1, rgba(t, 0.8));
+      g.fillStyle = gr; path(); g.fill();
+      g.filter = 'none';
+    });
+  }
+
+  /** Long horizontal anamorphic streak: hot middle, tinted, fading to the ends. */
+  hstreak(t) {
+    return this.sprite(`hstreak-${t}`, 512, (g, n) => {
+      const gr = g.createLinearGradient(0, 0, n, 0);
+      gr.addColorStop(0, rgba(t, 0)); gr.addColorStop(0.35, rgba(t, 0.35)); gr.addColorStop(0.5, 'rgba(255,250,235,0.95)'); gr.addColorStop(0.65, rgba(t, 0.35)); gr.addColorStop(1, rgba(t, 0));
+      g.fillStyle = gr;
+      const vg = g.createLinearGradient(0, 0, 0, n);
+      g.fillRect(0, n * 0.4, n, n * 0.2);
+      g.globalCompositeOperation = 'destination-in';
+      vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(0.5, 'rgba(0,0,0,1)'); vg.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = vg; g.fillRect(0, 0, n, n);
+    });
+  }
+
+  /** A large dotted red arc with a faint rainbow fringe, open towards the source. */
+  redarc() {
+    return this.sprite('redarc', 512, (g, n) => {
+      const h = n / 2;
+      g.filter = 'blur(1.5px)';
+      for (let k = 0; k < 180; k++) {
+        const a = -1.3 + (k / 180) * 2.6;
+        const x = h + Math.cos(a) * h * 0.9, y = h + Math.sin(a) * h * 0.9;
+        g.fillStyle = `rgba(230,40,60,${0.55 * Math.cos(a * 0.6)})`; g.fillRect(x - 2.5, y - 1.5, 5, 3);
+      }
+      for (const [c, dr] of [['rgba(255,180,80,0.18)', -8], ['rgba(120,220,255,0.14)', 8]]) {
+        g.strokeStyle = c; g.lineWidth = 3; g.beginPath(); g.arc(h, h, h * 0.9 + dr, -1.1, 1.1); g.stroke();
+      }
+      g.filter = 'none';
+    });
+  }
+
+  /** Small rainbow sliver (chromatic streak). */
+  sliver() {
+    return this.sprite('sliver', 128, (g, n) => {
+      const h = n / 2;
+      g.filter = 'blur(1px)';
+      const cols = ['rgba(255,80,80,0.7)', 'rgba(255,220,80,0.7)', 'rgba(90,255,140,0.7)', 'rgba(80,170,255,0.7)', 'rgba(170,100,255,0.6)'];
+      cols.forEach((c, i) => { g.fillStyle = c; g.beginPath(); g.ellipse(h, h - 4 + i * 2, h * 0.9, 1.4, 0, 0, Math.PI * 2); g.fill(); });
+      g.globalCompositeOperation = 'destination-in';
+      const lg = g.createLinearGradient(0, 0, n, 0); lg.addColorStop(0, 'rgba(0,0,0,0)'); lg.addColorStop(0.5, 'rgba(0,0,0,1)'); lg.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = lg; g.fillRect(0, 0, n, n);
+    });
+  }
 
   /** Wide soft halo. */
   halo(t) {
@@ -375,3 +561,25 @@ export class WindowLight {
 function smooth(a, b, x) { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); }
 
 function rgba(t, a) { return `rgba(${(t[0] * 255) | 0},${(t[1] * 255) | 0},${(t[2] * 255) | 0},${a})`; }
+
+/**
+ * Flare profiles for lights outside the hospital (the hospital keeps its A–D in HospitalExpansion).
+ *   LAMP  warm point lamp / street light — 'star'
+ *   PALE  pale overcast window (school, station) — soft 'star'
+ *   MOON  cold moon / moonlit cave mouth — faint 'star'
+ *   MIST  sun through mist (forest, December) — soft 'star' with a wide halo
+ *   LOWSUN  low winter sun / headlights — 'anamorphic'
+ */
+const base = { triggerDistance: 3.0, fadeDistance: 2.0, exposure: 0.08, bloom: 0.15, starburstIntensity: 0, ringIntensity: 0, ghostCount: 6, ghostSpacing: 0.4, ghostTints: [[1, 0.8, 0.5]] };
+export const FLARE_PROFILES = {
+  LAMP: { ...base, id: 'LAMP', style: 'star', intensity: 0.8, flareSize: 0.75, ghostIntensity: 0.7, colorTint: [1.0, 0.78, 0.5], maxScreenOpacity: 0.75 },
+  PALE: { ...base, id: 'PALE', style: 'star', intensity: 0.6, flareSize: 0.8, ghostIntensity: 0.5, colorTint: [0.9, 0.94, 1.0], maxScreenOpacity: 0.55, exposure: 0.1 },
+  MOON: { ...base, id: 'MOON', style: 'star', intensity: 0.5, flareSize: 0.6, ghostIntensity: 0.45, colorTint: [0.7, 0.82, 1.0], maxScreenOpacity: 0.5, exposure: 0.04, bloom: 0.08 },
+  MIST: { ...base, id: 'MIST', style: 'star', intensity: 0.55, flareSize: 1.3, ghostIntensity: 0.35, colorTint: [1.0, 0.92, 0.78], maxScreenOpacity: 0.5, exposure: 0.05, bloom: 0.12 },
+  LOWSUN: { ...base, id: 'LOWSUN', style: 'anamorphic', intensity: 0.9, flareSize: 0.9, ghostIntensity: 0.8, colorTint: [1.0, 0.66, 0.25], maxScreenOpacity: 0.8, exposure: 0.1, bloom: 0.2 },
+};
+
+/** A flare source in a scene: profile + position (+ dir, defaults to facing the camera). */
+export function flareSource(profile, position, opts = {}) {
+  return { ...FLARE_PROFILES[profile], position, dir: opts.dir || new THREE.Vector3(0, 0, 1), ...opts };
+}
