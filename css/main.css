@@ -399,3 +399,4 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .light-floor .bark-name { color: #6a1a14; text-shadow: 0 0 6px rgba(255,250,240,.8); }
 .light-floor .bark.sp-thought .bark-name { color: rgba(42,30,22,.6); }
 .light-floor .bark-hint { color: rgba(42,30,22,.55); }
+.phone.lz .aurora { background: radial-gradient(ellipse at 30% 20%, rgba(220,140,90,.55), transparent 60%), radial-gradient(ellipse at 70% 80%, rgba(120,60,90,.6), transparent 65%), #1a1018; }

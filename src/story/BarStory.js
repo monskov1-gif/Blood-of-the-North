@@ -434,15 +434,23 @@ export class BarStory {
   // ------------------------------------------------------------------ dialogue backgrounds
 
   async paintBackground(key) {
-    const cacheKey = `${this.g.locationId}|${key}|${this.owen.root.visible}`;
+    const cacheKey = `${this.g.locationId}|${this.g.world.state}|${key}|${this.owen.root.visible}`;
     if (this.bgCache.has(cacheKey)) return this.bgCache.get(cacheKey);
     const world = this.g.world;
-    const shot = world.shots?.[key] || this.scene.shots[key];
-    if (!shot) return null;
-    const cam = new THREE.PerspectiveCamera(shot.fov, 16 / 9, 0.1, 80);
+    // the location's own painted shot; the bar's shots only in the bar; anywhere else without a
+    // shot of that name — the current view of the location (never a picture of another place)
+    const shot = world.shots?.[key] || (this.g.locationId === 'bar' ? this.scene.shots[key] : null);
+    let cam;
+    if (shot) {
+      cam = new THREE.PerspectiveCamera(shot.fov, 16 / 9, 0.1, 80);
+      cam.position.set(...shot.pos);
+      cam.lookAt(new THREE.Vector3(...shot.look));
+    } else {
+      const c = this.g.cameraSys.camera;
+      cam = new THREE.PerspectiveCamera(c.fov, 16 / 9, 0.1, 80);
+      cam.position.copy(c.position); cam.quaternion.copy(c.quaternion);
+    }
     cam.layers.enable(1);
-    cam.position.set(...shot.pos);
-    cam.lookAt(new THREE.Vector3(...shot.look));
     cam.updateMatrixWorld();
     const low = this.g.renderer.isLow;
     const hide = [this.julian.root, this.kayden.root, this.waiter.root, this.coupe, ...(world.vnHide || [])];

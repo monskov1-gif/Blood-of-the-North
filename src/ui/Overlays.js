@@ -77,6 +77,8 @@ export class PhoneView {
 
   open() {
     if (this.wrap) return;
+    const st = this.state.stage || '';
+    if (st.startsWith('lizzie')) return this.openLizzie(st);
     this.audio.play('sfx.phone');
     const w = this.wrap = el('div', 'phone-wrap', this.root);
     const ph = el('div', 'phone', w);
@@ -117,6 +119,39 @@ export class PhoneView {
     this.esc = (e) => { if (e.code === 'Escape' || e.code === 'KeyQ') { e.stopPropagation(); this.close(); } };
     window.addEventListener('keydown', this.esc, true);
     this.state.set('read_phone', true);
+    this.bus.emit('panel', true);
+  }
+
+  /** Lizzie's own phone in her chapters (no Kayden, no Julian's voicemail); in the cave she has none. */
+  openLizzie(st) {
+    const n = +st.slice(-1);
+    if (n >= 3) { this.bus.emit('toast', 'Телефона нет. Он остался в лесу, у реки.'); return; }
+    this.audio.play('sfx.phone');
+    const w = this.wrap = el('div', 'phone-wrap', this.root);
+    const ph = el('div', 'phone lz', w);
+    const sc = el('div', 'screen', ph);
+    el('div', 'aurora', sc);
+    const [time, date] = n === 1 ? ['15:42', 'пятница, 5 ноября · −6°'] : ['16:58', 'четверг, 11 ноября · −9°'];
+    el('div', 'time', sc, time);
+    el('div', 'date', sc, date);
+    const notes = el('div', 'notes', sc);
+    const MSG = n === 1 ? [
+      ['Пуриэль', '12 мин назад', 'РИД. ДЕЛО ВЕКА. СТОЛОВАЯ. СЕЙЧАС.'],
+      ['Оливия', '14 мин назад', 'беру бутерброды на всех. и пластыри'],
+      ['Викки', '20 мин назад', 'я всё ещё против. но я приду'],
+      ['Джул', 'утром', 'Купи молока. И не трогай мои папки, Лиз.'],
+    ] : [
+      ['Джул', '3 мин назад', 'Ты где? Перезвони.'],
+      ['Пуриэль', '40 мин назад', 'машина заправлена. сестра убьёт меня'],
+      ['Оливия', '1 ч назад', 'аптечка ✓ термос ✓ фонарики ✓'],
+      ['Викки', '1 ч назад', 'если нас съедят — я говорила'],
+    ];
+    for (const [who, t, text] of MSG) el('div', `ntf${who === 'Джул' && n === 2 ? ' missed' : ''}`, notes, `<b>${who} <span>${t}</span></b>${text}`);
+    const close = el('div', 'close-p', sc);
+    el('div', 'phone-hint', w, 'НАЖМИТЕ ВНЕ ТЕЛЕФОНА, ЧТОБЫ УБРАТЬ');
+    w.addEventListener('pointerdown', (e) => { if (e.target === w || e.target === close) this.close(); });
+    this.esc = (e) => { if (e.code === 'Escape' || e.code === 'KeyQ') { e.stopPropagation(); this.close(); } };
+    window.addEventListener('keydown', this.esc, true);
     this.bus.emit('panel', true);
   }
 
