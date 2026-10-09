@@ -1,0 +1,194 @@
+{
+ "source": "tools/art/julian_v010.png",
+ "crop": [
+  40,
+  15
+ ],
+ "frame": [
+  190,
+  635
+ ],
+ "scale_px": 0.30032,
+ "parts": {
+  "torso": {
+   "offset": [
+    18,
+    11
+   ],
+   "size": [
+    158,
+    588
+   ],
+   "pivot": [
+    88,
+    300
+   ],
+   "pivot_local": [
+    70,
+    289
+   ],
+   "parent": null,
+   "z": 4
+  },
+  "head": {
+   "offset": [
+    56,
+    12
+   ],
+   "size": [
+    103,
+    107
+   ],
+   "pivot": [
+    104,
+    104
+   ],
+   "pivot_local": [
+    48,
+    92
+   ],
+   "parent": "torso",
+   "z": 6
+  },
+  "scarf": {
+   "offset": [
+    43,
+    90
+   ],
+   "size": [
+    131,
+    254
+   ],
+   "pivot": [
+    88,
+    100
+   ],
+   "pivot_local": [
+    45,
+    10
+   ],
+   "parent": "torso",
+   "z": 7
+  },
+  "arm_near": {
+   "offset": [
+    20,
+    108
+   ],
+   "size": [
+    85,
+    207
+   ],
+   "pivot": [
+    60,
+    128
+   ],
+   "pivot_local": [
+    40,
+    20
+   ],
+   "parent": "torso",
+   "z": 5
+  },
+  "leg_near": {
+   "offset": [
+    38,
+    296
+   ],
+   "size": [
+    96,
+    331
+   ],
+   "pivot": [
+    88,
+    304
+   ],
+   "pivot_local": [
+    50,
+    8
+   ],
+   "parent": "torso",
+   "z": 2
+  },
+  "leg_far": {
+   "offset": [
+    94,
+    296
+   ],
+   "size": [
+    78,
+    319
+   ],
+   "pivot": [
+    120,
+    304
+   ],
+   "pivot_local": [
+    26,
+    8
+   ],
+   "parent": "torso",
+   "z": 0
+  },
+  "coat_front": {
+   "offset": [
+    126,
+    284
+   ],
+   "size": [
+    42,
+    221
+   ],
+   "pivot": [
+    140,
+    292
+   ],
+   "pivot_local": [
+    14,
+    8
+   ],
+   "parent": "torso",
+   "z": 3
+  },
+  "coat_back": {
+   "offset": [
+    14,
+    296
+   ],
+   "size": [
+    57,
+    202
+   ],
+   "pivot": [
+    46,
+    300
+   ],
+   "pivot_local": [
+    32,
+    4
+   ],
+   "parent": "torso",
+   "z": 3
+  },
+  "arm_far": {
+   "offset": [
+    30,
+    108
+   ],
+   "size": [
+    85,
+    207
+   ],
+   "pivot": [
+    70,
+    128
+   ],
+   "pivot_local": [
+    40,
+    20
+   ],
+   "parent": "torso",
+   "z": 1
+  }
+ }
+}
