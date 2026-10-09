@@ -86,7 +86,7 @@ export class CaseFiles {
     const fv = this.folder(board, CASES.VAMPIRE, 'fv', [
       { cls: 'ph rose', kind: 'rose', cap: '«Северная роза»' },
       { cls: 'ph kayden', kind: 'kayden', cap: 'К. Альварес' },
-    ], 'В РАБОТЕ', '');
+    ], 'ДОСТУП ЗАКРЫТ', 'свидетель<br>— не моё');
     const note = el('div', 'cf-note', board, 'одна и та же зима?<br>одна и та же ночь?');
     el('i', 'cf-pin', note);
     const pin = (sel) => board.querySelector(`${sel} > .cf-pin`);
@@ -119,9 +119,14 @@ export class CaseFiles {
     const w = this.wrap;
     w.classList.add('cf-previewing');
     const book = this.book(w, id, { preview: true });
-    if (CASES[id].wip) el('p', 'cf-hand small', book.querySelector('.cf-rbody'), 'Расследование Джулиана здесь ещё в разработке. Но выбор — окончательный: от него зависит, где он будет той ночью.');
-    const take = el('button', 'cf-take', book.querySelector('.cf-right'), '<b>ВЗЯТЬ ДЕЛО</b><small>TAKE THE CASE</small>');
-    take.addEventListener('click', (e) => { e.stopPropagation(); this.result = id; this.close(); });
+    if (CASES[id].wip) {
+      // the bar case is Kowalski's, and Julian is its only surviving witness: he can't take it
+      el('p', 'cf-hand small', book.querySelector('.cf-rbody'), 'Свидетель не может вести своё дело. Ковальски не отдаст его — и правильно сделает.');
+      el('div', 'cf-take locked', book.querySelector('.cf-right'), '<b>ДОСТУП ЗАКРЫТ</b><small>WITNESS — NOT ASSIGNABLE</small>');
+    } else {
+      const take = el('button', 'cf-take', book.querySelector('.cf-right'), '<b>ВЗЯТЬ ДЕЛО</b><small>TAKE THE CASE</small>');
+      take.addEventListener('click', (e) => { e.stopPropagation(); this.result = id; this.close(); });
+    }
     const back = el('button', 'cf-take ghost', book.querySelector('.cf-right'), '<b>К ПАПКАМ</b><small>BACK</small>');
     back.addEventListener('click', (e) => { e.stopPropagation(); book.remove(); w.classList.remove('cf-previewing'); });
   }
@@ -185,8 +190,9 @@ export class CaseFiles {
       } else if (key === 'tasks') {
         const list = el('div', 'cf-tasks', body);
         for (const t of c.tasks || []) {
-          if (t.req && !f[t.req]) continue;
-          el('div', `cf-task${f[t.done] ? ' done' : ''}`, list, t.text);
+          if (t.req && ![].concat(t.req).every((k) => f[k])) continue;
+          const row = el(t.action && !f[t.done] ? 'button' : 'div', `cf-task${f[t.done] ? ' done' : ''}${t.action && !f[t.done] ? ' act' : ''}`, list, t.text);
+          if (t.action === 'analysis' && !f[t.done]) row.addEventListener('click', () => this.analysis(body, () => show('tasks')));
         }
       } else if (key === 'victims') {
         if (!f.read_victims) { el('p', 'cf-text', body, 'Список погибших — на доске объявлений в участке.'); return; }
@@ -213,6 +219,51 @@ export class CaseFiles {
     }
     show('case');
     return wrapBook;
+  }
+
+  /**
+   * Task «Сопоставить следы» (chapter 8): three findings from the valley side by side on the page,
+   * one question. A wrong answer is crossed out with the reason in Julian's hand.
+   */
+  analysis(body, back) {
+    body.innerHTML = '';
+    el('h4', 'cf-evtitle', body, 'Сопоставить следы');
+    const row = el('div', 'cf-an-row', body);
+    const cards = [
+      ['track', 'Слепок · 19 см', 'Передняя лапа. Волчья по форме, по размеру — вдвое больше.'],
+      ['claws', 'Борозды · 2,1 м', 'Четыре полосы, сверху вниз. Зверь стоял на задних лапах.'],
+      ['carcass', 'Кость', 'Перекушена, не разгрызена. Следы одной пасти. Стаи нет.'],
+    ];
+    for (const [kind, cap, note] of cards) {
+      const card = el('div', 'cf-an-card', row);
+      this.photo(card, kind, 'ph an', cap);
+      el('p', 'cf-an-note', card, note);
+    }
+    el('p', 'cf-hand', body, 'Что здесь было?');
+    const answers = [
+      ['Стая волков', 'Тогда где следы стаи? Здесь прошёл один.'],
+      ['Медведь-шатун', 'Медведь не убивает двадцать три туши, не съев ни одной. И когти не те.'],
+      ['Один зверь. Огромный. Встаёт на задние лапы.', null],
+    ];
+    const list = el('div', 'cf-an-answers', body);
+    const msg = el('p', 'cf-an-msg', body, '');
+    for (const [text, wrong] of answers) {
+      const b = el('button', 'cf-an-ans', list, text);
+      b.addEventListener('click', () => {
+        if (wrong) {
+          b.classList.add('wrong'); msg.textContent = wrong;
+          this.audio.play('ui.hover', { volume: 0.5 });
+          return;
+        }
+        b.classList.add('right');
+        msg.textContent = 'Один. Огромный. И он не охотится — он что-то уничтожает. Нарочно.';
+        this.state.set('fo_analysis_done', true);
+        this.audio.play('sfx.paper', { volume: 0.6 });
+        setTimeout(back, 2600);
+      });
+    }
+    const bk = el('button', 'cf-link', body, '← к задачам');
+    bk.addEventListener('click', back);
   }
 
   /** Evidence #11: Lizzie's phone, cracked, last screen of 11 November. */

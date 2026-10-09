@@ -212,15 +212,23 @@ const methods = {
   forestInteractables(w) {
     const g = this.g;
     const say = (id) => () => g.dialogue.start(id);
+    // both clues seen → the folder gets the task «Сопоставить следы» (solved inside the folder)
+    const clue = (id) => async () => {
+      await g.dialogue.start(id);
+      if (g.state.get('fo_claws') && g.state.get('fo_bones') && !g.state.get('fo_analysis_done') && !this.analysisHinted) {
+        this.analysisHinted = true;
+        g.hud.notifyCase(true);
+        g.hud.toast('Папка (J) → Задачи: сопоставить следы', 3600);
+      }
+    };
     return [
       { id: 'fo_car', label: 'Машина', at: { x: -11.2, z: 0.2 }, radius: 0.9, anchor: A(-11.6, 1.4, 0.4), run: say('fo_car') },
       { id: 'fo_flyer', label: 'Листовка', at: { x: -6.2, z: -2.1 }, radius: 0.7, anchor: w.anchors.flyer, run: say('fo_flyer') },
       { id: 'fo_tape', label: 'Оцепление', at: { x: -4.6, z: -1.8 }, radius: 0.8, anchor: w.anchors.tape, run: say('fo_tape') },
       { id: 'fo_river', label: 'Река', at: { x: 0.6, z: -2.2 }, radius: 1.0, anchor: w.anchors.river, run: say('fo_river') },
       { id: 'fo_marker11', label: 'Маркер № 11', at: { x: 3.0, z: -2.2 }, radius: 0.7, anchor: w.anchors.marker11, run: say('fo_marker11') },
-      { id: 'fo_bones', label: 'Кости', at: { x: 5.2, z: -2.2 }, radius: 0.6, anchor: A(5.4, 0.4, -4.0), run: say('fo_bones') },
-      { id: 'fo_claws', label: 'Осина', at: { x: 7.4, z: -2.2 }, radius: 0.7, anchor: w.anchors.claws, run: say('fo_claws') },
-      { id: 'fo_analysis', label: 'Сопоставить следы', at: { x: 9.6, z: -1.6 }, radius: 0.8, anchor: A(9.6, 1.2, -2.4), run: () => (g.state.get('fo_claws') && g.state.get('fo_bones') ? g.dialogue.start('fo_analysis') : g.view.flash('thought', 'Сначала — осина и кости. Потом сопоставлять.', 2200)) },
+      { id: 'fo_bones', label: 'Кости', at: { x: 5.2, z: -2.2 }, radius: 0.6, anchor: A(5.4, 0.4, -4.0), run: clue('fo_bones') },
+      { id: 'fo_claws', label: 'Осина', at: { x: 7.4, z: -2.2 }, radius: 0.7, anchor: w.anchors.claws, run: clue('fo_claws') },
       { id: 'fo_trail', label: 'Тропа в чащу', at: { x: 12.0, z: 0.2 }, radius: 0.9, anchor: A(12.6, 1.4, 0), run: say('fo_trail') },
     ];
   },
@@ -243,6 +251,18 @@ const methods = {
     if (S !== this.session) return;
     g.hud.show(false);
     await g.card.show('Два дня спустя', { en: 'Two Days Later', ms: 1900 });
+    if (S !== this.session) return;
+    // at home, in front of the TV: the news, then his own map of the attacks over the scene
+    // (the map lies under the fader — it must never be shown on a black screen)
+    await this.enter('apartment', 'day', null);
+    {
+      const w = g.world, sp = w.spots || {};
+      const st = sp.sofa || sp.window || { x: -2, z: -1 };
+      this.julian.placeAt(st.x + 0.4, Math.max(-1.4, st.z + 0.6), -1);
+      this.julian.setPose('think');
+      g.cameraSys.snap();
+    }
+    await g.fader.to(false, 1200);
     g.audio.play('sfx.tv', { volume: 0.5 });
     if (!(await this.lines(g.dialogue.dialogues.fo_news))) return;
     await sleep(0.8);
@@ -258,6 +278,7 @@ const methods = {
     });
     if (S !== this.session) return;
     if (!(await this.lines(g.dialogue.dialogues.fo_routes))) return;
+    this.julian.setPose('idle');
     g.keyScene = false;
     if (!g.state.get('lizzie_chapter_4_complete') && !(await this.playLizzie(4))) return;
     if (S !== this.session) return;
@@ -464,7 +485,7 @@ const methods = {
     if (st === 'forest' && !this.callStarted && g.player.enabled && !g.dialogue.busy) {
       const f = g.state.flags;
       const seen = ['fo_tape', 'fo_marker', 'fo_claws', 'fo_river'].filter((k) => f[k]).length;
-      if (seen >= 3 && f.fo_marker && f.fo_analysis_done) this.touristsCall();
+      if (seen >= 3 && f.fo_marker && f.fo_analysis_done && !g.cases.isOpen) this.touristsCall();
     }
     if (st !== 'forest_night') return;
     const J = this.julian, wolf = this.beast, man = this.stranger;

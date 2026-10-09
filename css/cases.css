@@ -285,3 +285,20 @@
 .cf-list { color: #120c08; }
 .cf-desk::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse 46% 40% at 50% 46%, rgba(255,196,120,.16), transparent 72%); }
 .cf-hand.small { font-size: calc(var(--f) * 1.5); line-height: 1.15; }
+
+/* v0.14: the in-folder task «Сопоставить следы» */
+.cf-task.act { background: none; border: 0; text-align: left; font: inherit; font-size: calc(var(--f) * 1.38); color: #8a1016; cursor: pointer; text-decoration: underline dotted rgba(138,16,22,.6); text-underline-offset: .25em; }
+.cf-task.act:hover { color: #b0161d; }
+.cf-an-row { display: flex; gap: 1em; margin: .4em 0 .8em; }
+.cf-an-card { flex: 1; position: relative; }
+.cf-an-card .ph.an { position: relative; left: auto; top: auto; width: 100%; transform: rotate(var(--rot, -1.5deg)); }
+.cf-an-card:nth-child(2) .ph.an { --rot: 1.2deg; }
+.cf-an-note { font-size: calc(var(--f) * 1.05); line-height: 1.35; margin: .5em 0 0; color: rgba(43,29,20,.85); }
+.cf-an-answers { display: flex; flex-direction: column; gap: .35em; margin: .3em 0; }
+.cf-an-ans { background: rgba(255,250,236,.55); border: 1px solid rgba(60,40,20,.35); padding: .45em .8em; font: inherit; font-size: calc(var(--f) * 1.2); text-align: left; cursor: pointer; color: #2b1d14; }
+.cf-an-ans:hover { background: rgba(255,250,236,.9); }
+.cf-an-ans.wrong { text-decoration: line-through; text-decoration-color: #b0161d; opacity: .55; }
+.cf-an-ans.right { border-color: #b0161d; box-shadow: inset 3px 0 0 #b0161d; }
+.cf-an-msg { min-height: 2.6em; font-family: inherit; font-style: italic; color: #8a1016; font-size: calc(var(--f) * 1.15); }
+.cf-take.locked { cursor: not-allowed; opacity: .75; filter: grayscale(.5); border-style: dashed; }
+.cf-folder.fv { filter: saturate(.7) brightness(.9); }

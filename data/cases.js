@@ -42,6 +42,7 @@ export const CASES = {
     tasks: [
       { text: 'Место пропажи Лиззи — долина у реки', done: 'forest_visited' },
       { text: 'Просмотреть улики в папке', done: 'saw_lizzy_phone' },
+      { text: 'Сопоставить следы: слепок, борозды, кости', done: 'fo_analysis_done', req: ['fo_claws', 'fo_bones'], action: 'analysis' },
       { text: 'Найти, кто это делает', done: 'saw_transform', req: 'tourists_news' },
       { text: 'Проследить за ним', done: 'found_cave', req: 'saw_transform' },
     ],
