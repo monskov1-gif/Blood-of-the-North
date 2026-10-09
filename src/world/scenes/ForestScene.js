@@ -950,15 +950,17 @@ export class ForestScene extends LocationBase {
     L.key.intensity = dark ? 3.2 : 0;
     L.rim.intensity = dark ? 1.4 : golden ? 0.8 : 0;
     L.rim.color.set(golden ? 0xffb070 : 0xd89a6a);
+    L.rim.position.set(30, 3, -30);
     if (this.caveLight) this.caveLight.intensity = dark ? 11 : 3;
     this.background = dark ? 0x1a2232 : grey ? 0x8e949a : 0xa8b2bc;
-    this.fog.color.set(name === 'l2' ? 0x3e4a5e : dark ? 0x1e2838 : grey ? 0x8a9096 : 0xb4bcc4);
+    this.fog.color.set(name === 'l2' ? 0x56647a : dark ? 0x1e2838 : grey ? 0x8a9096 : 0xb4bcc4);
     this.fog.density = dark ? 0.028 : golden ? 0.016 : 0.025;
     if (dark) this.paintSky([[0, '#0c1222'], [0.45, '#22304e'], [0.6, '#46507a'], [0.68, '#7a6278'], [0.74, '#b07c5e'], [0.8, '#8a6258'], [1, '#3a3446']]);
     else if (grey) this.paintSky([[0, '#5e6268'], [0.45, '#8a8e94'], [0.8, '#a8acb0'], [1, '#b4b6b8']]);
     else this.paintSky([[0, '#7a8696'], [0.55, '#aab4c0'], [1, '#cdd2d8']]);
     if (this.tapeMat) this.tapeMat.emissive.set(dark ? 0x6a5600 : 0x2a2400);
-    if (this.waterSky) this.waterSky.value.set(dark ? 0x2a3854 : grey ? 0x6a7076 : 0x8a96a6);
+    if (this.waterMat) this.waterMat.specular.set(nov ? 0x262c34 : 0x9aaabb);
+    if (this.waterSky) this.waterSky.value.set(name === 'l2' ? 0x18202c : dark ? 0x2a3854 : grey ? 0x343a42 : 0x8a96a6);   // November water is black, not a bright strip
     this.mtn.material.color.set(dark ? 0x5a6884 : grey ? 0x6e7470 : 0xd8e0ea);
     this.far.material.color.set(dark ? 0x283246 : grey ? 0x3a4238 : 0x8e9aa4);
     this.far2.material.color.set(dark ? 0x1c2432 : grey ? 0x2a3228 : 0x6a7680);
@@ -967,7 +969,7 @@ export class ForestScene extends LocationBase {
     this.lowFog.forEach((b) => { b.material.color.set(dark ? 0x3e4c66 : grey ? 0x9aa0a6 : 0xe8ecf0); b.material.opacity = dark ? 0.22 : grey ? 0.26 : 0.3; });
     // the ground follows the grade of the hour (the dusk is blue, not olive)
     this.groundAutumn.material.color.set(name === 'l2' ? 0xa8b4cc : 0xffffff);
-    if (name === 'l2') L.key.intensity = 5.5;
+    if (name === 'l2') { L.key.intensity = 5.5; L.rim.color.set(0x8aa4d8); L.rim.intensity = 2.2; L.rim.position.set(-6, 6, -20); }   // a cold sky rim on the herd and Lizzie
     this.undergrowth.material.color.set(name === 'l2' ? 0x8a96b4 : 0xffffff);
     // November (l1, l2): no snow on the ground or the branches yet
     const snowy = !nov;

@@ -299,13 +299,13 @@ export function spruceStand(trees, { low = false, snow = 1, variant = 0, tint = 
     const R = (t.kind === 'tall' ? 1.5 : 1.35) * s * (0.85 + r() * 0.3);
     trunks.push({ x: t.x, y: t.y || 0, z: t.z, h: H * 0.96, r: (t.kind === 'tall' ? 0.12 : 0.09) * s * (0.75 + r() * 0.5), lean: (r() - 0.5) * 0.06 });
     if (t.snag) continue;                                   // a dead snag: just the bare trunk
-    const tiers = Math.max(6, Math.round((H - crownBase) / (0.42 * s)));
+    const tiers = Math.max(7, Math.round((H - crownBase) / (0.3 * s)));       // tiers overlap: no stacked 'plates'
     for (let k = 0; k < tiers; k++) {
       const f = k / tiers;
       const y = crownBase + (H - crownBase) * f;
       if (t.kind === 'young' && k > 1 && r() < 0.18) continue;          // a missing whorl: young spruces are ragged
       const width = R * 2 * Math.pow(1 - f, 0.92) * (t.kind === 'young' ? 0.65 + r() * 0.7 : 0.85 + r() * 0.3) + 0.25 * s;
-      const height = width * (0.42 + r() * 0.12);
+      const height = width * (0.55 + r() * 0.18);
             // two cards turned towards the camera (never edge-on), a narrower one across for depth
       const shade = 0.82 + r() * 0.3 - (1 - f) * 0.08;
       for (const [yaw, ww] of [[-0.45 + (r() - 0.5) * 0.3, 1], [0.45 + (r() - 0.5) * 0.3, 0.92], [Math.PI / 2 + (r() - 0.5) * 0.4, 0.7]]) cards.push({ x: t.x + (t.kind === 'young' ? (r() - 0.5) * 0.12 * s : 0), y: (t.y || 0) + y + height * 0.9, z: t.z, yaw, w: width * ww, h: height, shade });

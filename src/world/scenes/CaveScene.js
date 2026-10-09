@@ -33,6 +33,10 @@ const floorTex = () => PX('floor', 64, 64, (ctx, w, h) => {
   for (let i = 0; i < 40; i++) { ctx.fillStyle = rgb(170, 146, 84, 0.7); ctx.fillRect(r() * w, r() * h, 3 + r() * 4, 1); } // straw
   for (let i = 0; i < 3; i++) { ctx.fillStyle = rgb(70, 30, 22, 0.25); ctx.beginPath(); ctx.arc(r() * w, r() * h, 2 + r() * 4, 0, 7); ctx.fill(); }
   for (let i = 0; i < 60; i++) { ctx.fillStyle = rgb(110, 96, 80, 0.8); ctx.fillRect(r() * w, r() * h, 1, 1); }   // grit
+  for (let y = 2; y < h; y += 5) for (let x = 0; x < w; x++) {                       // wind ripples in the sand
+    const yy = Math.round(y + Math.sin(x * 0.25 + y) * 1.5);
+    ctx.fillStyle = rgb(176, 150, 116, 0.35); ctx.fillRect(x, yy, 1, 1); ctx.fillStyle = rgb(96, 80, 62, 0.35); ctx.fillRect(x, yy + 1, 1, 1);
+  }
 });
 
 /** A red splash (decal) — the ritual chamber, Olivia's clothes. */
@@ -45,14 +49,21 @@ const bloodTex = (seed) => PX(`blood${seed}`, 32, 32, (ctx, w, h) => {
 });
 
 /** The night outside the mouth: sky, a hill of spruce, a pale ground. */
-const outsideTex = () => canvasTexture('cave-outside', 128, 128, (ctx, w, h) => {
-  const g = ctx.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#1a2440'); g.addColorStop(0.6, '#4a5a80'); g.addColorStop(1, '#6a7898');
+const outsideTex = () => canvasTexture('cave-outside2', 128, 128, (ctx, w, h) => {
+  const g = ctx.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#1e2a46'); g.addColorStop(0.55, '#4e5e84'); g.addColorStop(1, '#7484a2');
   ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
   const r = rng(733);
-  ctx.fillStyle = '#141c2a';
-  for (let i = 0; i < 26; i++) { const x = r() * w, hh = 30 + r() * 50, b = h * 0.78; ctx.beginPath(); ctx.moveTo(x, b - hh); ctx.lineTo(x - 7 - r() * 5, b); ctx.lineTo(x + 7 + r() * 5, b); ctx.fill(); }
-  ctx.fillStyle = '#8a96b0'; ctx.fillRect(0, h * 0.78, w, h * 0.22);
-  for (let i = 0; i < 30; i++) { ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.fillRect(r() * w, r() * h * 0.4, 1, 1); }
+  for (let i = 0; i < 26; i++) { ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.fillRect(r() * w, r() * h * 0.35, 1, 1); }
+  ctx.filter = 'blur(2px)';
+  for (const [y0, col] of [[0.58, 'rgba(40,52,78,0.8)'], [0.68, 'rgba(26,34,52,0.9)']]) {          // misty layered tree lines, soft
+    ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(0, h);
+    for (let x = 0; x <= w; x += 2) ctx.lineTo(x, h * y0 - Math.abs(Math.sin(x * 0.37 + y0 * 9)) * 9 - r() * 4);
+    ctx.lineTo(w, h); ctx.fill();
+  }
+  ctx.filter = 'none';
+  ctx.fillStyle = 'rgba(150,164,190,0.9)'; ctx.fillRect(0, h * 0.8, w, h * 0.2);
+  const m = ctx.createLinearGradient(0, h * 0.55, 0, h * 0.8); m.addColorStop(0, 'rgba(160,176,204,0)'); m.addColorStop(1, 'rgba(160,176,204,0.6)');
+  ctx.fillStyle = m; ctx.fillRect(0, h * 0.55, w, h * 0.25);
 });
 
 /** Sandstone grain for the walls: fine streaks along the layers, no crack lines. */
@@ -94,7 +105,7 @@ function wallHeight(x, y, fine = false) {
     d += (fbm3(x * 4, y * 4, 2, 35, 3) - 0.5) * 0.1;
   }
   d += Math.max(0, 0.9 - y) * 0.7;
-  d += Math.pow(Math.max(0, y - 2.6), 1.6) * 1.15;                                   // leans over into the vault
+  d += Math.pow(Math.max(0, y - 3.0), 1.4) * 0.6;                                    // leans gently over into the vault
   return d;
 }
 
@@ -223,7 +234,7 @@ export class CaveScene extends LocationBase {
       c.setScalar(Math.min(1.1, lit) * (1 - sat(-d * 0.5 - 0.2) * 0.5));
     });
     const wallMat = rockMaterial(this.low, { roughness: 0.95 });
-    wallMat.map = wallBakedTex(this.low ? 1024 : 1536, this.low ? 144 : 214); wallMat.map.repeat.set(1, 1); wallMat.map.wrapS = wallMat.map.wrapT = THREE.ClampToEdgeWrapping;
+    wallMat.map = wallBakedTex(this.low ? 1536 : 2048, this.low ? 214 : 286); wallMat.map.repeat.set(1, 1); wallMat.map.wrapS = wallMat.map.wrapT = THREE.ClampToEdgeWrapping;
     const vaultMat = rockMaterial(this.low, { roughness: 0.95 });
     vaultMat.map = sandGrainTex(); vaultMat.map.repeat.set(16, 3);
     this.wallMat = wallMat;
@@ -347,7 +358,10 @@ export class CaveScene extends LocationBase {
     for (const [x, y, z] of [[-17.2, 0.14, BACK + 1.25], [-16.9, 0.14, BACK + 1.45], [-17.05, 0.32, BACK + 1.33], [-12.0, 0.14, BACK + 1.3], [-11.7, 0.14, BACK + 1.5], [-15.6, 0.14, BACK + 1.4]]) g.add(this.skull(x, y, z, bone));
     for (let i = 0; i < 3; i++) {
       const ax = -16.4 + i * 2.4;
-      g.add(this.antlers(ax, 1.9, BACK - 0.5 + wallHeight(ax, 2.2) + 0.08, bone));
+      const az = BACK - 0.5 + wallHeight(ax, 1.6) + 0.1;
+      g.add(this.antlers(ax, 1.45, az, bone));
+      const shd = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 1.2), new THREE.MeshBasicMaterial({ map: glowTexture(), color: 0x000000, transparent: true, opacity: 0.5, depthWrite: false }));
+      shd.position.set(ax + 0.08, 1.4, az - 0.06); g.add(shd);
     }
     // the red light of the chamber (L5)
     this.ritualLight = new THREE.PointLight(0xc03a20, 0, 9, 1.3); this.ritualLight.position.set(-14, 2.6, 0.4); g.add(this.ritualLight);
@@ -454,7 +468,7 @@ export class CaveScene extends LocationBase {
     // cold light falling in from the mouth: soft shafts in the dust
     const shT = shaftTexture();
     for (let i = 0; i < 5; i++) {
-      const sh = new THREE.Mesh(new THREE.PlaneGeometry(0.7 + i * 0.15, 6), new THREE.MeshBasicMaterial({ map: shT, color: 0x9ab0d4, transparent: true, opacity: 0.12, depthWrite: false, blending: THREE.AdditiveBlending }));
+      const sh = new THREE.Mesh(new THREE.PlaneGeometry(1.4 + i * 0.3, 6), new THREE.MeshBasicMaterial({ map: shT, color: 0x9ab0d4, transparent: true, opacity: 0.07, depthWrite: false, blending: THREE.AdditiveBlending }));
       sh.position.set(20.4 - i * 0.55, 1.6, -1.4 + i * 0.2); sh.rotation.z = 1.05 + i * 0.04; g.add(sh);
     }
     this.moonLight = new THREE.PointLight(0x8aa0c8, 6, 9, 1.2); this.moonLight.position.set(21.4, 2.2, -0.6); g.add(this.moonLight);
