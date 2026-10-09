@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { glowTexture, canvasTexture } from '../render/textures.js';
 import { CharacterState } from './CharacterState.js';
+import { WolfRig } from './WolfRig.js';
 
 const PX = 0.01; // metres per sprite pixel
 // walk-cycle beats per second at normal walking speed (6 beats = two steps ≈ 1 s)
@@ -68,6 +69,13 @@ export class Character2D {
 
     if (def.layer) this.sprite.layers.set(def.layer);
     this.applyFrame();
+    // wolves are animated from their painted parts (gait, feeding) instead of baked frames
+    if (def.rig && atlas.has(`wolf_${def.rig}_p_body`)) {
+      this.rig = new WolfRig(this, def.rig);
+      this.pivot.add(this.rig.group);
+      this.sprite.visible = false;
+      this.shadow.scale.set(2.0, 1, 1);
+    }
   }
 
   get position() { return this.root.position; }
@@ -391,6 +399,12 @@ export class Character2D {
     } else if (this.lieMesh?.visible) this.hideLie();
     this.applyFrame();
     this.sprite.scale.y = this.frameH * sy;
+    if (this.rig) {
+      // the rig carries its own bob and tilt
+      if (this.state !== 'collapse' && this.state !== 'rise') { this.pivot.rotation.z = 0; this.pivot.position.y = 0; }
+      this.rig.group.scale.x = this.facing;
+      this.rig.update(sdt);
+    }
   }
 
   updateDead() {

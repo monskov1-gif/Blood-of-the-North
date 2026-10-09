@@ -749,6 +749,9 @@ for c in ['lizzy', 'vikki', 'olivia', 'puriel']:
 for c in ['grey', 'white', 'red', 'dark']:
     for n in ['', '_walk1', '_walk2', '_eat']:
         frames[f'wolf_{c}{n}'] = load(f'wolf_{c}{n}')
+    # v0.14: the eight parts for the runtime rig (tools/wolf_rig.py)
+    for part in ['head', 'ruff', 'body', 'tail', 'frontL', 'frontR', 'hindL', 'hindR']:
+        frames[f'wolf_{c}_p_{part}'] = load(f'wolf_{c}_p_{part}')
 # v0.13: the pack in human form and Stinko Bob — crowd sprites re-dyed muddy and dirtied
 # (no redrawing): faded clothes, grime specks, torn hems
 def grime(a, seed, hue=0.08, sat=0.45, val=0.72, tear=True):
