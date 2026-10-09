@@ -257,6 +257,8 @@ export class Game {
     Character2D.navRoot = w.root;
     this.hallucination.scene = w;
     if (this.debugSafeZones) w.safeZones?.setDebug(true, w.root, w.bounds.walk);
+    // subtitles: dark letters where the floor under them is bright
+    document.getElementById('ui')?.classList.toggle('light-floor', LIGHT_FLOORS.has(id) || LIGHT_FLOORS.has(`${id}:${w.state}`));
     this.bus.emit('location', { id, state });
     return w;
   }
@@ -518,6 +520,9 @@ const TITLE_PLACES = {
 };
 
 const INTERACTIVE_STAGES = new Set(['explore', 'morning', 'car', 'station', 'interrogation', 'hospital_day', 'hospital_night', 'hospital_return', 'station_return', 'forest', 'forest_night', 'lizzie_1', 'lizzie_2', 'lizzie_3', 'lizzie_4', 'lizzie_5', 'home_1', 'home_2']);
+
+// locations (or location:state) whose floor under the subtitles is light
+const LIGHT_FLOORS = new Set(['school', 'cafeteria', 'station', 'interrogation', 'hospital:day', 'street', 'forest:day', 'apartment:day']);
 
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 

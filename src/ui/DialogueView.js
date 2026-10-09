@@ -110,6 +110,14 @@ export class DialogueView {
     if (d.mode === 'vn') {
       this.cast = { ...(d.cast || {}) };
       this.expr = {};
+      // the first line's cast, expression and speaker are known now: draw the right portraits
+      // from the start (no neutral face that jumps to the real one a second later)
+      const first = d.nodes?.[from || Object.keys(d.nodes || {})[0]];
+      if (first) {
+        Object.assign(this.cast, first.cast || {});
+        Object.assign(this.expr, first.expr || {});
+        this.speaking = first.speaker;
+      }
       for (const s of SLOTS) this.slots[s].wrap.classList.remove('show', 'active');
       this.textEl.textContent = '';
       this.nameEl.textContent = '';
@@ -118,8 +126,12 @@ export class DialogueView {
       this.vn.classList.remove('hidden');
       this.audio.play('ui.open');
       await wait(30);
-      this.vn.classList.add('show');
       this.refreshCast();
+      // wait (briefly) for the portraits to decode before the screen fades in
+      const pending = SLOTS.map((k) => this.slots[k]).filter((sl) => sl.id).flatMap((sl) => sl.imgs)
+        .filter((im) => im.src && !im.complete).map((im) => new Promise((r) => { im.addEventListener('load', r, { once: true }); im.addEventListener('error', r, { once: true }); }));
+      if (pending.length) await Promise.race([wait(700), Promise.all(pending)]);
+      this.vn.classList.add('show');
       await wait(450);
     }
   }
@@ -218,6 +230,7 @@ export class DialogueView {
     const cur = slot.imgs[slot.front];
     next.src = `assets/portraits/${CHARACTERS[id]?.portrait || id}_${idx}.webp`;
     const swap = () => { next.classList.add('on'); cur.classList.remove('on'); slot.front = 1 - slot.front; };
+    next.decoding = 'sync';
     if (next.complete && next.naturalWidth) swap(); else next.onload = swap;
   }
 
@@ -265,8 +278,9 @@ export class DialogueView {
         if (line.choices) { this.showChoices(line.choices); return; }
         this.nextEl.classList.add('show');
         this.barkHint.classList.add('show');
-        if (this.skip && line.read) { setTimeout(() => this.advance(), 60); return; }
-        if (this.input.skipHeld && line.read) { setTimeout(() => this.advance(), 40); return; }
+        // skip belongs to the dialogue window: subtitles over the scene play out at their pace
+        if (this.skip && line.read && this.mode === 'vn') { setTimeout(() => this.advance(), 60); return; }
+        if (this.input.skipHeld && line.read && this.mode === 'vn') { setTimeout(() => this.advance(), 40); return; }
         if (this.auto || this.mode === 'cinematic') this.scheduleAuto();
       }, line);
     });
@@ -290,7 +304,7 @@ export class DialogueView {
     // a previous distorted line must not leave the blur on
     target.classList.remove('distort');
     target.style.removeProperty('--blur');
-    const fast = (this.skip || this.input.skipHeld) && line.read;
+    const fast = (this.skip || this.input.skipHeld) && line.read && this.mode === 'vn';
     const cps = fast ? 400 : 22 + this.settings.get('textSpeed') * 70;
     let i = 0;
     let acc = 0;

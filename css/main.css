@@ -94,8 +94,8 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 
 /* ------------------------------------------------------------------ bark subtitles */
 .bark { position: absolute; left: 0; right: 0; margin: 0 auto; bottom: calc(calc(9 * var(--vh)) + var(--safe-b)); width: min(880px, calc(88 * var(--vw))); text-align: center; z-index: 20; pointer-events: none; animation: rise 0.35s ease; }
-.bark-name { font-family: var(--sc); letter-spacing: 0.3em; font-size: 12px; color: var(--gold); margin-bottom: 6px; min-height: 1em; }
-.bark-text { font-size: clamp(18px, calc(2.2 * var(--vw)), 24px); line-height: 1.4; color: #f1e6d3; text-shadow: 0 2px 10px #000, 0 0 3px #000, 0 0 1px #000; }
+.bark-name { font-family: var(--sc); letter-spacing: 0.3em; font-size: 14px; color: var(--gold); margin-bottom: 6px; min-height: 1em; }
+.bark-text { font-size: clamp(22px, calc(2.75 * var(--vw)), 31px); line-height: 1.38; font-weight: 500; color: #f1e6d3; text-shadow: 0 2px 10px #000, 0 0 3px #000, 0 0 1px #000; }
 .bark.sp-thought .bark-text { font-style: italic; color: #e6d8c4; }
 .bark.sp-thought .bark-name { color: rgba(233,220,197,0.45); }
 .bark.sp-unknown .bark-text { color: #d9b3b3; letter-spacing: 0.04em; }
@@ -343,7 +343,7 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
   .dossier { display: none; }
   .mm-title h1 { font-size: 34px; }
   .bark { bottom: calc(calc(4 * var(--vh)) + var(--safe-b)); }
-  .bark-text { font-size: 17px; }
+  .bark-text { font-size: 20px; }
 }
 @media (orientation: portrait) and (max-width: 700px) {
   .rotate-hint.enabled { display: flex; }
@@ -392,3 +392,10 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .st-time .ct-main { position: relative; z-index: 1; font-family: 'Playfair SC', var(--serif); font-style: italic; font-size: clamp(28px, calc(4.2 * var(--vw)), 52px); letter-spacing: 0.06em; color: #efe3cd; }
 .st-time .ct-en { order: -1; font-family: 'MonteCarlo', cursive; font-size: clamp(64px, calc(10 * var(--vw)), 150px); line-height: 0.6; height: 0.6em; color: rgba(181,142,79,0.16); margin-bottom: -0.05em; }
 .card-title.show.st-time .ct-en { transition-delay: 0s; transition-duration: 2.4s; }
+
+/* v0.14: subtitles over bright floors (school, hospital by day, the station…) turn dark */
+.light-floor .bark-text { color: #15100c; text-shadow: 0 0 10px rgba(255,250,240,.85), 0 0 3px rgba(255,250,240,.9), 0 0 1px #fff; }
+.light-floor .bark.sp-thought .bark-text { color: #2a1e16; }
+.light-floor .bark-name { color: #6a1a14; text-shadow: 0 0 6px rgba(255,250,240,.8); }
+.light-floor .bark.sp-thought .bark-name { color: rgba(42,30,22,.6); }
+.light-floor .bark-hint { color: rgba(42,30,22,.55); }
