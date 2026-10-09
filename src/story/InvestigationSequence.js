@@ -469,10 +469,11 @@ const methods = {
     if (st !== 'forest_night') return;
     const J = this.julian, wolf = this.beast, man = this.stranger;
     if (!wolf) return;
-    // feeding: head down, up, down
+    // feeding: the rig tugs at the kill; every few seconds the head comes up to look round
     if (this.nightPhase === 'walk' || this.nightPhase === 'watch') {
       wolf.eatT += dt;
-      if (wolf.eatT > 0.55 + Math.random() * 0.5) { wolf.eatT = 0; wolf.setPose(wolf.pose === 'eat' ? 'idle' : 'eat'); }
+      const up = wolf.pose !== 'eat';
+      if (wolf.eatT > (up ? 1.3 : 4 + Math.random() * 3)) { wolf.eatT = 0; wolf.setPose(up ? 'eat' : 'idle'); }
     }
     if (this.nightPhase === 'walk') {
       if (J.position.x > 13.2 && !this.heardSound) { this.heardSound = true; this.lines(g.dialogue.dialogues.fn_sound, { blocking: false }); g.state.set('objective', 'watch'); }
