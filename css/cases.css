@@ -271,3 +271,16 @@
 .cf-lphone .notes { gap: calc(var(--f) * 0.3) !important; }
 .cf-lphone .ntf { line-height: 1.2 !important; }
 .cf-lphone .ntf img.shot { height: calc(var(--f) * 2.7) !important; }
+
+/* ---- round 4 (critic) */
+.cf-phone-on .cf-rmeta, .cf-phone-on .cf-rstamp { display: none; }
+.cf-lphone { box-shadow: 0 0 0 calc(var(--f) * 0.5) #0c0a08, 8px 22px 30px rgba(0,0,0,.65), 0 0 calc(var(--f) * 5) rgba(170,190,230,.22) !important; }
+.cf-lphone .glare { background: linear-gradient(115deg, transparent 22%, rgba(255,255,255,.16) 30%, transparent 38%, transparent 62%, rgba(255,255,255,.07) 68%, transparent 74%) !important; }
+.cf-case .cf-blood { right: calc(50% - var(--W) * 0.505) !important; top: calc(49% - var(--W) * 0.2) !important; width: calc(var(--W) * 0.07) !important;
+  background: radial-gradient(ellipse 30% 22% at 40% 12%, #7a0a0c 0 60%, transparent 62%), radial-gradient(ellipse 8% 18% at 47% 26%, #6a080a 0 60%, transparent 62%),
+    radial-gradient(ellipse 14% 10% at 30% 46%, #6a080a 0 60%, transparent 62%), radial-gradient(ellipse 5% 12% at 34% 56%, #6a080a 0 60%, transparent 62%),
+    radial-gradient(circle at 70% 64%, #7a0a0c 0 4%, transparent 5%), radial-gradient(ellipse 18% 9% at 55% 84%, #7a0a0c 0 60%, transparent 62%) !important; }
+.cf-sheet.under { display: none; }
+.cf-sheet { box-shadow: 0 24px 50px rgba(0,0,0,.8), 10px 12px 0 -2px #b8a888, 18px 22px 0 -4px #9a8a6a !important; }
+.cf-list { color: #120c08; }
+.cf-desk::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse 46% 40% at 50% 46%, rgba(255,196,120,.16), transparent 72%); }

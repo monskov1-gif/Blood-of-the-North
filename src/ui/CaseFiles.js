@@ -106,7 +106,7 @@ export class CaseFiles {
 
   folder(board, c, cls, photos, stamp, scrawl) {
     const f = el('div', `cf-folder ${cls}`, board);
-    el('div', 'cf-ftab', f, c.no.replace('ДЕЛО ', '№ '));
+    el('div', 'cf-ftab', f, c.no.replace('ДЕЛО ', ''));
     const body = el('div', 'cf-fbody', f);
     el('div', 'cf-fno', body, `${c.no}<br><small>${c.en}</small>`);
     el('i', 'cf-clipm', body);
@@ -174,6 +174,7 @@ export class CaseFiles {
     const tabEls = {};
     const show = (key) => {
       for (const [k, t] of Object.entries(tabEls)) t.classList.toggle('on', k === key);
+      this.wrap?.classList.remove('cf-phone-on');
       body.innerHTML = '';
       if (key === 'case') {
         el('p', 'cf-text', body, c.summary);
@@ -208,6 +209,7 @@ export class CaseFiles {
       }
       const back = el('button', 'cf-link', body, '← к списку улик');
       back.addEventListener('click', () => show('ev'));
+      this.wrap?.classList.remove('cf-phone-on');
     };
     for (const [k, ru, en] of sections) {
       const t = tabEls[k] = el('button', 'cf-tab', tabs, `${ru}<small>${en}</small>`);
@@ -220,6 +222,7 @@ export class CaseFiles {
   /** Evidence #11: Lizzie's phone, cracked, last screen of 11 November. */
   lizzyPhone(body) {
     body.innerHTML = '';
+    this.wrap?.classList.add('cf-phone-on');
     const ph = el('div', 'cf-lphone', body);
     const cr = el('div', 'crack', ph);
     cr.style.backgroundImage = `url(${crackTexture()})`;
@@ -293,7 +296,7 @@ function crackTexture() {
   const x = c.getContext('2d');
   let s = 91;
   const r = () => ((s = (s * 16807) % 2147483647) / 2147483647);
-  const cx = W * 0.3, cy = H * 0.62;
+  const cx = W * 0.86, cy = H * 0.9;   // impact in the lower corner, away from the text
   const rays = [];
   for (let i = 0; i < 13; i++) {
     const a = (i / 13) * Math.PI * 2 + r() * 0.3, L = 120 + r() * 420;
@@ -306,7 +309,7 @@ function crackTexture() {
   x.lineJoin = 'miter';
   // shadow under every crack (refraction), then the bright edge, tapering away from the impact
   for (const p of rays) for (let k = 0; k < p.length - 1; k++) {
-    const w = Math.max(0.6, 3.2 - k * 0.32);
+    const w = Math.max(0.5, 2.6 - k * 0.3);
     stroke([p[k], p[k + 1]], w + 1.6, 'rgba(0,0,0,0.55)');
     stroke([[p[k][0] - 0.8, p[k][1] - 0.8], [p[k + 1][0] - 0.8, p[k + 1][1] - 0.8]], w, 'rgba(240,246,252,0.85)');
   }

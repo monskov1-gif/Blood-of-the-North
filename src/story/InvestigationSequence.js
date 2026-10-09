@@ -199,7 +199,7 @@ const methods = {
     // the wolf at the river, eating; the man appears later
     const wolf = this.castIn(w, 'wolf', 'beast');
     wolf.placeAt(w.anchors.wolf.x, w.anchors.wolf.z, -1);
-    wolf.root.scale.setScalar(1.9);
+    wolf.root.scale.setScalar(1.7);
     wolf.setPose('eat');
     wolf.eatT = 0;
     const man = this.castIn(w, 'stranger', 'stranger');
@@ -368,7 +368,7 @@ const methods = {
       this.transformT += dt;
       const k = Math.min(1, this.transformT / 3.2);
       wolf.root.position.x = this.g.world.anchors.wolf.x + Math.sin(this.transformT * 38) * 0.04 * k;
-      wolf.root.scale.set(1.9 * (1 - 0.1 * k), 1.9 * (1 - 0.25 * k + Math.sin(this.transformT * 22) * 0.04 * k), 1.9);
+      wolf.root.scale.set(1.7 * (1 - 0.1 * k), 1.7 * (1 - 0.25 * k + Math.sin(this.transformT * 22) * 0.04 * k), 1.7);
     }
     if (this.puffs) {
       for (const s of this.puffs) {
