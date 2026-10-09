@@ -18,4 +18,4 @@ export class Director {
   }
 }
 
-export const sleep = (s) => new Promise((r) => setTimeout(r, s * 1000));
+export const sleep = (s) => new Promise((r) => setTimeout(r, s * 1000 * (globalThis.__ts || 1)));   // __ts: QA speed-up

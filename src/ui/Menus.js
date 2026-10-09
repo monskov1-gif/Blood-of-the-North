@@ -22,6 +22,11 @@ const STAGE_LABEL = {
   station_return: 'Участок. Неделю спустя',
   forest: 'Долина Такхини',
   forest_night: 'Долина. Сумерки',
+  lizzie_1: 'Лиззи · След',
+  lizzie_2: 'Лиззи · Лес',
+  lizzie_3: 'Лиззи · Пещера',
+  lizzie_4: 'Лиззи · Стая',
+  lizzie_5: 'Лиззи · Побег',
   ended: 'Конец демо',
 };
 

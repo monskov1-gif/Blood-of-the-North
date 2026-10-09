@@ -53,6 +53,7 @@ export class DialogueSystem {
         if (this.active !== run) { finish(null); return null; } // aborted (load / title)
       }
       if (node.bg) await this.view.setBackground?.(node.bg);
+      if (node.cast) for (const [slot, cid] of Object.entries(node.cast)) this.view.setCast?.(slot, cid);
       if (node.expr) this.view.setExpressions?.(node.expr);
       if (node.pose) for (const [cid, pose] of Object.entries(node.pose)) this.characters.get(cid)?.setPose(pose);
 

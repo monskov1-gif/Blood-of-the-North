@@ -76,7 +76,8 @@ export class Character2D {
     const m = new THREE.MeshLambertMaterial({
       map: tex,
       emissiveMap: tex,
-      emissive: new THREE.Color(this.def.selfLight ?? 0x8a7c74),
+      color: new THREE.Color(this.def.tint ?? 0xffffff),
+      emissive: new THREE.Color(this.def.selfLight ?? 0x8a7c74).multiply(new THREE.Color(this.def.tint ?? 0xffffff)),
       emissiveIntensity: 1,
       alphaTest: 0.5,
       side: THREE.DoubleSide,

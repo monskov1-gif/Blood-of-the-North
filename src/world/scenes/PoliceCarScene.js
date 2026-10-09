@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { bevelBox, spruceStand } from '../nature.js';
 import { LocationBase } from '../LocationBase.js';
 import { canvasTexture, rng, glowTexture } from '../../render/textures.js';
 import { glow, lightPool } from '../props.js';
@@ -585,9 +586,9 @@ export class PoliceCarScene extends LocationBase {
     }
     // center console between the front seats: cup holder (coffee), the bottle, radio head
     this.B(0.6, 0.3, 0.2, plastic, 0.3, FL + 0.15, -0.68);
-    const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.028, 0.11, 10), this.mat('cupRed', { color: 0x9a1c1c, roughness: 0.6 }));
+    const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.028, 0.11, 16), this.mat('cupRed', { color: 0x9a1c1c, roughness: 0.6 }));
     cup.position.set(0.18, FL + 0.36, -0.62); root.add(cup);
-    this.bottle = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.2, 8), this.mat('bottle', { color: 0xb8d0e0, transparent: true, opacity: 0.7, roughness: 0.1 }));
+    this.bottle = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.2, 16), this.mat('bottle', { color: 0xb8d0e0, transparent: true, opacity: 0.7, roughness: 0.1 }));
     this.bottle.position.set(0.42, FL + 0.4, -0.72); root.add(this.bottle);
     this.steam = [];
     if (!this.low) for (let k = 0; k < 3; k++) { const st = glow(0xdfe6ee, 0.07, 0.22); st.position.set(0.18, FL + 0.45, -0.62); root.add(st); this.steam.push(st); }
@@ -664,15 +665,15 @@ export class PoliceCarScene extends LocationBase {
     const birchM = new THREE.MeshLambertMaterial({ color: 0xd8d4c8 });
     const markM = new THREE.MeshLambertMaterial({ color: 0x1a1a1a });
     const leafM = new THREE.MeshLambertMaterial({ color: 0xffffff });
-    const leafGeo = new THREE.BoxGeometry(0.14, 0.11, 0.04);
+    const leafGeo = bevelBox(0.14, 0.11, 0.04);
     this.units = [];
     for (let u = 0; u < UNITS; u++) {
       const g = new THREE.Group();
       const z = -5.8;
-      const pole = new THREE.Mesh(new THREE.BoxGeometry(0.2, 8.2, 0.2), wood); pole.position.set(0, ROAD + 4.1, z); g.add(pole);
-      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 1.6), wood); arm.position.set(0, ROAD + 7.6, z); g.add(arm);
-      const arm2 = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.08, 0.08), wood); arm2.position.set(0, ROAD + 7.1, z); g.add(arm2);
-      if (u % 2 === 0) { const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.5, 8), lampM); tr.position.set(0.25, ROAD + 6.4, z); g.add(tr); }
+      const pole = new THREE.Mesh(bevelBox(0.2, 8.2, 0.2), wood); pole.position.set(0, ROAD + 4.1, z); g.add(pole);
+      const arm = new THREE.Mesh(bevelBox(0.1, 0.1, 1.6), wood); arm.position.set(0, ROAD + 7.6, z); g.add(arm);
+      const arm2 = new THREE.Mesh(bevelBox(1.4, 0.08, 0.08), wood); arm2.position.set(0, ROAD + 7.1, z); g.add(arm2);
+      if (u % 2 === 0) { const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.5, 16), lampM); tr.position.set(0.25, ROAD + 6.4, z); g.add(tr); }
       const wpts = [];
       for (const [wy, wz] of [[7.65, -0.7], [7.65, 0.7], [7.15, 0.0], [7.15, -0.6]]) {
         for (let i = 0; i < 12; i++) {
@@ -684,28 +685,25 @@ export class PoliceCarScene extends LocationBase {
       g.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(wpts), wireM));
       // street lamp (cobra head over the road), still burning in the late dawn
       const lx = S * 0.5, lz = -4.5;
-      const lp = new THREE.Mesh(new THREE.BoxGeometry(0.1, 6.0, 0.1), lampM); lp.position.set(lx, ROAD + 3.0, lz); g.add(lp);
-      const la = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 1.4), lampM); la.position.set(lx, ROAD + 5.95, lz + 0.7); g.add(la);
-      const head = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.1, 0.45), lampM); head.position.set(lx, ROAD + 5.9, lz + 1.4); g.add(head);
+      const lp = new THREE.Mesh(bevelBox(0.1, 6.0, 0.1), lampM); lp.position.set(lx, ROAD + 3.0, lz); g.add(lp);
+      const la = new THREE.Mesh(bevelBox(0.06, 0.06, 1.4), lampM); la.position.set(lx, ROAD + 5.95, lz + 0.7); g.add(la);
+      const head = new THREE.Mesh(bevelBox(0.25, 0.1, 0.45), lampM); head.position.set(lx, ROAD + 5.9, lz + 1.4); g.add(head);
       const lg = glow(0xffc890, 1.2, 0.55); lg.position.set(lx, ROAD + 5.8, lz + 1.4); g.add(lg);
       // spruce (stacked cones, snow-laden) on every other unit
       if (u % 2 === 1) {
         const tx = S * 0.25, tz = -6.8;
-        for (let k = 0; k < 4; k++) {
-          const c = new THREE.Mesh(new THREE.ConeGeometry(1.0 - k * 0.2, 1.6, 7), spruce); c.position.set(tx, ROAD + 1.3 + k * 0.9, tz); g.add(c);
-          if (k === 3) { const s = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.18, 7), snowy); s.position.set(tx, ROAD + 2.15 + k * 0.9, tz); g.add(s); } // a little first snow on the tip
-        }
+        g.add(spruceStand([{ x: tx, z: tz, y: ROAD, s: 0.62, kind: 'young', seed: u * 7 + 1 }], { low: this.low, snow: 0.3, variant: u % 3 }));
       } else {
         // a road sign
-        const sp = new THREE.Mesh(new THREE.BoxGeometry(0.06, 2.2, 0.06), lampM); sp.position.set(S * 0.8, ROAD + 1.1, -4.4); g.add(sp);
+        const sp = new THREE.Mesh(bevelBox(0.06, 2.2, 0.06), lampM); sp.position.set(S * 0.8, ROAD + 1.1, -4.4); g.add(sp);
         const sign = this.textSign(u === 0 ? 'MAXIMUM 50' : 'MAIN ST', { w: 0.6, h: u === 0 ? 0.7 : 0.22, bg: u === 0 ? '#e8ecee' : '#1e5a3a', fg: u === 0 ? '#111' : '#e8f0e8' });
         sign.position.set(S * 0.8, ROAD + 2.0, -4.36); g.add(sign);
       }
       // a birch on every unit: white trunk with black marks, a thin crown with the last leaves
       {
         const bx = S * (u % 2 ? 0.62 : 0.42), bz = -5.2 - (u % 3) * 0.4, bh = 4.2 + (u % 2) * 0.8;
-        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.1, bh, 6), birchM); trunk.position.set(bx, ROAD + bh / 2, bz); g.add(trunk);
-        for (let k = 0; k < 5; k++) { const mk = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.05, 0.02), markM); mk.position.set(bx, ROAD + 0.6 + k * 0.7 + (k % 2) * 0.2, bz + 0.09); g.add(mk); }
+        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.1, bh, 16), birchM); trunk.position.set(bx, ROAD + bh / 2, bz); g.add(trunk);
+        for (let k = 0; k < 5; k++) { const mk = new THREE.Mesh(bevelBox(0.16, 0.05, 0.02), markM); mk.position.set(bx, ROAD + 0.6 + k * 0.7 + (k % 2) * 0.2, bz + 0.09); g.add(mk); }
         const r = rng(400 + u);
         const leaves = new THREE.InstancedMesh(leafGeo, leafM, 34);
         const mtx = new THREE.Matrix4(), col = new THREE.Color();
@@ -730,10 +728,10 @@ export class PoliceCarScene extends LocationBase {
       const oc = new THREE.Group();
       const bodyM = new THREE.MeshLambertMaterial({ color: 0x5a1e1c });
       const glassM = new THREE.MeshLambertMaterial({ color: 0x1a2028 });
-      const b1 = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.62, 1.8), bodyM); b1.position.y = 0.6; oc.add(b1);
-      const b2 = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.5, 1.7), glassM); b2.position.set(0.5, 1.15, 0); oc.add(b2);
-      const sn = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.08, 1.6), snowy); sn.position.set(0.5, 1.43, 0); oc.add(sn);
-      for (const x of [-1.5, 1.5]) { const wh = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 1.82, 12), new THREE.MeshLambertMaterial({ color: 0x0c0c0e })); wh.rotation.x = Math.PI / 2; wh.position.set(x, 0.34, 0); oc.add(wh); }
+      const b1 = new THREE.Mesh(bevelBox(4.6, 0.62, 1.8), bodyM); b1.position.y = 0.6; oc.add(b1);
+      const b2 = new THREE.Mesh(bevelBox(2.4, 0.5, 1.7), glassM); b2.position.set(0.5, 1.15, 0); oc.add(b2);
+      const sn = new THREE.Mesh(bevelBox(2.3, 0.08, 1.6), snowy); sn.position.set(0.5, 1.43, 0); oc.add(sn);
+      for (const x of [-1.5, 1.5]) { const wh = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 1.82, 16), new THREE.MeshLambertMaterial({ color: 0x0c0c0e })); wh.rotation.x = Math.PI / 2; wh.position.set(x, 0.34, 0); oc.add(wh); }
       const hl = glow(0xfff0d0, 1.2, 0.8); hl.position.set(-2.35, 0.65, 0.6); oc.add(hl);
       const tl = glow(0xff2a1a, 0.4, 0.6); tl.position.set(2.35, 0.7, 0.6); oc.add(tl);
       oc.position.set(40, ROAD, -3.3);

@@ -9,7 +9,7 @@
 - Репозиторий: `monskov1-gif/Blood-of-the-North`
 - Рабочая ветка разработки задаётся сессией; сайт собирается с ветки `claude/admiring-turing-t5ns0m`
   (см. `release.md`).
-- Версия: `src/version.js` (на момент написания — 0.12).
+- Версия: `src/version.js` (на момент написания — 0.13).
 
 ## Сюжет и этапы (stage)
 
@@ -38,14 +38,44 @@
    - `station_return` — участок через неделю: список погибших в «Северной розе» на доске (11 имён, среди
      них Кристиан Кокс = Крис из бара, Агата Росс, Беатрис Уотсон, Женевьева Морель), Куинн, детектив
      Ковальски предлагает участвовать → меню папок (`src/ui/CaseFiles.js`, `css/cases.css`, по
-     референсу `docs/claude/case_menu_reference.jpg`). Флаг `case_route`: `WEREWOLF` (лесной фауницид)
-     или `VAMPIRE` (сейчас — штамп «ветка в разработке»). После выбора — кнопка папки в HUD (J):
+     референсу `docs/claude/case_menu_reference.jpg`). Флаг `investigation_route`: `WEREWOLF` (лесной фауницид)
+     или `VAMPIRE` (Джулиановы главы 8/10 — заглушки, но маршрут ведёт к L5 и гибели Лиззи). После выбора — кнопка папки в HUD (J):
      дело, улики (телефон Лиззи — вещдок № 11, флаг `saw_lizzy_phone`), задачи, жертвы.
    - `forest` — долина Такхини днём (`ForestScene`, состояние `day`): оцепление, маркеры, осина с
      когтями, маркер 11. После осмотра — звонок Куинн о туристах у каньона Майлс, радио (`tourists_news`).
    - `forest_night` — сумерки (состояние `night`): волк ест у реки → превращается в человека
      (`stranger`) → слежка до пещеры (x ≈ 42) → «Продолжение следует» → `ended`.
-   - Лиззи-арка (`docs/claude/lizzy_arc_spec.md`) — следующий этап, ещё не начата.
+
+### Порядок глав (v0.13, утверждён владельцем)
+
+| № | Чья | Глава | stage / где |
+|---|---|---|---|
+| 01 | Джулиан | Кровавый вечер | `explore`…`escape`, утро, `car` |
+| 02 | Лиззи I | След | `lizzie_1`: школа (`SchoolScene`) → три точки в долине (`forest`/`l1`), фото → карта |
+| 03 | Джулиан | Подозреваемый | `station` → `interrogation` → `medical` → `hospital_day`/`evening` |
+| 04 | Лиззи II | Лес | `lizzie_2`: стадо у реки (`forest`/`l2`), видео нападения, звонок Джулиану, Пуриэль схвачена |
+| 05 | Джулиан | Жажда | `hospital_night` → `hospital_return` → `recovery` → `street` |
+| 06 | Джулиан | Улики | `station_return`: материалы, свидетели Рэй/Ноа, камеры (`lzui.cctv`), карта нападений (`lzui.map`), выбор папки |
+| 07 | Лиззи III | Пещера | `lizzie_3` (`CaveScene`/`l3`): пробуждение, Пуриэль мертва, Боб и правила, неудачный побег |
+| 08 | Джулиан | Территория | WEREWOLF: `forest` + «Сопоставить следы» (`fo_analysis`, ошибка → возврат) + маршруты (`fo_routes`); VAMPIRE: карточка-заглушка |
+| 09 | Лиззи IV | Стая | `lizzie_4` (`l4`, +19 дней): разговоры со стаей и Бобом, Викки уводят |
+| 10 | Джулиан | Волк | WEREWOLF: `forest_night`, наблюдение, `fn_predict` (угадать маршрут), слежка до пещеры; VAMPIRE: заглушка |
+| 11 | Лиззи V | Побег | `lizzie_5` (`l5`): ритуал над Оливией, «Беги», погоня по пещере под управлением игрока |
+| 12 | Оба | Пересечение | `forest`/`night`: погоня по лесу → WEREWOLF: Джулиан спасает (SAVED) / VAMPIRE: гибель (DEAD) → `ended` |
+
+Код Лиззи: `src/story/LizzieSequence.js` (`playLizzie(n)`, `lizzieL1..L5`, `lzRunCave`, `lzRunForest`,
+финалы), текст `data/dialogue/lizzie.js`, UI `src/ui/LizzieUI.js` + `css/lizzie.css` (фото, REC,
+карта, камеры). Лиззи играет тот же персонаж игрока (`setOutfit('lizzy')`), девочки/стая/Боб — `lzCastIn`.
+Состояния персонажей и модель оборотней — `data/narrative.js` + `src/story/NarrativeState.js`
+(`g.narrative`: `setChar` с проверкой допустимых состояний, `feed`, `tickDays`, `setFate`, `resetL5`).
+
+Флаги: `lizzie_chapter_N_complete` (1–5), `char_<id>` (lizzie/puriel/olivia/vicky/bob/pack),
+`puriel_dead`, `vicky_taken`, `olivia_taken`, `olivia_dead`, `lizzie_escape_started`, `lizzie_saved`,
+`investigation_route` (`WEREWOLF`/`VAMPIRE`, выбор в гл. 6), `lizzie_fate` (`SAVED`/`DEAD`), `ww_*`.
+Синхронизация линий: главы Лиззи вставлены в конец Джулиановых (`carTalk` → L1, вечер → L2,
+`afterEvidence` → L3, `touristsCall`/`vampireChain` → L4, `caveEnding`/`vampireChain` → L5), каждая
+проверяет свой флаг `_complete`, поэтому загрузка сейва не повторяет главу. Загрузка `lizzie_N` после
+главы продолжает Джулиана (`loadLizzie`). QA-хуки: `globalThis.__ts` (ускорение пауз), `__dtMax`.
 
 Сохранения: `SaveSystem`, слот хранит `stage`; загрузка этапа custody запускает свежую сессию сцены.
 Тестовые скриншоты стартуют любой этап через `localStorage` (`tools/shots/at.mjs`).

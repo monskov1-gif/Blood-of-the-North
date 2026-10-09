@@ -24,6 +24,8 @@ import { MainMenu, Panels } from '../ui/Menus.js';
 import { Fader, PhoneView, Insert, EndingScreen, PortraitFlash, Card, Letterbox } from '../ui/Overlays.js';
 import { el } from '../ui/dom.js';
 import { CaseFiles } from '../ui/CaseFiles.js';
+import { LizzieUI } from '../ui/LizzieUI.js';
+import { NarrativeState } from '../story/NarrativeState.js';
 import { SCENES, LOCATIONS } from '../world/scenes/index.js';
 import { DIALOGUES } from '../../data/dialogue/index.js';
 
@@ -95,6 +97,8 @@ export class Game {
     this.card = new Card(root);
     this.phone = new PhoneView({ root, bus: this.bus, audio: this.audio, state: this.state });
     this.ending = new EndingScreen({ root, bus: this.bus, audio: this.audio });
+    this.lzui = new LizzieUI({ root, bus: this.bus, audio: this.audio });
+    this.narrative = new NarrativeState(this.state);
     this.cases = new CaseFiles({ root, bus: this.bus, audio: this.audio, state: this.state, atlas: this.atlas });
 
     // systems
@@ -114,6 +118,7 @@ export class Game {
     this.director.registerAll(this.story.commands());
     this.director.registerAll(this.story.custodyCommands());
     this.director.registerAll(this.story.investigationCommands?.() || {});
+    this.director.registerAll(this.story.lizzieCommands?.() || {});
     this.interactions.setItems(this.story.interactables());
     this.view.bgProvider = (key) => this.story.paintBackground(key);
     this.windowLight = new WindowLight({ renderer: this.renderer, settings: this.settings, canvas: this.renderer.canvas });
@@ -175,9 +180,9 @@ export class Game {
       if (this.mode !== 'play') return;
       if (what === 'pause' && !this.panels.open && !this.phone.isOpen && !this.cases.isOpen) this.panels.pause();
       if (what === 'log') this.panels.log();
-      if (what === 'case' && this.hud.visible && !this.dialogue.busy && !this.panels.open && !this.phone.isOpen && !this.cases.isOpen && this.state.get('case_route')) {
+      if (what === 'case' && this.hud.visible && !this.dialogue.busy && !this.panels.open && !this.phone.isOpen && !this.cases.isOpen && this.state.get('investigation_route')) {
         this.hud.notifyCase(false);
-        this.cases.open(this.state.get('case_route'));
+        this.cases.open(this.state.get('investigation_route'));
       }
       if (what === 'phone' && this.hud.visible && !this.dialogue.busy && !this.panels.open) {
         this.hud.notifyPhone(false);
@@ -242,6 +247,7 @@ export class Game {
     this.state.sceneId = id;
     if (state) w.setState?.(state);
     this.scene3d.background.set(w.background ?? 0x040202);
+    this.scene3d.fog = w.fog || null;
     // the player's character lives in the current location
     w.root.add(this.story.julian.root);
     this.cameraSys.configure(w.camera);
@@ -417,7 +423,7 @@ export class Game {
     this.story.startAmbient();
     this.updateControl();
     this.hud.setObjective(this.state.get('objective'));
-    this.hud.setCase(this.state.get('case_route'));
+    this.hud.setCase(this.state.get('investigation_route'));
     await this.story.load(data.story);
   }
 
@@ -433,7 +439,7 @@ export class Game {
   loop() {
     const tick = () => {
       requestAnimationFrame(tick);
-      const dt = Math.min(0.05, this.clock.getDelta());
+      const dt = Math.min(globalThis.__dtMax || 0.05, this.clock.getDelta());   // __dtMax: QA runs on slow machines
       this.frame++;
       this.updateControl();
       const canMove = this.mode === 'play' && !this.blocked;
@@ -450,6 +456,8 @@ export class Game {
       }
       this.hallucination.update(dt);
       this.world.update(dt);
+      if (this.scene3d.fog !== (this.world.fog || null)) this.scene3d.fog = this.world.fog || null;
+      if (this.world.background != null && this.scene3d.background.getHex() !== this.world.background) this.scene3d.background.set(this.world.background);
       this.cameraSys.update(dt);
       this.world.safeZones?.update(this.cameraSys.camera, dt);
       this.hud.update(this.cameraSys.camera);
@@ -505,8 +513,9 @@ const TITLE_PLACES = {
   hospital_return: { id: 'hospital', state: 'night', x: 18 }, recovery: { id: 'hospital', state: 'day', x: 18 },
   street: { id: 'street' },
   station_return: { id: 'station' }, forest: { id: 'forest', state: 'day' }, forest_night: { id: 'forest', state: 'night' },
+  lizzie_1: { id: 'school' }, lizzie_2: { id: 'forest', state: 'l2' }, lizzie_3: { id: 'cave', state: 'L3' }, lizzie_4: { id: 'cave', state: 'L4' }, lizzie_5: { id: 'cave', state: 'L5' },
 };
 
-const INTERACTIVE_STAGES = new Set(['explore', 'morning', 'car', 'station', 'interrogation', 'hospital_day', 'hospital_night', 'hospital_return', 'station_return', 'forest', 'forest_night']);
+const INTERACTIVE_STAGES = new Set(['explore', 'morning', 'car', 'station', 'interrogation', 'hospital_day', 'hospital_night', 'hospital_return', 'station_return', 'forest', 'forest_night', 'lizzie_1', 'lizzie_2', 'lizzie_3', 'lizzie_4', 'lizzie_5']);
 
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));

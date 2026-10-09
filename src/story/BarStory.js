@@ -8,6 +8,7 @@ import { sleep } from './Director.js';
 import { installMorning } from './MorningSequence.js';
 import { installCustody, CUSTODY_STAGES } from './CustodySequence.js';
 import { installInvestigation, INVESTIGATION_STAGES } from './InvestigationSequence.js';
+import { installLizzie, LIZZIE_STAGES } from './LizzieSequence.js';
 
 /**
  * Scene logic for the prologue in the "Northern Rose" bar:
@@ -207,7 +208,7 @@ export class BarStory {
     // Julian starts at the door (placed before the fade, so he never pops back)
     this.julian.placeAt(-12.2, -2.1, 1);
     g.cameraSys.snap();
-    await g.card.show('Северная Роза', { num: 'Prologue', en: 'The Northern Rose', sub: 'УАЙТХОРС · ЮКОН', ms: 2200 });
+    await g.card.show('Кровавый вечер', { num: 'Глава 1', en: 'A Bloody Evening', sub: '«СЕВЕРНАЯ РОЗА» · УАЙТХОРС', ms: 2200 });
     if (S !== this.session) return;
     const fade = g.fader.to(false, 2200);
     await sleep(0.9);
@@ -522,6 +523,7 @@ export class BarStory {
     this.updateMorning(dt);
     this.updateCustody(dt);
     this.updateInvestigation(dt);
+    this.updateLizzie(dt);
     const J = this.julian;
     // Kayden calls out when Julian gets close the first time
     if (g.state.stage === 'explore' && !g.state.get('kayden_called') && J.position.x > -3.5) {
@@ -559,6 +561,10 @@ export class BarStory {
     const a = this.scene.anchors;
     if (CUSTODY_STAGES.includes(st)) {
       await this.loadCustody(st);
+      return;
+    }
+    if (LIZZIE_STAGES.includes(st)) {
+      await this.loadLizzie(st);
       return;
     }
     if (INVESTIGATION_STAGES.includes(st)) {
@@ -613,3 +619,4 @@ export class BarStory {
 installMorning(BarStory);
 installCustody(BarStory);
 installInvestigation(BarStory);
+installLizzie(BarStory);

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { bevelBox } from '../nature.js';
 import { LocationBase } from '../LocationBase.js';
 import { streetTexture, canvasTexture, rng, beamTexture } from '../../render/textures.js';
 import { glow, lightCone, pixTex } from '../props.js';
@@ -81,7 +82,7 @@ class Batch {
 
 /** Box with world-scaled UVs (u = x/uS, v = y/vS) so wall textures continue across it. */
 function uvBox(w, h, d, ox, oz, uS = 4, vS = H) {
-  const g = new THREE.BoxGeometry(w, h, d);
+  const g = bevelBox(w, h, d).clone();
   g.translate(0, h / 2, 0);
   const p = g.attributes.position, n = g.attributes.normal, uv = g.attributes.uv;
   for (let i = 0; i < p.count; i++) {
@@ -1190,7 +1191,7 @@ export class StationScene extends LocationBase {
     this.anchors.cellDoor = new THREE.Vector3(6.1, 2.0, BACK + 0.2);
     // red "in custody" lamp
     S.box(0.14, 0.14, 0.06, this.mDark, 7.95, 2.6, BACK + 0.04);
-    const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 8), this.mat('custodyLamp', { color: 0, emissive: 0xff3a20, emissiveIntensity: 3 }));
+    const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.05, 14, 10), this.mat('custodyLamp', { color: 0, emissive: 0xff3a20, emissiveIntensity: 3 }));
     lamp.position.set(7.95, 2.6, BACK + 0.1); root.add(lamp);
     const lg = glow(0xff3020, 0.8, 0.45); lg.position.set(7.95, 2.6, BACK + 0.16); root.add(lg);
   }
@@ -1239,7 +1240,7 @@ export class StationScene extends LocationBase {
       for (let y = 0; y < h; y++) { const v = (y % 4 === 0) ? 96 : (y % 4 === 1 ? 168 : 142) + (r() - 0.5) * 8; ctx.fillStyle = `rgb(${v},${v + 4},${v + 8})`; ctx.fillRect(0, y, w, 1); }
       noise(ctx, w, h, 8, r);
     });
-    const shGeo = new THREE.BoxGeometry(1.62, 2.3, 0.04);
+    const shGeo = bevelBox(1.62, 2.3, 0.04).clone();
     shGeo.translate(0, -1.15, 0); // pivot at the top: rolling up = scaling towards it
     const shutter = new THREE.Mesh(shGeo, this.pm('medshutter', shTex, { roughness: 0.5, metalness: 0.5 }));
     shutter.position.set(9.8, 2.3, BACK + 0.045);

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { bevelBox } from './nature.js';
 import { glowTexture, labelTexture, rng, canvasTexture } from '../render/textures.js';
 
 /**
@@ -157,7 +158,7 @@ export function bistroTable(mats, { radius = 0.5, height = 0.76, top = 'marble' 
     const f = new THREE.Mesh(footGeo, wood);
     f.rotation.y = (i / 3) * Math.PI * 2 + 0.5;
     g.add(f);
-    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.022, 8, 6), brass);
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.022, 14, 10), brass);
     cap.position.set(Math.cos(-f.rotation.y) * 0.27, 0.02, Math.sin(-f.rotation.y) * 0.27);
     g.add(cap);
   }
@@ -195,7 +196,7 @@ export function barStool(mats) {
   seat.position.y = 0.78;
   const studs = new THREE.Mesh(new THREE.TorusGeometry(0.195, 0.008, 4, 30), pixMat(mats, 'brass'));
   studs.rotation.x = Math.PI / 2; studs.position.y = 0.74;
-  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.74, 10), pixMat(mats, 'wood', { color: 0x3a2a24 }));
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.74, 16), pixMat(mats, 'wood', { color: 0x3a2a24 }));
   pole.position.y = 0.37;
   const foot = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.014, 6, 24), pixMat(mats, 'brass'));
   foot.rotation.x = Math.PI / 2; foot.position.y = 0.3;
@@ -207,13 +208,13 @@ export function barStool(mats) {
 
 export function candle(mats, { lit = true } = {}) {
   const g = new THREE.Group();
-  const holder = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.03, 0.07, 10), mats.glass());
+  const holder = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.03, 0.07, 16), mats.glass());
   holder.position.y = 0.035;
-  const wax = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.03, 10), mats.get('wax', { color: 0xe8dcc0, roughness: 0.6, emissive: 0x402010 }));
+  const wax = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.03, 16), mats.get('wax', { color: 0xe8dcc0, roughness: 0.6, emissive: 0x402010 }));
   wax.position.y = 0.02;
   g.add(holder, wax);
   if (lit) {
-    const flame = new THREE.Mesh(new THREE.SphereGeometry(0.008, 6, 6), mats.emissive(0xffb050, 6));
+    const flame = new THREE.Mesh(new THREE.SphereGeometry(0.008, 14, 10), mats.emissive(0xffb050, 6));
     flame.scale.set(1, 2.2, 1); flame.position.y = 0.05;
     const halo = glow(0xff9a40, 0.32, 0.55);
     halo.position.y = 0.06;
@@ -226,14 +227,14 @@ export function candle(mats, { lit = true } = {}) {
 
 export function wineGlass(mats, filled = 0x5a0a10) {
   const g = new THREE.Group();
-  const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.02, 0.07, 12, 1, true), mats.glass());
+  const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.02, 0.07, 16, 1, true), mats.glass());
   bowl.position.y = 0.15;
-  const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.1, 6), mats.glass());
+  const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.1, 16), mats.glass());
   stem.position.y = 0.06;
-  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.005, 12), mats.glass());
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.005, 16), mats.glass());
   g.add(bowl, stem, base);
   if (filled) {
-    const liq = new THREE.Mesh(new THREE.CylinderGeometry(0.033, 0.02, 0.04, 12), mats.get(`liq-${filled}`, { color: filled, roughness: 0.1, emissive: filled, emissiveIntensity: 0.25 }));
+    const liq = new THREE.Mesh(new THREE.CylinderGeometry(0.033, 0.02, 0.04, 16), mats.get(`liq-${filled}`, { color: filled, roughness: 0.1, emissive: filled, emissiveIntensity: 0.25 }));
     liq.position.y = 0.135;
     g.add(liq);
   }
@@ -242,9 +243,9 @@ export function wineGlass(mats, filled = 0x5a0a10) {
 
 export function tumbler(mats, fill = 0x8a4a14) {
   const g = new THREE.Group();
-  const glass = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.03, 0.09, 12, 1, true), mats.glass());
+  const glass = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.03, 0.09, 16, 1, true), mats.glass());
   glass.position.y = 0.045;
-  const liq = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.028, 0.035, 12), mats.get(`liq-${fill}`, { color: fill, roughness: 0.1, emissive: fill, emissiveIntensity: 0.35 }));
+  const liq = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.028, 0.035, 16), mats.get(`liq-${fill}`, { color: fill, roughness: 0.1, emissive: fill, emissiveIntensity: 0.35 }));
   liq.position.y = 0.02;
   g.add(glass, liq);
   return g;
@@ -254,9 +255,9 @@ export function tumbler(mats, fill = 0x8a4a14) {
 export function bottleRow(mats, length, seed = 1) {
   const r = rng(seed);
   const count = Math.floor(length / 0.11);
-  const bodyGeo = new THREE.CylinderGeometry(0.04, 0.04, 1, 10);
+  const bodyGeo = new THREE.CylinderGeometry(0.04, 0.04, 1, 16);
   bodyGeo.translate(0, 0.5, 0);
-  const neckGeo = new THREE.CylinderGeometry(0.012, 0.02, 1, 8);
+  const neckGeo = new THREE.CylinderGeometry(0.012, 0.02, 1, 16);
   neckGeo.translate(0, 0.5, 0);
   const tints = [0x7a3a08, 0x5a2a06, 0x2c4a1a, 0x9a6a20, 0x3a1206, 0xb08a40, 0x1e2a1a, 0x6a1010, 0xd0b070];
   const bodyMat = mats.get('bottle', {
@@ -294,7 +295,7 @@ export function bottleRow(mats, length, seed = 1) {
 export function chandelier(mats) {
   const g = new THREE.Group();
   const brass = mats.brass();
-  const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.7, 6), brass);
+  const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.7, 16), brass);
   stem.position.y = 0.35;
   const ring = new THREE.Mesh(new THREE.TorusGeometry(0.45, 0.02, 8, 36), brass);
   ring.rotation.x = Math.PI / 2;
@@ -310,9 +311,9 @@ export function chandelier(mats) {
   for (let i = 0; i < 10; i++) {
     const a = (i / 10) * Math.PI * 2;
     const x = Math.cos(a) * 0.45, z = Math.sin(a) * 0.45;
-    const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.018, 0.05, 8), brass);
+    const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.018, 0.05, 16), brass);
     cup.position.set(x, 0.03, z);
-    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.018, 6, 6), bulbMat);
+    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.018, 14, 10), bulbMat);
     bulb.scale.set(1, 1.8, 1);
     bulb.position.set(x, 0.09, z);
     g.add(cup, bulb);
@@ -341,7 +342,7 @@ export function chandelier(mats) {
 /** Wall sconce with pleated shade (ref 06). */
 export function sconce(mats, shadeColor = 0xc7605a) {
   const g = new THREE.Group();
-  const plate = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.02, 12), mats.brass());
+  const plate = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.02, 16), mats.brass());
   plate.rotation.x = Math.PI / 2;
   const arm = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.01, 6, 12, Math.PI / 2), mats.brass());
   arm.position.set(0, 0.0, 0.12); arm.rotation.y = Math.PI / 2;
@@ -351,7 +352,7 @@ export function sconce(mats, shadeColor = 0xc7605a) {
   });
   const shade = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.11, 0.13, 16, 1, true), shadeMat);
   shade.position.set(0, 0.17, 0.13);
-  const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 8), mats.emissive(0xffd0a0, 4));
+  const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.03, 14, 10), mats.emissive(0xffd0a0, 4));
   bulb.position.set(0, 0.14, 0.13);
   const halo = glow(0xff9070, 1.1, 0.45);
   halo.position.set(0, 0.16, 0.16);
@@ -362,14 +363,14 @@ export function sconce(mats, shadeColor = 0xc7605a) {
 /** Fringed table lamp (ref 05). */
 export function tableLamp(mats, shadeColor = 0x120a08) {
   const g = new THREE.Group();
-  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.08, 0.25, 12), mats.brass());
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.08, 0.25, 16), mats.brass());
   base.position.y = 0.125;
   const shadeMat = mats.get(`lampshade-${shadeColor}`, { color: shadeColor, emissive: 0x3a1808, roughness: 0.9, side: THREE.DoubleSide });
   const shade = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.17, 0.17, 16, 1, true), shadeMat);
   shade.position.y = 0.36;
   const fringe = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.175, 0.04, 16, 1, true), mats.get('fringe', { color: 0xb08a40, emissive: 0x3a2808, roughness: 1, side: THREE.DoubleSide }));
   fringe.position.y = 0.26;
-  const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 8), mats.emissive(0xffc080, 4));
+  const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.03, 14, 10), mats.emissive(0xffc080, 4));
   bulb.position.y = 0.3;
   const pool = glow(0xffa860, 0.9, 0.5);
   pool.position.y = 0.22;
@@ -382,7 +383,7 @@ export function garland(mats, curve, count = 40) {
   const g = new THREE.Group();
   const tube = new THREE.Mesh(new THREE.TubeGeometry(curve, 60, 0.06, 6, false), mats.get('garland', { color: 0x0d1a0e, roughness: 1 }));
   g.add(tube);
-  const geo = new THREE.SphereGeometry(0.012, 4, 4);
+  const geo = new THREE.SphereGeometry(0.012, 14, 10);
   const mat = mats.emissive(0xffd890, 6);
   const lights = new THREE.InstancedMesh(geo, mat, count);
   const m = new THREE.Matrix4();
@@ -406,7 +407,7 @@ export function frame(mats, w, h, texture, { gold = true, depth = 0.05, border =
     [border, h, w / 2 + border / 2, 0],
   ];
   for (const [pw, ph, x, y] of parts) {
-    const b = new THREE.Mesh(new THREE.BoxGeometry(pw, ph, depth), fm);
+    const b = new THREE.Mesh(bevelBox(pw, ph, depth), fm);
     b.position.set(x, y, depth / 2);
     g.add(b);
   }
@@ -433,9 +434,9 @@ export function wineBottle(mats, color = 0x1e2a14) {
 export function ashtray(mats) {
   const g = new THREE.Group();
   const bowl = new THREE.Mesh(lathe([[0, 0], [0.06, 0], [0.065, 0.02], [0.05, 0.025], [0, 0.018]], 16), mats.glass());
-  const cig = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.07, 6), mats.get('cig', { color: 0xe8e0d0 }));
+  const cig = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.07, 16), mats.get('cig', { color: 0xe8e0d0 }));
   cig.rotation.z = Math.PI / 2 - 0.15; cig.position.set(0.03, 0.03, 0);
-  const ember = new THREE.Mesh(new THREE.SphereGeometry(0.005, 6, 6), mats.emissive(0xff5020, 6));
+  const ember = new THREE.Mesh(new THREE.SphereGeometry(0.005, 14, 10), mats.emissive(0xff5020, 6));
   ember.position.set(0.065, 0.035, 0);
   g.add(bowl, cig, ember);
   return g;
@@ -479,7 +480,7 @@ export function column(mats, height, radius = 0.2) {
   const brass = pixMat(mats, 'brass');
   const R = radius;
   // plinth + base mouldings
-  const plinth = new THREE.Mesh(new THREE.BoxGeometry(R * 3, 0.16, R * 3), dark);
+  const plinth = new THREE.Mesh(bevelBox(R * 3, 0.16, R * 3), dark);
   plinth.position.y = 0.08;
   const base = new THREE.Mesh(lathe([[0, 0], [R * 1.4, 0], [R * 1.4, 0.05], [R * 1.25, 0.09], [R * 1.3, 0.14], [R * 1.08, 0.2], [R * 1.12, 0.24], [R, 0.3], [0, 0.3]], 40), wood);
   base.position.y = 0.16;
@@ -504,9 +505,9 @@ export function column(mats, height, radius = 0.2) {
   cap.position.y = capY;
   const capRing = new THREE.Mesh(new THREE.TorusGeometry(R * 1.0, 0.02, 8, 40), brass);
   capRing.rotation.x = Math.PI / 2; capRing.position.y = capY + 0.05;
-  const abacus = new THREE.Mesh(new THREE.BoxGeometry(R * 3.4, 0.12, R * 3.4), dark);
+  const abacus = new THREE.Mesh(bevelBox(R * 3.4, 0.12, R * 3.4), dark);
   abacus.position.y = capY + 0.34;
-  const top = new THREE.Mesh(new THREE.BoxGeometry(R * 3.0, height - capY - 0.4, R * 3.0), dark);
+  const top = new THREE.Mesh(bevelBox(R * 3.0, height - capY - 0.4, R * 3.0), dark);
   top.position.y = capY + 0.4 + (height - capY - 0.4) / 2;
   g.add(plinth, base, shaft, ring, cap, capRing, abacus, top);
   return g;

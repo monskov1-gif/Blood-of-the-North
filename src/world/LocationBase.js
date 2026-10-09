@@ -1,4 +1,7 @@
 import * as THREE from 'three';
+import { roundedBox } from './nature.js';
+
+const boxCache = new Map();
 import { MaterialLib, glow, lightPool } from './props.js';
 import { canvasTexture, rng } from '../render/textures.js';
 import { SafeZones } from './SafeZones.js';
@@ -31,8 +34,17 @@ export class LocationBase {
 
   mat(key, params) { return this.mats.get(key, params); }
 
+  /** A box with softly bevelled edges (no razor-sharp primitive corners anywhere). */
   box(w, h, d, mat, x, y, z, parent = this.root) {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+    const key = `${w.toFixed(3)}|${h.toFixed(3)}|${d.toFixed(3)}`;
+    let geo = boxCache.get(key);
+    if (!geo) {
+      const r = Math.min(0.02, 0.18 * Math.min(w, h, d));
+      geo = r > 0.002 ? roundedBox(w, h, d, r, 1) : new THREE.BoxGeometry(w, h, d);
+      geo.parameters = { width: w, height: h, depth: d };
+      boxCache.set(key, geo);
+    }
+    const m = new THREE.Mesh(geo, mat);
     m.position.set(x, y, z);
     parent.add(m);
     return m;

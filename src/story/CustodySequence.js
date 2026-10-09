@@ -12,6 +12,7 @@ const STAGE_MUSIC = {
   hospital_day: 'hospital_day', hospital_evening: 'hospital_evening', hospital_night: 'hospital_night',
   hospital_return: 'hospital_night', recovery: 'recovery', street: 'street',
   station_return: 'station', forest: 'street', forest_night: 'hospital_night',
+  lizzie_1: 'recovery', lizzie_2: 'street', lizzie_3: 'hospital_night', lizzie_4: 'interrogation', lizzie_5: 'hospital_night',
 };
 import { glow } from '../world/props.js';
 import { sleep } from './Director.js';
@@ -111,7 +112,8 @@ const methods = {
     g.cameraSys.snap();
     this.resetJulian();
     if (stage) g.state.setStage(stage);
-    this.setOutfit(GOWN_STAGES.has(stage) ? 'gown' : 'coat');
+    const st = stage || g.state.stage || '';
+    this.setOutfit(st.startsWith('lizzie') ? 'lizzy' : GOWN_STAGES.has(st) ? 'gown' : 'coat');
     if (STAGE_MUSIC[stage]) g.audio.music(STAGE_MUSIC[stage], 2.5);
   },
 
@@ -218,7 +220,7 @@ const methods = {
       get: () => jpos.copy(this.julian.root.getWorldPosition(jpos)).add(V(0, 0.9, 0)),
       active: () => g.mode === 'play' && (g.keyScene || !g.player.enabled) && this.julian.root.parent === world.root });
     // free walk in the long hospital: a column or door post may cross Julian, but never hide him
-    if (world.id === 'hospital' || world.id === 'forest') {
+    if (['hospital', 'forest', 'school', 'cave'].includes(world.id)) {
       const walking = () => g.mode === 'play' && g.player.enabled && !g.keyScene && this.julian.root.parent === world.root;
       const jp2 = new THREE.Vector3();
       zones.addZone({ id: 'julian (walk)', radius: 0.42, maxOcclusion: 0.3, priority: 1, active: walking,
@@ -279,7 +281,7 @@ const methods = {
     this.gazeReticle(w);
     g.hud.show(false);
     g.player.enabled = false;
-    await g.card.show('Полицейская машина', { num: 'I', en: 'The Ride', sub: 'УТРО · WHITEHORSE, YUKON', ms: 2200 });
+    await g.card.show('Полицейская машина', { en: 'The Ride', sub: 'УТРО · WHITEHORSE, YUKON', ms: 2200 });
     if (S !== this.session) return;
     await g.fader.to(false, 1800);
     await g.dialogue.start('car_intro');
@@ -320,6 +322,7 @@ const methods = {
     await g.fader.to(true, 1600);
     this.carTalking = false;
     if (S !== this.session) return;
+    if (!g.state.get('lizzie_chapter_1_complete') && !(await this.playLizzie(1))) return;
     await this.startStation();
   },
 
@@ -358,7 +361,7 @@ const methods = {
     nurse.setVisible(!!g.state.get('survivors_questioned'));
     this.stationCast = { sg, noah, leo, chef, tommy, nurse };
     g.cameraSys.snap();
-    await g.card.show('Участок', { num: 'II', en: 'The Detachment', sub: 'RCMP · WHITEHORSE', ms: 2200, style: 'chapter-b' });
+    await g.card.show('Подозреваемый', { num: 'Глава 3', en: 'The Suspect', sub: 'УЧАСТОК RCMP · WHITEHORSE', ms: 2200, style: 'chapter-b' });
     if (S !== this.session) return;
     await g.fader.to(false, 1500);
     g.hud.show(true);
@@ -542,7 +545,7 @@ const methods = {
     g.keyScene = true;
     g.cameraSys.setShot({ x: -4.5, y: 1.55, z: -1.2, lookX: -4.5, lookY: 1.1, lookZ: -6.2, fov: 40 }, 1);
     g.cameraSys.snap();
-    await g.card.show('Городская больница', { num: 'III', en: 'Whitehorse General', sub: 'ОБСЛЕДОВАНИЕ', ms: 2200 });
+    await g.card.show('Городская больница', { en: 'Whitehorse General', sub: 'ОБСЛЕДОВАНИЕ', ms: 2200 });
     if (S !== this.session) return;
     g.renderer.setLayer('wake', { blur: 0.5, vignette: 0.3 });
     await g.fader.to(false, 1400);
@@ -736,6 +739,7 @@ const methods = {
     kow.setVisible(false);
     g.keyScene = false;
     if (S !== this.session) return;
+    if (!g.state.get('lizzie_chapter_2_complete') && !(await this.playLizzie(2))) return;
     await this.startNight();
   },
 
@@ -780,7 +784,7 @@ const methods = {
     const close = { x: mp.x + 1.1, y: mp.y + 0.02, z: mp.z + 1.9, lookX: mp.x, lookY: mp.y - 0.02, lookZ: mp.z, fov: 18 };
     g.cameraSys.setShot(wide, 1);
     g.cameraSys.snap();
-    await g.card.show('Ночь', { en: 'Night', sub: '03:12', ms: 1900 });
+    await g.card.show('Жажда', { num: 'Глава 5', en: 'Thirst', sub: 'НОЧЬ · 03:12', ms: 2000, style: 'chapter-b' });
     if (S !== this.session) return;
     g.letterbox.set(true, 2400);
     await g.fader.to(false, 2000);
@@ -1118,7 +1122,7 @@ const methods = {
     g.keyScene = true;
     g.cameraSys.setShot({ x: 1.5, y: 2.0, z: 8.0, lookX: 1.5, lookY: 1.4, lookZ: -1.5, fov: 34 }, 1);
     g.cameraSys.snap();
-    await g.card.show('Выписка', { num: 'IV', en: 'Discharge', sub: 'ДЕНЬ ШЕСТОЙ', ms: 2200, style: 'chapter-b' });
+    await g.card.show('Выписка', { en: 'Discharge', sub: 'ДЕНЬ ШЕСТОЙ', ms: 2200 });
     if (S !== this.session) return;
     g.audio.play('sfx.door', { volume: 0.5 });
     await g.fader.to(false, 2200);

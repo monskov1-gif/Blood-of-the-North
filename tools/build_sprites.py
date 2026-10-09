@@ -749,6 +749,32 @@ for c in ['lizzy', 'vikki', 'olivia', 'puriel']:
 for c in ['grey', 'white', 'red', 'dark']:
     for n in ['', '_walk1', '_walk2', '_eat']:
         frames[f'wolf_{c}{n}'] = load(f'wolf_{c}{n}')
+# v0.13: the pack in human form and Stinko Bob — crowd sprites re-dyed muddy and dirtied
+# (no redrawing): faded clothes, grime specks, torn hems
+def grime(a, seed, hue=0.08, sat=0.45, val=0.72, tear=True):
+    a = variant(a, hue, sat, val)
+    r = np.random.default_rng(seed)
+    op = a[..., 3] > 0
+    ys, xs = np.where(op)
+    pick = r.random(len(ys)) < 0.06
+    for y, x in zip(ys[pick], xs[pick]):
+        a[y, x, :3] = a[y, x, :3] * 0.62 + np.array([46, 34, 22]) * 0.38
+    if tear:   # ragged hem: drop edge pixels in the lowest coat rows (not the boots)
+        h = a.shape[0]
+        for y in range(int(h * 0.62), int(h * 0.8)):
+            row = np.where(a[y, :, 3] > 0)[0]
+            if len(row) > 6 and r.random() < 0.5:
+                k = int(r.integers(1, 3))
+                a[y, row[:k], 3] = 0
+                a[y, row[-k:], 3] = 0
+    return a
+
+frames['bob_idle'] = grime(frames['npc_cap_front'], 13, hue=0.1, sat=0.35, val=0.66)
+frames['bob_talk'] = frames['bob_idle']
+frames['bob_side'] = grime(frames['npc_cap_side'], 14, hue=0.1, sat=0.35, val=0.66)
+for i, (src, hue) in enumerate([('npc_smoker_front', 0.06), ('npc_vest_side', 0.12), ('npc_glasses_side', 0.02), ('npc_fur_side', 0.9), ('npc_green_side', 0.05)]):
+    frames[f'pack_{"abcde"[i]}'] = grime(frames[src], 20 + i, hue=hue)
+
 # the hospital beds are seen close up: the lying patients go on a 1.5× coarser grid
 # (1 px = 1.5 cm, stored small and drawn 1.5× larger — even pixels, no doubling)
 for n in ['lie_julian_gown', 'lie_granny']:

@@ -518,7 +518,7 @@ const methods = {
     const globeOff = this.mat('hxGlobeOff', { color: 0xc8c4b8, emissive: 0x000000, roughness: 0.3 });
     for (const [gx, on] of [[39.5, true], [43.5, true], [47.5, false], [51.5, true], [55.0, true]]) {
       this.cy(0.006, 0.006, 0.9, 4, iron, gx, H2 - 0.45, -1.3);
-      const g = new THREE.Mesh(new THREE.SphereGeometry(0.17, 12, 8), gx === 51.5 ? globeN : on ? globe : globeOff);
+      const g = new THREE.Mesh(new THREE.SphereGeometry(0.17, 14, 10), gx === 51.5 ? globeN : on ? globe : globeOff);
       g.position.set(gx, H2 - 1.0, -1.3); root.add(g);
       this.pendants.push(g);
     }
@@ -589,7 +589,7 @@ const methods = {
     this.bx(w, 0.05, depth, m, cx, 2.7, BACK - depth / 2);
     this.bx(w, 2.7, 0.1, this.mat('hxFarWall', { color: 0x1a1c1a, roughness: 0.9 }), cx, 1.35, BACK - depth);
     // one bulb far down, a pool under it
-    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), this.mat('hxFarBulb', { color: 0, emissive: 0xffe0b0, emissiveIntensity: 2.5 }));
+    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.05, 14, 10), this.mat('hxFarBulb', { color: 0, emissive: 0xffe0b0, emissiveIntensity: 2.5 }));
     bulb.position.set(cx, 2.5, BACK - depth + 0.8); root.add(bulb);
     const g = glow(0xffd8a0, 0.6, 0.35); g.position.copy(bulb.position); root.add(g);
     this.pool(0xffc890, cx, BACK - depth + 1.0, 1.0, 1.4, 0.18);

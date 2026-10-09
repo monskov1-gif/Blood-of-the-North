@@ -22,6 +22,13 @@ const OBJECTIVES = {
   watch: { ru: 'Не спугнуть. Смотреть', en: 'STAY DOWN. WATCH' },
   follow: { ru: 'Проследить за ним', en: 'FOLLOW HIM' },
   cave: { ru: 'Пещера', en: 'THE CAVE' },
+  lz_girls: { ru: 'Девочки ждут у доски объявлений', en: 'THE GIRLS' },
+  lz_sites: { ru: 'Сфотографировать следы. Идти вдоль реки', en: 'PHOTOGRAPH THE TRACES' },
+  lz_herd: { ru: 'Стадо у реки. Подойти тихо', en: 'THE HERD BY THE RIVER' },
+  lz_cave: { ru: 'Осмотреться. Понять, где мы', en: 'WHERE ARE WE' },
+  lz_pack: { ru: 'Слушать стаю', en: 'LISTEN TO THE PACK' },
+  lz_follow: { ru: 'Найти Оливию', en: 'FIND OLIVIA' },
+  lz_escape: { ru: 'БЕГИ', en: 'RUN' },
 };
 
 /** Exploration overlay: objective, interaction marker, phone & menu buttons, toasts. */
@@ -51,7 +58,7 @@ export class HUD {
     bus.on('focus', (item) => { this.focus = item; this.renderMarker(); });
     bus.on('flag', ({ flag, value }) => {
       if (flag === 'objective') this.setObjective(value);
-      if (flag === 'case_route') this.setCase(value);
+      if (flag === 'investigation_route') this.setCase(value);
     });
   }
 

@@ -7,7 +7,7 @@ export function el(tag, cls, parent, html) {
   return e;
 }
 
-export const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+export const wait = (ms) => new Promise((r) => setTimeout(r, ms * (globalThis.__ts || 1)));
 
 export const ICONS = {
   menu: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 7h16M4 12h16M4 17h16"/></svg>',

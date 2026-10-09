@@ -94,13 +94,8 @@ export class CaseFiles {
     deco(w);
     const cap = el('div', 'cf-caption', w, '«Выберите дело, которым займётесь»<small>“Choose the case you will work on”</small>');
     fw.addEventListener('click', () => this.preview('WEREWOLF'));
-    fv.addEventListener('click', () => {
-      if (fv.classList.contains('wip')) return;
-      fv.classList.add('wip');
-      el('div', 'cf-stamp-wip', fv, 'ВЕТКА В РАЗРАБОТКЕ');
-      this.audio.play('sfx.thud', { volume: 0.5 });
-      cap.innerHTML = '«Эта линия расследования ещё в разработке»<small>“The vampire branch is still in development”</small>';
-    });
+    fv.addEventListener('click', () => this.preview('VAMPIRE'));
+    void cap;
     return new Promise((r) => { this.resolve = r; });
   }
 
@@ -124,6 +119,7 @@ export class CaseFiles {
     const w = this.wrap;
     w.classList.add('cf-previewing');
     const book = this.book(w, id, { preview: true });
+    if (CASES[id].wip) el('p', 'cf-hand small', book.querySelector('.cf-rbody'), 'Расследование Джулиана здесь ещё в разработке. Но выбор — окончательный: от него зависит, где он будет той ночью.');
     const take = el('button', 'cf-take', book.querySelector('.cf-right'), '<b>ВЗЯТЬ ДЕЛО</b><small>TAKE THE CASE</small>');
     take.addEventListener('click', (e) => { e.stopPropagation(); this.result = id; this.close(); });
     const back = el('button', 'cf-take ghost', book.querySelector('.cf-right'), '<b>К ПАПКАМ</b><small>BACK</small>');

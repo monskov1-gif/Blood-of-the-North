@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { bevelBox } from '../nature.js';
 import { streetTexture, canvasTexture, glowTexture } from '../../render/textures.js';
 import { bistroTable, bentwoodChair, wineGlass, wineBottle, lightPool, pixTex } from '../props.js';
 
@@ -133,7 +134,7 @@ export function buildMorningProps(bar) {
 
   // a handbag on the floor, menus scattered
   const bag = new THREE.Group();
-  const body = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.2, 0.12), new THREE.MeshStandardMaterial({ map: pixTex('wood'), color: 0x3a1418, roughness: 0.6 }));
+  const body = new THREE.Mesh(bevelBox(0.32, 0.2, 0.12), new THREE.MeshStandardMaterial({ map: pixTex('wood'), color: 0x3a1418, roughness: 0.6 }));
   body.position.y = 0.1;
   const strap = new THREE.Mesh(new THREE.TorusGeometry(0.11, 0.008, 6, 20, Math.PI), new THREE.MeshStandardMaterial({ color: 0x1a0a08 }));
   strap.position.y = 0.2;
@@ -141,7 +142,7 @@ export function buildMorningProps(bar) {
   lie(bag, 8.6, 0.85, 0.35, 0.5);
   const menuMat = new THREE.MeshStandardMaterial({ color: 0x6a1018, roughness: 0.7 });
   for (const [x, z, r] of [[-5.6, 0.9, 0.4], [3.6, 0.2, 1.3], [-11.0, 0.8, 2.1], [7.2, -1.8, 0.9]]) {
-    const menu = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.008, 0.3), menuMat);
+    const menu = new THREE.Mesh(bevelBox(0.22, 0.008, 0.3), menuMat);
     menu.position.set(x, 0.005, z); menu.rotation.y = r;
     g.add(menu);
   }

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { spruceStand, bareTree } from '../nature.js';
 import { LocationBase } from '../LocationBase.js';
 import { canvasTexture, rng, glowTexture } from '../../render/textures.js';
 import { glow, lightPool } from '../props.js';
@@ -169,22 +170,18 @@ export class StreetScene extends LocationBase {
     const leafMats = leafCols.map((c, i) => this.mat(`leaf${i}`, { color: c, roughness: 0.8, side: THREE.DoubleSide }));
     const leaves = leafMats.map(() => []);
     const tree = (x, z, s) => {
-      const g = new THREE.Group();
-      this.B(0.12, 3.2, 0.12, bark, 0, 1.6, 0, g);
-      const tips = [];
-      for (let k = 0; k < 7; k++) {
-        const y = 1.5 + k * 0.28, side = k % 2 ? 1 : -1, L = 0.9 - k * 0.08;
-        const b = this.B(0.04, L, 0.04, twig, side * L * 0.32, y + L * 0.35, (r() - 0.5) * 0.3, g);
-        b.rotation.z = -side * 0.75;
-        tips.push([side * L * 0.62, y + L * 0.7, b.position.z]);
-      }
-      tips.push([0, 3.3, 0]);
+      const g = bareTree(Math.round(x * 31 + z * 7 + 300), { low: this.low, height: 3.6, kind: 'birch' });
       g.position.set(x, 0, z); g.scale.setScalar(s);
       this.root.add(g);
+      // branch tips (the highest twig vertices) carry the last leaves
+      const tw = g.children[1].geometry.attributes.position;
+      const tips = [];
+      for (let i = 0; i < tw.count; i += 23) if (tw.getY(i) > 2.0) tips.push([tw.getX(i), tw.getY(i), tw.getZ(i)]);
+      void bark; void twig;
       // the last leaves: small clusters on about half the branch tips
       for (const [tx, ty, tz] of tips) {
         if (r() < 0.45) continue;
-        for (let k = 0; k < 16; k++) leaves[r() < 0.8 ? (r() < 0.5 ? 0 : 1) : (r() < 0.7 ? 2 : 3)].push([x + (tx * 0.8 + (r() - 0.5) * 0.55) * s, (ty - 0.1 + (r() - 0.5) * 0.45) * s, z + tz * s + (r() - 0.5) * 0.4]);
+        for (let k = 0; k < 6; k++) leaves[r() < 0.8 ? (r() < 0.5 ? 0 : 1) : (r() < 0.7 ? 2 : 3)].push([x + (tx + (r() - 0.5) * 0.25) * s, (ty + (r() - 0.5) * 0.2) * s, z + (tz + (r() - 0.5) * 0.25) * s]);
       }
       for (let k = 0; k < 18; k++) leaves[Math.floor(r() * 4)].push([x + (r() - 0.5) * 2.4, 0.02, z + (r() - 0.5) * 1.6, true]);
     };
@@ -261,17 +258,10 @@ export class StreetScene extends LocationBase {
     for (const [x, z, s] of [[-11.2, -5, 1.2], [-15.5, -7, 1.5], [-17.5, -4.5, 1.0], [6.0, -3.0, 0.9], [21, -5, 1.3], [-10.2, -3.6, 0.7]]) this.spruce(x, z, s);
   }
 
+  /** A spruce built from branch cards (thin first snow on the branches). */
   spruce(x, z, s, parent = this.root) {
-    const g = new THREE.Group();
-    const needles = this.mat('spruce', { color: 0x1c2a26, roughness: 0.9, flatShading: true });
-    const snow = this.mat('spruceSnow', { color: 0xe4ecf2, roughness: 1, flatShading: true });
-    this.B(0.18, 0.8, 0.18, this.mat('bark', { color: 0x3a2a20 }), 0, 0.4, 0, g);
-    for (let k = 0; k < 5; k++) {
-      const rr = (1.25 - k * 0.22), y = 0.9 + k * 0.85;
-      const c = new THREE.Mesh(new THREE.ConeGeometry(rr, 1.5, 7), needles); c.position.y = y; c.rotation.y = k; g.add(c);
-      if (k === 4) { const sn = new THREE.Mesh(new THREE.ConeGeometry(rr * 0.5, 0.2, 7), snow); sn.position.y = y + 0.62; sn.rotation.y = k; g.add(sn); }
-    }
-    g.position.set(x, 0, z); g.scale.setScalar(s);
+    const g = spruceStand([{ x: 0, z: 0, s: s * 0.75, kind: 'young' }], { low: this.low, snow: 0.3, variant: Math.abs(Math.round(x)) % 3 });
+    g.position.set(x, 0, z);
     parent.add(g);
     return g;
   }
@@ -442,7 +432,7 @@ export class StreetScene extends LocationBase {
       this.B(0.04, 0.42, 0.04, steel, 0, 0.22, 0, c);
       c.position.set(-0.2 + i * 0.5, 0, FZ - 3.7); root.add(c);
     }
-    const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.17, 0.45, 10), this.mat('pot', { color: 0x3a3430, roughness: 0.7 }));
+    const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.17, 0.45, 16), this.mat('pot', { color: 0x3a3430, roughness: 0.7 }));
     pot.position.set(1.05, 0.22, FZ - 1.0); root.add(pot);
     for (let k = 0; k < 6; k++) {
       const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.8, 4), this.mat('leaf', { color: 0x2a5a32, roughness: 0.8 }));
@@ -567,7 +557,7 @@ export class StreetScene extends LocationBase {
       this.B(1.0, 0.07, 1.7, snow, -1.85, 0.96, 0, g);
     }
     for (const x of [-L / 2 + 0.9, L / 2 - 0.9]) for (const z of [-0.85, 0.85]) {
-      const w = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.22, 12), dark); w.rotation.x = Math.PI / 2; w.position.set(x, 0.34, z); g.add(w);
+      const w = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.22, 16), dark); w.rotation.x = Math.PI / 2; w.position.set(x, 0.34, z); g.add(w);
     }
     this.B(0.04, 0.12, 0.3, this.mat('headlamp', { color: 0xe8e8e0, emissive: 0x3a3a30 }), L / 2 + 0.01, 0.75, 0.6, g);
     this.B(0.04, 0.12, 0.3, this.mat('taillamp', { color: 0x8a1010, emissive: 0x300404 }), -L / 2 - 0.01, 0.75, 0.6, g);
@@ -667,8 +657,8 @@ export class StreetScene extends LocationBase {
     // hydrant
     const hy = fgGroup('fg-hydrant');
     const hm = this.mat('hydrant', { color: 0xc8a020, roughness: 0.5, metalness: 0.2 });
-    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 0.7, 8), hm); body.position.set(5.6, 0.35, 2.1); hy.add(body);
-    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 4, 0, Math.PI * 2, 0, Math.PI / 2), this.mat('hydrantCap', { color: 0xb02020, roughness: 0.5 })); cap.position.set(5.6, 0.7, 2.1); hy.add(cap);
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 0.7, 16), hm); body.position.set(5.6, 0.35, 2.1); hy.add(body);
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.13, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2), this.mat('hydrantCap', { color: 0xb02020, roughness: 0.5 })); cap.position.set(5.6, 0.7, 2.1); hy.add(cap);
     this.B(0.42, 0.07, 0.07, hm, 5.6, 0.45, 2.1, hy);
     const flag = this.B(0.02, 1.4, 0.02, this.mat('hydrantFlag', { color: 0xd04020 }), 5.75, 0.9, 2.1, hy); void flag;
   }

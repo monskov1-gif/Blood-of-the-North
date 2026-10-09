@@ -194,7 +194,7 @@ export class DialogueView {
       if (!id) { slot.wrap.classList.remove('show'); slot.id = null; continue; }
       slot.id = id;
       slot.wrap.classList.add('show');
-      slot.wrap.classList.toggle('active', this.speaking === id || (this.speaking === 'thought' && id === 'julian'));
+      slot.wrap.classList.toggle('active', this.speaking === id || (this.speaking === 'thought' && id === 'julian') || (this.speaking === 'lthought' && id === 'lizzy'));
       this.drawSlot(slot);
     }
   }
@@ -233,6 +233,7 @@ export class DialogueView {
 
   speakerInfo(id) {
     if (id === 'thought') return { name: 'Джулиан', en: 'INNER VOICE', cls: 'thought' };
+    if (id === 'lthought') return { name: 'Лиззи', en: 'INNER VOICE', cls: 'thought' };
     if (id === 'narrator') return { name: '', en: '', cls: 'narrator' };
     if (id === 'unknown') return { name: '???', en: 'UNKNOWN', cls: 'unknown' };
     const c = CHARACTERS[id];
@@ -372,6 +373,7 @@ export class DialogueView {
 
   /** Non-blocking subtitle (does not take input or stop the player). */
   flash(speaker, text, ms = 3200, { top = false } = {}) {
+    ms *= globalThis.__ts || 1;
     if (this.mode && this.mode !== 'flash') return Promise.resolve();
     const info = this.speakerInfo(speaker);
     this.mode = 'flash';

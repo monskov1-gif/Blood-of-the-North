@@ -1,0 +1,55 @@
+/* ------------------------------------------------------------------ Lizzie's phone camera + river map (src/ui/LizzieUI.js) */
+.lz-flash { position: absolute; inset: 0; z-index: 58; background: #fff; pointer-events: none; animation: lzFlash .38s ease-out forwards; }
+@keyframes lzFlash { from { opacity: .95; } to { opacity: 0; } }
+.lz-thumb { position: absolute; right: calc(18px + var(--safe-r)); bottom: calc(120px + var(--safe-b)); z-index: 57; width: 120px; padding: 6px 6px 22px; background: #efe6d4;
+  box-shadow: 0 8px 18px rgba(0,0,0,.55); transform: rotate(4deg); animation: lzThumbIn .4s cubic-bezier(.3,1.4,.6,1) both; pointer-events: none; transition: transform .5s, opacity .5s; }
+.lz-thumb i { display: block; height: 72px; background: radial-gradient(ellipse at 50% 60%, #8a8a84, #2a2a28); filter: grayscale(.4); }
+.lz-thumb span { position: absolute; left: 0; right: 0; bottom: 4px; text-align: center; font-family: 'MonteCarlo', 'Pinyon', cursive; font-size: 15px; color: #2a2030; }
+.lz-thumb.out { transform: translate(40px, 40px) rotate(14deg); opacity: 0; }
+@keyframes lzThumbIn { from { transform: translate(60px, 0) rotate(20deg); opacity: 0; } to { transform: rotate(4deg); opacity: 1; } }
+
+.lz-rec { position: absolute; inset: calc(6 * var(--vh)) calc(5 * var(--vw)); z-index: 52; pointer-events: none; font-family: -apple-system, 'Segoe UI', sans-serif; color: #fff;
+  text-shadow: 0 1px 2px #000; animation: fadeIn .3s; transition: opacity .5s; }
+.lz-rec.out { opacity: 0; }
+.lz-rec .c { position: absolute; width: 34px; height: 34px; border: 2px solid rgba(255,255,255,.85); }
+.lz-rec .tl { left: 0; top: 0; border-right: 0; border-bottom: 0; } .lz-rec .tr { right: 0; top: 0; border-left: 0; border-bottom: 0; }
+.lz-rec .bl { left: 0; bottom: 0; border-right: 0; border-top: 0; } .lz-rec .br { right: 0; bottom: 0; border-left: 0; border-top: 0; }
+.lz-rec .rec { position: absolute; left: 46px; top: 10px; font-weight: 700; letter-spacing: .1em; }
+.lz-rec .rec i { display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #e02020; margin-right: 8px; vertical-align: -1px; animation: pulse 1s infinite; }
+.lz-rec .tc { position: absolute; right: 46px; top: 10px; font-variant-numeric: tabular-nums; }
+.lz-rec .bat { position: absolute; right: 46px; bottom: 10px; font-size: 13px; opacity: .85; }
+
+.lz-map-wrap { position: absolute; inset: 0; z-index: 55; pointer-events: auto; display: grid; place-items: center; background: rgba(4,3,2,.78); animation: fadeIn .4s; transition: opacity .5s; }
+.lz-map-wrap.out { opacity: 0; }
+.lz-map { position: relative; width: min(calc(80 * var(--vw)), calc(120 * var(--vh))); aspect-ratio: 10 / 7; background: #e2d4b2; transform: rotate(-1deg);
+  box-shadow: 0 24px 50px rgba(0,0,0,.8), inset 0 0 60px rgba(120,90,50,.45); border-radius: 2px; }
+.lz-map svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.lz-map .river { fill: none; stroke: #4a7aa8; stroke-width: 2.4; stroke-linecap: round; opacity: .8; }
+.lz-map .road { fill: none; stroke: #8a6a4a; stroke-width: .6; stroke-dasharray: 2 1.4; }
+.lz-map text { font-family: 'Playfair SC', serif; font-size: 3px; fill: #4a3a2a; letter-spacing: .3px; }
+.lz-map .link { fill: none; stroke: #b0161d; stroke-width: .9; vector-effect: non-scaling-stroke; stroke-width: 3px; }
+.lz-map .next { fill: none; stroke: #b0161d; stroke-width: 3px; vector-effect: non-scaling-stroke; stroke-dasharray: 8 6; }
+.lz-pin { position: absolute; transform: translate(-50%, -50%); width: 26px; height: 26px; border-radius: 50%; border: 2px solid #3a2a1a; background: #f2ead8; cursor: pointer; padding: 0; }
+.lz-pin b { position: absolute; left: 50%; top: 120%; transform: translateX(-50%); white-space: nowrap; font-family: 'MonteCarlo', 'Pinyon', cursive; font-size: 22px; font-weight: 400; color: #1d2550; }
+.lz-pin.on { background: #b0161d; border-color: #6a0a0e; }
+.lz-pin.next { background: none; border: 2px dashed #b0161d; animation: pulse 1.4s infinite; }
+.lz-pin.shake { animation: lzShake .35s; }
+@keyframes lzShake { 25% { transform: translate(-58%, -50%); } 75% { transform: translate(-42%, -50%); } }
+.lz-map-hint { position: absolute; bottom: calc(5 * var(--vh) + var(--safe-b)); left: 0; right: 0; text-align: center; color: #e2d0ae; font-family: var(--serif); font-size: 18px; text-shadow: 0 2px 6px #000; }
+
+/* Lizzie's chapters: no Julian's phone or case folder in the HUD */
+.hud.lizzie .hud-btn:not(:last-child) { display: none !important; }
+
+.lz-map.jul { background: #d8ccb0; }
+.lz-map .cliffs { fill: none; stroke: #5a4a3a; stroke-width: .5; }
+.lz-pin.ghost { background: none; border: 2px solid rgba(60,40,20,.4); cursor: default; }
+.lz-pin.ghost b { color: rgba(30,30,60,.6); }
+.cctv { align-content: center; gap: 14px; }
+.cc-title { color: #c8d0c8; font-family: 'Courier New', monospace; letter-spacing: .2em; font-size: 14px; text-align: center; }
+.cc-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; width: min(calc(86 * var(--vw)), calc(140 * var(--vh))); }
+.cc-frame { position: relative; padding: 0; border: 2px solid #2a2a2a; background: #000; cursor: pointer; }
+.cc-frame canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; filter: contrast(1.1); }
+.cc-tc { position: absolute; left: 6px; top: 4px; color: #e8e8e8; font: 11px 'Courier New', monospace; text-shadow: 0 1px 2px #000; }
+.cc-frame.hit { border-color: #b0161d; box-shadow: 0 0 0 2px rgba(176,22,29,.5); }
+.cc-frame.miss { opacity: .55; }
+.cctv .lz-map-hint { position: static; }

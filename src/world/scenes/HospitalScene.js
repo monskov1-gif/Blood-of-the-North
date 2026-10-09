@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { bevelBox } from '../nature.js';
 import { Reflector } from 'three/addons/objects/Reflector.js';
 import { LocationBase, tiled } from '../LocationBase.js';
 import { streetTexture, canvasTexture, rng } from '../../render/textures.js';
@@ -523,7 +524,7 @@ export class HospitalScene extends LocationBase {
     list.push(geo);
     return geo;
   }
-  bx(w, h, d, mat, x, y, z, o) { return this._add(new THREE.BoxGeometry(w, h, d), mat, x, y, z, o); }
+  bx(w, h, d, mat, x, y, z, o) { return this._add(bevelBox(w, h, d), mat, x, y, z, o); }
   pl(w, h, mat, x, y, z, o) { return this._add(new THREE.PlaneGeometry(w, h), mat, x, y, z, o); }
   cy(rt, rb, h, seg, mat, x, y, z, o) { return this._add(new THREE.CylinderGeometry(rt, rb, h, seg), mat, x, y, z, o); }
   flushBatches() {
@@ -1062,7 +1063,7 @@ export class HospitalScene extends LocationBase {
     const dlShade = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.16, 0.1, 14, 1, true, 0, Math.PI * 2), this.mat('dlShade', { color: 0x1e6a40, emissive: 0x0a3a18, roughness: 0.3, side: THREE.DoubleSide }));
     dlShade.position.y = 0.36; dl.add(dlShade);
     this.dlBulb = this.mat('hDlBulb', { color: 0x000000, emissive: 0xffd8a0, emissiveIntensity: 0 });
-    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 6), this.dlBulb); bulb.position.y = 0.32; dl.add(bulb);
+    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.03, 14, 10), this.dlBulb); bulb.position.y = 0.32; dl.add(bulb);
     dl.position.set(6.2, 1.125, -2.85); root.add(dl);
     this.deskLamp = new THREE.PointLight(0xffc888, 0, 4.5, 1.5);
     this.deskLamp.position.set(6.2, 1.5, -2.7); root.add(this.deskLamp);
@@ -1238,7 +1239,7 @@ export class HospitalScene extends LocationBase {
     rim.position.set(x, y, z + 0.04); this.root.add(rim);
     for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2; this.bx(0.012, 0.03, 0.005, this.mat('hBlack'), x + Math.sin(a) * 0.14, y + Math.cos(a) * 0.14, z + 0.043, { rz: -a }); }
     const handM = this.mat('hBlack');
-    const mk = (len, wd) => { const p = new THREE.Group(); const m = new THREE.Mesh(new THREE.BoxGeometry(wd, len, 0.006), handM); m.position.y = len / 2 - 0.02; p.add(m); p.position.set(x, y, z + 0.05); this.root.add(p); return p; };
+    const mk = (len, wd) => { const p = new THREE.Group(); const m = new THREE.Mesh(bevelBox(wd, len, 0.006), handM); m.position.y = len / 2 - 0.02; p.add(m); p.position.set(x, y, z + 0.05); this.root.add(p); return p; };
     this.clocks = this.clocks || [];
     this.clocks.push({ hour: mk(0.09, 0.016), min: mk(0.13, 0.01) });
   }
@@ -1439,7 +1440,7 @@ export class HospitalScene extends LocationBase {
     // bed, monitor (on a wall arm), IV, cabinet, chair, sink
     const bed = this.bed(bedX, bedZ);
     const black = this.mat('hBlack');
-    for (const sx of [-0.95, 0.95]) for (const sz of [-0.4, 0.4]) { const wh = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.04, 10), black); wh.rotation.x = Math.PI / 2; wh.position.set(sx, 0.05, sz); bed.add(wh); }
+    for (const sx of [-0.95, 0.95]) for (const sz of [-0.4, 0.4]) { const wh = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.04, 16), black); wh.rotation.x = Math.PI / 2; wh.position.set(sx, 0.05, sz); bed.add(wh); }
     this.box(0.04, 0.3, 0.24, this.mat('hClipboard'), 1.06, 0.72, 0.15, bed);
     this.box(0.01, 0.26, 0.2, this.mat('hPaper'), 1.085, 0.72, 0.15, bed);
     this.box(0.3, 0.1, 0.86, this.mat(patient ? 'hKnit' : 'blanket', patient ? { map: TX.knit(), color: 0xffffff, roughness: 0.95 } : {}), 0.78, 0.8, 0, bed);

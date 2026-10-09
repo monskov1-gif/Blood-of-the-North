@@ -33,17 +33,23 @@ const methods = {
     sg.placeAt(w.anchors.deskOfficer.x, w.anchors.deskOfficer.z, 1);
     sg.shadow.visible = false;
     const quinn = this.castIn(w, 'quinn', 'quinn_station');
-    quinn.placeAt(-1.6, -2.75, -1);
+    quinn.placeAt(0.4, -2.75, -1);
     const kow = this.castIn(w, 'investigator', 'kowalski');
-    kow.placeAt(2.9, -2.7, -1);
-    this.returnCast = { sg, quinn, kow };
+    kow.placeAt(3.8, -2.7, -1);
+    // the witnesses came back to give statements again
+    const ray = this.castIn(w, 'barman', 'ray_return');
+    ray.placeAt(-7.4, -2.75, 1);
+    const noah = this.castIn(w, 'survivorWaiter', 'noah_return');
+    noah.sit({ x: w.anchors.benchB.x, z: w.anchors.benchB.z }, 1);
+    noah.setPose('hands');
+    this.returnCast = { sg, quinn, kow, ray, noah };
     const J = this.julian;
     J.placeAt(-11.4, -2.0, 1);
     this.setAmbience(['amb.station']);
     g.hud.show(false);
     g.player.enabled = false;
     g.cameraSys.snap();
-    await g.card.show('Участок', { num: 'V', en: 'Back on Duty', sub: 'ДЕНЬ СЕДЬМОЙ', ms: 2200, style: 'chapter-b' });
+    await g.card.show('Улики', { num: 'Глава 6', en: 'Evidence', sub: 'УЧАСТОК · ДЕНЬ СЕДЬМОЙ', ms: 2200, style: 'chapter-b' });
     if (S !== this.session) return;
     await g.fader.to(false, 1400);
     await J.walkTo({ x: -8.6, z: -1.6 }, { speed: 1.1 });
@@ -52,7 +58,7 @@ const methods = {
     if (!(await this.lines(g.dialogue.dialogues.sr_enter))) return;
     g.hud.show(true);
     g.player.enabled = true;
-    g.state.set('objective', g.state.get('case_route') ? 'valley' : g.state.get('read_victims') ? 'kowalski' : 'victims');
+    g.state.set('objective', g.state.get('investigation_route') ? 'valley' : 'kowalski');
     g.interactions.setItems(this.stationReturnInteractables(w));
   },
 
@@ -61,16 +67,64 @@ const methods = {
     const c = this.returnCast;
     const f = () => g.state.flags;
     const say = (id) => () => g.dialogue.start(id);
+    const talk = (id, ch) => async () => { ch.faceTowards(this.julian.position.x); await g.dialogue.start(id); this.evidenceProgress(); };
     return [
       { id: 'sr_desk', label: 'Сержант Пелли', at: { x: -9.5, z: -1.9 }, radius: 1.0, anchor: w.anchors.desk, run: say('sr_desk') },
-      { id: 'sr_board', label: 'Список погибших', at: { x: -4.4, z: -2.4 }, radius: 0.7, anchor: w.anchors.board, run: () => this.readVictims() },
-      { id: 'sr_quinn', label: 'Куинн', at: { x: -1.6, z: -2.2 }, radius: 0.7, anchor: A(-1.6, 2.1, -2.75),
-        run: async () => { c.quinn.face(-1); await g.dialogue.start(f().sr_quinn ? 'sr_quinn_again' : 'sr_quinn'); } },
-      { id: 'sr_vending', label: 'Автомат', at: { x: -0.4, z: -2.4 }, radius: 0.5, anchor: w.anchors.vending, run: say('sr_vending') },
-      { id: 'sr_kowalski', label: 'Детектив Ковальски', at: { x: 2.6, z: -2.2 }, radius: 0.8, anchor: A(2.9, 2.1, -2.7), run: () => this.talkKowalski() },
+      { id: 'sr_ray', label: 'Рэй, бармен', at: { x: -7.4, z: -2.1 }, radius: 0.6, anchor: A(-7.4, 2.1, -2.75), run: talk('sr_ray', c.ray) },
+      { id: 'sr_noah', label: 'Ноа, официант', at: { x: -5.7, z: -2.2 }, radius: 0.6, anchor: A(-5.7, 1.7, -3.2), run: talk('sr_noah', c.noah) },
+      { id: 'sr_board', label: 'Список погибших', at: { x: -4.4, z: -2.4 }, radius: 0.6, anchor: w.anchors.board, run: () => this.readVictims() },
+      { id: 'sr_map', label: 'Карта нападений', at: { x: -2.6, z: -2.4 }, radius: 0.6, anchor: A(-2.6, 1.85, -4.2), run: () => this.attackMap() },
+      { id: 'sr_quinn', label: 'Куинн', at: { x: 0.4, z: -2.2 }, radius: 0.6, anchor: A(0.4, 2.1, -2.75),
+        run: async () => { c.quinn.faceTowards(this.julian.position.x); await g.dialogue.start(f().sr_quinn ? 'sr_quinn_again' : 'sr_quinn'); } },
+      { id: 'sr_cctv', label: 'Записи камер', at: { x: 2.0, z: -2.4 }, radius: 0.6, anchor: w.anchors.offices, run: () => this.reviewCameras() },
+      { id: 'sr_kowalski', label: 'Детектив Ковальски', at: { x: 3.6, z: -2.2 }, radius: 0.7, anchor: A(3.8, 2.1, -2.7), run: () => this.talkKowalski() },
       { id: 'sr_exit', label: 'Выход', at: { x: -12.0, z: -2.2 }, radius: 0.9, anchor: w.anchors.entrance,
-        run: () => (f().case_route === 'WEREWOLF' ? this.startForest() : g.dialogue.start('sr_exit_wait')) },
+        run: () => (f().investigation_route ? this.afterEvidence() : g.dialogue.start('sr_exit_wait')) },
     ];
+  },
+
+  /** What Julian has looked at himself (chapter 6): the list, the cameras, the map (+ witnesses). */
+  evidenceDone() {
+    const f = this.g.state.flags;
+    return !!(f.read_victims && f.sr_cctv_done && f.sr_map_done);
+  },
+
+  evidenceProgress() {
+    if (this.evidenceDone() && !this.g.state.get('investigation_route')) this.g.state.set('objective', 'kowalski');
+  },
+
+  async reviewCameras() {
+    const g = this.g;
+    if (!g.state.get('offer_heard')) return g.dialogue.start('sr_kowalski_wait');
+    if (g.state.get('sr_cctv_done')) return g.view.flash('thought', 'Пятно вместо лица. Пустое зеркало. Сорок одна минута тишины.', 2600);
+    await g.lzui.cctv([
+      { cam: 1, tc: '22:47:10', kind: 'enter', anomaly: false, note: 'Я вхожу. Кайден машет из-за столика. Обычный вечер.' },
+      { cam: 2, tc: '23:31:44', kind: 'cocktail', anomaly: true, note: 'Мужчина в углу передаёт коктейль. Вместо лица — белое пятно. На каждом кадре.' },
+      { cam: 2, tc: '23:44:02', kind: 'mirror', anomaly: true, note: 'Зеркало за стойкой. Я в нём есть. Его — нет.' },
+      { cam: 1, tc: '23:58:30', kind: 'static', anomaly: true, note: 'Обе камеры слепнут. Сорок одна минута помех.' },
+      { cam: 1, tc: '00:39:51', kind: 'after', anomaly: false, note: 'Камера оживает. В зале уже никто не двигается.' },
+      { cam: 3, tc: '06:12:00', kind: 'enter', anomaly: false, note: 'Утро. Пусто. Только снег за окном.' },
+    ], 3);
+    g.state.set('sr_cctv_done', true);
+    await this.lines(g.dialogue.dialogues.sr_cctv_after);
+    this.evidenceProgress();
+  },
+
+  async attackMap() {
+    const g = this.g;
+    if (!g.state.get('offer_heard')) return g.dialogue.start('sr_kowalski_wait');
+    if (g.state.get('sr_map_done')) return g.view.flash('thought', 'Каждые четыре дня — севернее. Потом — тишина.', 2400);
+    await g.lzui.map({
+      julian: true,
+      title: 'ДЕЛО 0417-ФН · НАПАДЕНИЯ',
+      pins: [[22, 47, '30 окт.'], [43, 34, '3 нояб.'], [62, 22, '7 нояб.'], [74, 15, '11 нояб. · Лиззи']],
+      next: [84, 5, 'скалы?'],
+      hint: 'Соедините нападения по датам',
+      done: 'Каждые четыре дня — севернее. После 11 ноября — ничего. Выше излучины — скалы.',
+    });
+    g.state.set('sr_map_done', true);
+    await this.lines(g.dialogue.dialogues.sr_map_after);
+    this.evidenceProgress();
   },
 
   async readVictims() {
@@ -79,7 +133,7 @@ const methods = {
     await g.dialogue.start(first ? 'sr_board' : 'sr_board_again');
     if (first) {
       await this.lines(g.dialogue.dialogues.sr_board_after);
-      if (!g.state.get('case_route')) g.state.set('objective', 'kowalski');
+      if (!g.state.get('investigation_route')) g.state.set('objective', 'kowalski');
     }
   },
 
@@ -87,23 +141,37 @@ const methods = {
     const g = this.g;
     const k = this.returnCast.kow;
     k.faceTowards(this.julian.position.x);
-    if (!g.state.get('read_victims')) return g.dialogue.start('sr_kowalski_wait');
-    if (g.state.get('case_route')) return g.dialogue.start('sr_exit_wait').then(() => g.hud.toast('Папка расследования — кнопка с папкой (J)'));
+    if (g.state.get('investigation_route')) return g.dialogue.start('sr_exit_wait').then(() => g.hud.toast('Папка расследования — кнопка с папкой (J)'));
     if (!g.state.get('offer_heard')) {
       g.player.enabled = false;
       const ok = await this.lines(g.dialogue.dialogues.sr_offer);
       g.player.enabled = true;
       if (!ok) return;
       g.state.set('offer_heard', true);
+      g.state.set('objective', 'evidence');
+      return;
     }
+    if (!this.evidenceDone()) return g.dialogue.start('sr_kowalski_wait2');
+    g.player.enabled = false;
+    await this.lines(g.dialogue.dialogues.sr_choose);
+    g.player.enabled = true;
     return this.chooseCase();
   },
 
   async chooseCase() {
     const g = this.g;
     const id = await g.cases.choose();
-    if (id !== 'WEREWOLF') return;
-    g.state.set('case_route', 'WEREWOLF');
+    if (!id) return;
+    g.state.set('investigation_route', id);
+    if (id === 'VAMPIRE') {
+      g.player.enabled = false;
+      await this.lines(g.dialogue.dialogues.j5_vampire);
+      g.player.enabled = true;
+      g.state.set('objective', 'vampire_lead');
+      g.hud.notifyCase(true);
+      g.saves.autosave('case');
+      return;
+    }
     g.player.enabled = false;
     await this.lines(g.dialogue.dialogues.sr_took_wolf);
     g.player.enabled = true;
@@ -128,7 +196,7 @@ const methods = {
     g.player.enabled = false;
     g.keyScene = true;
     g.cameraSys.snap();
-    await g.card.show('Долина', { num: 'VI', en: 'The Valley', sub: 'РЕКА ТАКХИНИ', ms: 2200, style: 'chapter-b' });
+    await g.card.show('Территория', { num: 'Глава 8', en: 'Territory', sub: 'ДОЛИНА ТАКХИНИ', ms: 2200, style: 'chapter-b' });
     if (S !== this.session) return;
     await g.fader.to(false, 2000);
     await J.walkTo({ x: -7.6, z: 0.3 }, { speed: 1.0 });
@@ -152,6 +220,7 @@ const methods = {
       { id: 'fo_marker11', label: 'Маркер № 11', at: { x: 3.0, z: -2.2 }, radius: 0.7, anchor: w.anchors.marker11, run: say('fo_marker11') },
       { id: 'fo_bones', label: 'Кости', at: { x: 5.2, z: -2.2 }, radius: 0.6, anchor: A(5.4, 0.4, -4.0), run: say('fo_bones') },
       { id: 'fo_claws', label: 'Осина', at: { x: 7.4, z: -2.2 }, radius: 0.7, anchor: w.anchors.claws, run: say('fo_claws') },
+      { id: 'fo_analysis', label: 'Сопоставить следы', at: { x: 9.6, z: -1.6 }, radius: 0.8, anchor: A(9.6, 1.2, -2.4), run: () => (g.state.get('fo_claws') && g.state.get('fo_bones') ? g.dialogue.start('fo_analysis') : g.view.flash('thought', 'Сначала — осина и кости. Потом сопоставлять.', 2200)) },
       { id: 'fo_trail', label: 'Тропа в чащу', at: { x: 12.0, z: 0.2 }, radius: 0.9, anchor: A(12.6, 1.4, 0), run: say('fo_trail') },
     ];
   },
@@ -178,7 +247,20 @@ const methods = {
     if (!(await this.lines(g.dialogue.dialogues.fo_news))) return;
     await sleep(0.8);
     if (S !== this.session) return;
+    // the routes: the tourists' camp on the map — the line ends at the cliffs
+    await g.lzui.map({
+      julian: true,
+      title: 'МАРШРУТЫ · ДОЛИНА ТАКХИНИ',
+      pins: [[22, 47, '30 окт.'], [43, 34, '3 нояб.'], [62, 22, '7 нояб.'], [74, 15, '11 нояб.'], [80, 9, '9 дек. · туристы']],
+      next: [86, 4, 'логово?'],
+      hint: 'Добавьте новое нападение и соедините все по датам',
+      done: 'Месяц тишины — и снова север. Туристы стояли под самыми скалами. Оно живёт там.',
+    });
+    if (S !== this.session) return;
+    if (!(await this.lines(g.dialogue.dialogues.fo_routes))) return;
     g.keyScene = false;
+    if (!g.state.get('lizzie_chapter_4_complete') && !(await this.playLizzie(4))) return;
+    if (S !== this.session) return;
     await this.startForestNight();
   },
 
@@ -210,7 +292,7 @@ const methods = {
     g.player.enabled = false;
     g.keyScene = true;
     g.cameraSys.snap();
-    await g.card.show('Сумерки', { num: 'VII', en: 'Dusk', sub: 'ДОЛИНА ТАКХИНИ', ms: 2200, style: 'chapter-b' });
+    await g.card.show('Волк', { num: 'Глава 10', en: 'The Wolf', sub: 'СУМЕРКИ · ДОЛИНА ТАКХИНИ', ms: 2200, style: 'chapter-b' });
     if (S !== this.session) return;
     await g.fader.to(false, 2200);
     if (!(await this.lines(g.dialogue.dialogues.fn_arrive))) return;
@@ -288,6 +370,10 @@ const methods = {
     await sleep(1.2);
     man.face(1);
     if (!(await this.lines(g.dialogue.dialogues.fn_after))) return;
+    // he doesn't rush after him: where will it go?
+    g.letterbox.set(false, 400);
+    await g.dialogue.start('fn_predict');
+    if (S !== this.session) return;
     g.state.set('saw_transform', true);
     g.hud.notifyCase(true);
     // he walks off along the river; Julian follows on the path
@@ -332,16 +418,42 @@ const methods = {
     await sleep(2.0);
     if (!(await this.lines(g.dialogue.dialogues.fn_cave))) return;
     g.state.set('found_cave', true);
+    J.face(-1);
+    J.walkTo({ x: 36.0, z: -0.4 }, { speed: 0.9, direct: true });
     await sleep(1.0);
     await g.fader.to(true, 2600);
     if (S !== this.session) return;
     g.letterbox.set(false, 10);
-    await g.card.show('Продолжение следует', { en: 'To Be Continued', sub: 'ВЕТКА «ОБОРОТНИ» · ПЕЩЕРА', ms: 3200 });
-    g.state.set('demo_completed', true);
-    g.state.setStage('ended');
-    g.saves.clear('auto');
     g.keyScene = false;
-    g.showEnding();
+    // J5 → L5: he waits by the cave; inside, it is the night of Lizzie's escape
+    await this.playLizzie(5);
+  },
+
+  /** After chapter 6 (both routes): ch.7 is Lizzie's cave, then Julian's line by route. */
+  async afterEvidence() {
+    const g = this.g;
+    const S = this.session;
+    if (!g.state.get('lizzie_chapter_3_complete') && !(await this.playLizzie(3))) return;
+    if (S !== this.session) return;
+    if (g.state.get('investigation_route') === 'WEREWOLF') return this.startForest();
+    return this.vampireChain();
+  },
+
+  /** Route VAMPIRE: Julian goes after the man from the bar (his chapters 8 and 10 are still in development). */
+  async vampireChain() {
+    const g = this.g;
+    const S = this.session;
+    g.player.enabled = false;
+    g.hud.show(false);
+    g.fader.set(true);
+    await g.card.show('Человек из бара', { num: 'Глава 8', en: 'The Man from the Bar', sub: 'РАССЛЕДОВАНИЕ ДЖУЛИАНА — В РАЗРАБОТКЕ', ms: 2600, style: 'chapter-b' });
+    if (S !== this.session) return;
+    if (!g.state.get('lizzie_chapter_4_complete') && !(await this.playLizzie(4))) return;
+    if (S !== this.session) return;
+    g.fader.set(true);
+    await g.card.show('Без отражения', { num: 'Глава 10', en: 'No Reflection', sub: 'РАССЛЕДОВАНИЕ ДЖУЛИАНА — В РАЗРАБОТКЕ', ms: 2600, style: 'chapter-b' });
+    if (S !== this.session) return;
+    await this.playLizzie(5);
   },
 
   // ------------------------------------------------------------------ per frame + loading
@@ -352,7 +464,7 @@ const methods = {
     if (st === 'forest' && !this.callStarted && g.player.enabled && !g.dialogue.busy) {
       const f = g.state.flags;
       const seen = ['fo_tape', 'fo_marker', 'fo_claws', 'fo_river'].filter((k) => f[k]).length;
-      if (seen >= 3 && f.fo_marker) this.touristsCall();
+      if (seen >= 3 && f.fo_marker && f.fo_analysis_done) this.touristsCall();
     }
     if (st !== 'forest_night') return;
     const J = this.julian, wolf = this.beast, man = this.stranger;

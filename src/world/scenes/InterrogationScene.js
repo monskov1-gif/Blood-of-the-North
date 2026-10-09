@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { bevelBox } from '../nature.js';
 import { LocationBase } from '../LocationBase.js';
 import { canvasTexture, rng } from '../../render/textures.js';
 import { glow, lightCone, lightPool } from '../props.js';
@@ -59,7 +60,7 @@ const hash2 = (a, b) => { const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453
 /** Merge indexed geometries (position/normal/uv) into one — one draw call per material. */
 function mergeGeos(geos) {
   let vc = 0, ic = 0;
-  for (const g of geos) { vc += g.attributes.position.count; ic += g.index.count; }
+  for (const g of geos) { vc += g.attributes.position.count; ic += g.index ? g.index.count : g.attributes.position.count; }
   const pos = new Float32Array(vc * 3), nor = new Float32Array(vc * 3), uv = new Float32Array(vc * 2);
   const idx = new Uint32Array(ic);
   let vo = 0, io = 0;
@@ -67,7 +68,7 @@ function mergeGeos(geos) {
     pos.set(g.attributes.position.array, vo * 3);
     nor.set(g.attributes.normal.array, vo * 3);
     uv.set(g.attributes.uv.array, vo * 2);
-    const src = g.index.array;
+    const src = g.index ? g.index.array : Array.from({ length: g.attributes.position.count }, (_, k) => k);
     for (let k = 0; k < src.length; k++) idx[io + k] = src[k] + vo;
     vo += g.attributes.position.count; io += src.length;
     g.dispose();
@@ -89,7 +90,7 @@ class Batch {
     this.geos.push(geo);
     return this;
   }
-  box(w, h, d, x, y, z, rx, ry, rz) { return this.add(new THREE.BoxGeometry(w, h, d), x, y, z, rx, ry, rz); }
+  box(w, h, d, x, y, z, rx, ry, rz) { return this.add(bevelBox(w, h, d).clone(), x, y, z, rx, ry, rz); }
   cyl(r, h, x, y, z, rx, ry, rz, seg = 8) { return this.add(new THREE.CylinderGeometry(r, r, h, seg), x, y, z, rx, ry, rz); }
   /** Tube between two points. */
   rod(r, a, b, seg = 6) {
@@ -840,11 +841,11 @@ export class InterrogationScene extends LocationBase {
     clockBody.rotation.x = Math.PI / 2; clockBody.position.set(2.7, 2.25, BACK + 0.0);
     root.add(clockBody);
     this.plane(0.36, 0.36, this.mat('irclockMat', { map: clockTex }), 2.7, 2.25, BACK + 0.027);
-    this.clockHand = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.15, 0.005), this.mat('hand', { color: 0x111111 }));
+    this.clockHand = new THREE.Mesh(bevelBox(0.01, 0.15, 0.005).clone(), this.mat('hand', { color: 0x111111 }));
     this.clockHand.geometry.translate(0, 0.075, 0);
     this.clockHand.position.set(2.7, 2.25, BACK + 0.04);
     root.add(this.clockHand);
-    const hour = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.1, 0.005), this.mat('hand', {}));
+    const hour = new THREE.Mesh(bevelBox(0.016, 0.1, 0.005).clone(), this.mat('hand', {}));
     hour.geometry.translate(0, 0.05, 0); hour.rotation.z = -1.95; hour.position.set(2.7, 2.25, BACK + 0.036);
     root.add(hour);
     const guard = new Batch();
@@ -858,9 +859,9 @@ export class InterrogationScene extends LocationBase {
     const camMat = this.mat('camBody', { color: 0x202224, roughness: 0.5 });
     this.box(0.2, 0.1, 0.11, camMat, 0, 0, 0, cam);
     this.box(0.24, 0.015, 0.14, camMat, 0.01, 0.06, 0, cam); // sunhood
-    const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.02, 12), this.mat('camLens', { color: 0x05070a, roughness: 0.1, metalness: 0.6 }));
+    const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.02, 16), this.mat('camLens', { color: 0x05070a, roughness: 0.1, metalness: 0.6 }));
     lens.rotation.z = Math.PI / 2; lens.position.set(-0.105, 0, 0); cam.add(lens);
-    const camLed = new THREE.Mesh(new THREE.SphereGeometry(0.012, 6, 6), this.mat('recLed', { color: 0, emissive: 0xff2020, emissiveIntensity: 4 }));
+    const camLed = new THREE.Mesh(new THREE.SphereGeometry(0.012, 14, 10), this.mat('recLed', { color: 0, emissive: 0xff2020, emissiveIntensity: 4 }));
     camLed.position.set(-0.1, 0.035, 0.04); cam.add(camLed);
     const camGlow = glow(0xff2020, 0.14, 0.7); camGlow.position.copy(camLed.position); cam.add(camGlow);
     this.camGlow = camGlow;
@@ -1009,7 +1010,7 @@ export class InterrogationScene extends LocationBase {
       ctx.fillStyle = '#c0e0b0'; ctx.fillRect(13, 4, 2, 2); ctx.fillRect(16, 4, 4, 1);
     });
     this.box(0.14, 0.04, 0.08, this.mat('recorder', { map: recTex, color: 0xffffff, roughness: 0.4 }), 0.5, 0.8, -1.25);
-    const recLed = new THREE.Mesh(new THREE.SphereGeometry(0.008, 6, 6), this.mat('recLed', { color: 0, emissive: 0xff2020, emissiveIntensity: 4 }));
+    const recLed = new THREE.Mesh(new THREE.SphereGeometry(0.008, 14, 10), this.mat('recLed', { color: 0, emissive: 0xff2020, emissiveIntensity: 4 }));
     recLed.position.set(0.55, 0.83, -1.21); root.add(recLed);
     const recGlow = glow(0xff2020, 0.08, 0.8); recLed.add(recGlow);
     this.recLed = recLed;
@@ -1025,7 +1026,7 @@ export class InterrogationScene extends LocationBase {
     butts.mesh(this.mat('irButt', { color: 0xc89058, roughness: 0.9 }), ash);
     ash.position.set(0.3, TOP, -1.3);
     root.add(ash);
-    const crushed = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.03, 0.09, 7), cupMat);
+    const crushed = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.03, 0.09, 16), cupMat);
     const cp = crushed.geometry.attributes.position;
     for (let i = 0; i < cp.count; i++) cp.setX(i, cp.getX(i) * (0.5 + 0.5 * Math.abs(Math.sin(i * 1.7))));
     crushed.geometry.computeVertexNormals();
@@ -1059,7 +1060,7 @@ export class InterrogationScene extends LocationBase {
     this.lampPivot = pivot;
     // canopy, cord, enamel shade (dark outside, white inside), cage, bulb
     this.box(0.12, 0.03, 0.12, this.darkSteel, 0, -0.015, 0, pivot);
-    const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.005, 0.42, 5), this.mat('irCord', { color: 0x0c0c0c }));
+    const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.005, 0.42, 16), this.mat('irCord', { color: 0x0c0c0c }));
     cord.position.y = -0.24; pivot.add(cord);
     const prof = [[0.035, 0.12], [0.06, 0.1], [0.12, 0.06], [0.22, -0.02], [0.28, -0.08], [0.3, -0.1]].map(([a, b]) => new THREE.Vector2(a, b));
     const shadeGeo = new THREE.LatheGeometry(prof, 20);
@@ -1069,7 +1070,7 @@ export class InterrogationScene extends LocationBase {
     pivot.add(out, inn);
     const rim = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.008, 4, 24), this.darkSteel);
     rim.rotation.x = Math.PI / 2; rim.position.y = -0.6; pivot.add(rim);
-    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 8), this.mat('irBulb', { color: 0, emissive: 0xf4f6ff, emissiveIntensity: 5 }));
+    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.05, 14, 10), this.mat('irBulb', { color: 0, emissive: 0xf4f6ff, emissiveIntensity: 5 }));
     bulb.position.y = -0.58; pivot.add(bulb);
     this.bulbGlow = glow(0xeef2ff, 0.6, 0.55); this.bulbGlow.material = this.bulbGlow.material.clone(); this.bulbGlow.position.y = -0.62; pivot.add(this.bulbGlow);
     this.lamp = new THREE.SpotLight(0xf0f4ff, 30, 6, 0.75, 0.6, 1.4);
@@ -1109,18 +1110,18 @@ export class InterrogationScene extends LocationBase {
       new THREE.MeshStandardMaterial({ color: 0xcfe6f6, transparent: true, opacity: 0.35, roughness: 0.15, depthWrite: false }));
     const water = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.15, 14), new THREE.MeshStandardMaterial({ color: 0x6c90a8, transparent: true, opacity: 0.45, roughness: 0.1, depthWrite: false }));
     water.position.y = 0.09;
-    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.034, 0.034, 0.03, 10), this.mat('irJugCap', { color: 0x1a4a8a, roughness: 0.5 }));
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.034, 0.034, 0.03, 16), this.mat('irJugCap', { color: 0x1a4a8a, roughness: 0.5 }));
     cap.position.y = 0.335;
     const jug = new THREE.Group(); jug.add(water, jugShell, cap); jug.position.set(0.1, 0.815, 0);
     fg.add(jug);
     // stacked paper cups, a box of files below, a roll of paper towels
-    const cupStack = new THREE.Mesh(new THREE.CylinderGeometry(0.043, 0.032, 0.24, 12), this.mat('cup', {}));
+    const cupStack = new THREE.Mesh(new THREE.CylinderGeometry(0.043, 0.032, 0.24, 16), this.mat('cup', {}));
     cupStack.position.set(-0.16, 0.935, 0.06); fg.add(cupStack);
     const ring = new Batch(); for (let i = 0; i < 6; i++) ring.add(new THREE.TorusGeometry(0.041 - i * 0.001, 0.003, 3, 12), -0.16, 0.84 + i * 0.035, 0.06, Math.PI / 2, 0, 0);
     ring.mesh(this.mat('cupRim', { color: 0xc8c8c0, roughness: 0.8 }), fg);
     const boxLabel = textTex('evbox', 32, 16, '#8a6a44', [{ t: 'CASE 24-117', f: 'bold 5px monospace', c: '#1a1410', y: 6 }, { t: 'R.C.M.P.', f: '4px monospace', c: '#2a2010', y: 12 }]);
     this.box(0.4, 0.22, 0.3, this.mat('irEvBox', { map: boxLabel, color: 0xffffff, roughness: 0.95 }), -0.05, 0.43, 0, fg);
-    const roll = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.22, 12), this.mat('irTowel', { color: 0xe0ded4, roughness: 1 }));
+    const roll = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.22, 16), this.mat('irTowel', { color: 0xe0ded4, roughness: 1 }));
     roll.position.set(0.21, 0.43, 0.02); fg.add(roll);
     fg.position.set(-2.4, 0, 1.9);
     fg.rotation.y = 0.12;
@@ -1131,7 +1132,7 @@ export class InterrogationScene extends LocationBase {
     // right foreground: a dented bin of paper cups and a stacked spare chair
     const fg2 = new THREE.Group();
     fg2.name = 'fg-bin';
-    const bin = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.14, 0.42, 12, 1, true), this.mat('irBin', { map: steelTex(), color: 0x4a5056, metalness: 0.6, roughness: 0.5, side: THREE.DoubleSide }));
+    const bin = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.14, 0.42, 16, 1, true), this.mat('irBin', { map: steelTex(), color: 0x4a5056, metalness: 0.6, roughness: 0.5, side: THREE.DoubleSide }));
     bin.position.set(0, 0.21, 0); fg2.add(bin);
     const trash = new Batch();
     for (let i = 0; i < 6; i++) trash.box(0.07, 0.05, 0.07, Math.cos(i * 2.1) * 0.08, 0.39 + (i % 3) * 0.02, Math.sin(i * 2.1) * 0.08, i, i * 0.7, i * 0.3);

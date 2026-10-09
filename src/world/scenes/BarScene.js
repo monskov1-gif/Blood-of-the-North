@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { bevelBox } from '../nature.js';
 import { Reflector } from 'three/addons/objects/Reflector.js';
 import {
   panelTexture, plankTexture, damaskTexture, leopardTexture, rugTexture, ceilingTexture,
@@ -176,15 +177,15 @@ export class BarScene {
     const spans = [[X0, DOOR.x - DOOR.w / 2 - 0.08], [DOOR.x + DOOR.w / 2 + 0.08, X1]];
     for (const [a0, a1] of spans) {
       const len = a1 - a0, mid = (a0 + a1) / 2;
-      const wains = new THREE.Mesh(new THREE.BoxGeometry(len, 1.15, 0.06), panelMat);
+      const wains = new THREE.Mesh(bevelBox(len, 1.15, 0.06), panelMat);
       wains.position.set(mid, 0.575, BACK + 0.03);
-      const rail = new THREE.Mesh(new THREE.BoxGeometry(len, 0.08, 0.1), m.woodPolished());
+      const rail = new THREE.Mesh(bevelBox(len, 0.08, 0.1), m.woodPolished());
       rail.position.set(mid, 1.18, BACK + 0.05);
-      const skirting = new THREE.Mesh(new THREE.BoxGeometry(len, 0.14, 0.09), m.woodDark());
+      const skirting = new THREE.Mesh(bevelBox(len, 0.14, 0.09), m.woodDark());
       skirting.position.set(mid, 0.07, BACK + 0.07);
       this.root.add(wains, rail, skirting);
     }
-    const crown = new THREE.Mesh(new THREE.BoxGeometry(X1 - X0, 0.22, 0.2), m.woodDark());
+    const crown = new THREE.Mesh(bevelBox(X1 - X0, 0.22, 0.2), m.woodDark());
     crown.position.set(0, CEIL - 0.11, BACK + 0.1);
     this.root.add(crown);
 
@@ -193,7 +194,7 @@ export class BarScene {
       const side = new THREE.Mesh(new THREE.PlaneGeometry(14, CEIL), sideMat);
       side.position.set(x, CEIL / 2, 2);
       side.rotation.y = x < 0 ? Math.PI / 2 : -Math.PI / 2;
-      const sw = new THREE.Mesh(new THREE.BoxGeometry(14, 1.15, 0.06), panelMat);
+      const sw = new THREE.Mesh(bevelBox(14, 1.15, 0.06), panelMat);
       sw.position.set(x + (x < 0 ? 0.03 : -0.03), 0.575, 2);
       sw.rotation.y = side.rotation.y;
       this.root.add(side, sw);
@@ -206,7 +207,7 @@ export class BarScene {
     ceil.position.set(0, CEIL, 2);
     this.root.add(ceil);
     for (let x = X0 + 2; x < X1; x += 3.2) {
-      const beam = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.3, 14), m.woodDark());
+      const beam = new THREE.Mesh(bevelBox(0.28, 0.3, 14), m.woodDark());
       beam.position.set(x, CEIL - 0.15, 2);
       this.root.add(beam);
     }
@@ -217,13 +218,13 @@ export class BarScene {
 
   pilaster(x) {
     const m = this.mats;
-    const col = new THREE.Mesh(new THREE.BoxGeometry(0.5, CEIL, 0.3), m.wood());
+    const col = new THREE.Mesh(bevelBox(0.5, CEIL, 0.3), m.wood());
     col.position.set(x, CEIL / 2, BACK + 0.15);
-    const flutes = new THREE.Mesh(new THREE.BoxGeometry(0.34, CEIL - 0.9, 0.04), m.woodDark());
+    const flutes = new THREE.Mesh(bevelBox(0.34, CEIL - 0.9, 0.04), m.woodDark());
     flutes.position.set(x, CEIL / 2, BACK + 0.31);
-    const cap = new THREE.Mesh(new THREE.BoxGeometry(0.66, 0.22, 0.42), m.get('giltCap', { color: 0x6a4a1c, metalness: 0.6, roughness: 0.4 }));
+    const cap = new THREE.Mesh(bevelBox(0.66, 0.22, 0.42), m.get('giltCap', { color: 0x6a4a1c, metalness: 0.6, roughness: 0.4 }));
     cap.position.set(x, CEIL - 0.45, BACK + 0.2);
-    const base = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.3, 0.4), m.woodDark());
+    const base = new THREE.Mesh(bevelBox(0.62, 0.3, 0.4), m.woodDark());
     base.position.set(x, 0.15, BACK + 0.2);
     this.root.add(col, flutes, cap, base);
   }
@@ -239,13 +240,13 @@ export class BarScene {
     const frameMat = m.woodDark();
     const doorFrame = new THREE.Group();
     for (const [w, h, x, y] of [[1.5, 0.16, 0, 2.5], [0.14, 2.5, -0.7, 1.25], [0.14, 2.5, 0.7, 1.25]]) {
-      const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.22), frameMat);
+      const b = new THREE.Mesh(bevelBox(w, h, 0.22), frameMat);
       b.position.set(x, y, 0);
       doorFrame.add(b);
     }
     const hinge = new THREE.Group();          // door leaf swings around its left edge
     hinge.position.set(-0.63, 0, 0);
-    const door = new THREE.Mesh(new THREE.BoxGeometry(1.26, 2.42, 0.06), m.wood());
+    const door = new THREE.Mesh(bevelBox(1.26, 2.42, 0.06), m.wood());
     door.position.set(0.63, 1.21, -0.02);
     const paneMat = m.get('coldPane', { color: 0x0, emissive: 0x6f8fc0, emissiveIntensity: 0.7, roughness: 0.2 });
     for (const [x, y] of [[-0.28, 1.85], [0.28, 1.85], [-0.28, 1.25], [0.28, 1.25]]) {
@@ -253,7 +254,7 @@ export class BarScene {
       p.position.set(x + 0.63, y, 0.02);
       hinge.add(p);
     }
-    const handle = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 8), m.brass());
+    const handle = new THREE.Mesh(new THREE.SphereGeometry(0.035, 14, 10), m.brass());
     handle.position.set(0.5 + 0.63, 1.05, 0.06);
     hinge.add(door, handle);
     this.doorHinge = hinge;
@@ -282,9 +283,9 @@ export class BarScene {
 
     // coat rack with parkas
     const rack = new THREE.Group();
-    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.035, 1.9, 8), m.woodDark());
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.035, 1.9, 16), m.woodDark());
     pole.position.y = 0.95;
-    const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.3, 0.05, 12), m.woodDark());
+    const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.3, 0.05, 16), m.woodDark());
     rack.add(pole, foot);
     const coatCols = [0x1b2230, 0x3a2a1e, 0x2a2a26];
     coatCols.forEach((c, i) => {
@@ -311,31 +312,31 @@ export class BarScene {
     root.add(outside);
     // wall cut: build the wall around the window opening as a dark reveal
     const reveal = m.get('reveal', { color: 0x140806, roughness: 0.8 });
-    const sillReveal = new THREE.Mesh(new THREE.BoxGeometry(winW, 0.06, 0.5), reveal);
+    const sillReveal = new THREE.Mesh(bevelBox(winW, 0.06, 0.5), reveal);
     sillReveal.position.set(winX, sill, BACK - 0.25);
     root.add(sillReveal);
     const sides = [[winX - winW / 2, 0], [winX + winW / 2, 0]];
     sides.forEach(([x]) => {
-      const s = new THREE.Mesh(new THREE.BoxGeometry(0.06, winH, 0.5), reveal);
+      const s = new THREE.Mesh(bevelBox(0.06, winH, 0.5), reveal);
       s.position.set(x, sill + winH / 2, BACK - 0.25);
       root.add(s);
     });
-    const topR = new THREE.Mesh(new THREE.BoxGeometry(winW, 0.06, 0.5), reveal);
+    const topR = new THREE.Mesh(bevelBox(winW, 0.06, 0.5), reveal);
     topR.position.set(winX, sill + winH, BACK - 0.25);
     root.add(topR);
     // mullions
     const mull = m.woodDark();
     for (const dx of [-winW / 2, -winW / 6, winW / 6, winW / 2]) {
-      const v = new THREE.Mesh(new THREE.BoxGeometry(0.06, winH, 0.08), mull);
+      const v = new THREE.Mesh(bevelBox(0.06, winH, 0.08), mull);
       v.position.set(winX + dx, sill + winH / 2, BACK + 0.02);
       root.add(v);
     }
     for (const dy of [0, winH * 0.55, winH]) {
-      const h = new THREE.Mesh(new THREE.BoxGeometry(winW + 0.1, 0.06, 0.08), mull);
+      const h = new THREE.Mesh(bevelBox(winW + 0.1, 0.06, 0.08), mull);
       h.position.set(winX, sill + dy, BACK + 0.02);
       root.add(h);
     }
-    const sillBoard = new THREE.Mesh(new THREE.BoxGeometry(winW + 0.3, 0.05, 0.28), m.woodPolished());
+    const sillBoard = new THREE.Mesh(bevelBox(winW + 0.3, 0.05, 0.28), m.woodPolished());
     sillBoard.position.set(winX, sill, BACK + 0.12);
     root.add(sillBoard);
     // frost on the glass
@@ -359,7 +360,7 @@ export class BarScene {
       c.position.set(winX + side * (winW / 2 + 0.2), 1.5 + 0.55, BACK + 0.12);
       root.add(c);
     }
-    const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, winW + 1.4, 8), m.brass());
+    const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, winW + 1.4, 16), m.brass());
     rod.rotation.z = Math.PI / 2; rod.position.set(winX, 3.55, BACK + 0.14);
     root.add(rod);
     this.anchors.window = new THREE.Vector3(winX, 1.9, BACK + 0.1);
@@ -434,20 +435,20 @@ export class BarScene {
     counterTex.needsUpdate = true;
     counterTex.repeat.set(len / 1.0, 1);
     const counterMat = m.get('counterFront', { map: counterTex, roughness: 0.4 });
-    const counter = new THREE.Mesh(new THREE.BoxGeometry(len, 1.05, depth), counterMat);
+    const counter = new THREE.Mesh(bevelBox(len, 1.05, depth), counterMat);
     counter.position.set(cx, 0.525, frontZ - depth / 2);
-    const top = new THREE.Mesh(new THREE.BoxGeometry(len + 0.2, 0.07, depth + 0.16), m.marble());
+    const top = new THREE.Mesh(bevelBox(len + 0.2, 0.07, depth + 0.16), m.marble());
     top.position.set(cx, 1.09, frontZ - depth / 2 + 0.03);
-    const lip = new THREE.Mesh(new THREE.BoxGeometry(len + 0.24, 0.05, 0.08), m.woodPolished());
+    const lip = new THREE.Mesh(bevelBox(len + 0.24, 0.05, 0.08), m.woodPolished());
     lip.position.set(cx, 1.06, frontZ + 0.08);
-    const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, len, 8), m.brass());
+    const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, len, 16), m.brass());
     rail.rotation.z = Math.PI / 2;
     rail.position.set(cx, 0.22, frontZ + 0.14);
-    const led = new THREE.Mesh(new THREE.BoxGeometry(len, 0.015, 0.02), m.emissive(0xff2020, 3));
+    const led = new THREE.Mesh(bevelBox(len, 0.015, 0.02), m.emissive(0xff2020, 3));
     led.position.set(cx, 1.0, frontZ + 0.03);
     root.add(counter, top, lip, rail, led);
     for (let x = x0 + 0.6; x < x1; x += 1.4) {
-      const bracket = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.3, 0.04), m.brass());
+      const bracket = new THREE.Mesh(bevelBox(0.04, 0.3, 0.04), m.brass());
       bracket.position.set(x, 0.22, frontZ + 0.08);
       root.add(bracket);
     }
@@ -470,15 +471,15 @@ export class BarScene {
       root.add(t);
     }
     for (let i = 0; i < 3; i++) {
-      const tap = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.32, 6), m.brass());
+      const tap = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.32, 16), m.brass());
       tap.position.set(-1.6 + i * 0.16, 1.28, frontZ - 0.45);
-      const handle = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.14, 0.03), m.black());
+      const handle = new THREE.Mesh(bevelBox(0.03, 0.14, 0.03), m.black());
       handle.position.set(-1.6 + i * 0.16, 1.5, frontZ - 0.45);
       root.add(tap, handle);
     }
-    const register = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.32, 0.35), m.brass());
+    const register = new THREE.Mesh(bevelBox(0.45, 0.32, 0.35), m.brass());
     register.position.set(3.9, 1.29, frontZ - 0.4);
-    const regTop = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.12, 0.1), m.brass());
+    const regTop = new THREE.Mesh(bevelBox(0.4, 0.12, 0.1), m.brass());
     regTop.position.set(3.9, 1.5, frontZ - 0.52);
     root.add(register, regTop);
 
@@ -491,9 +492,9 @@ export class BarScene {
 
     // back bar: cabinet, shelves, arches, glowing back panel
     const bbZ = BACK + 0.25;
-    const cab = new THREE.Mesh(new THREE.BoxGeometry(len, 0.95, 0.5), m.wood());
+    const cab = new THREE.Mesh(bevelBox(len, 0.95, 0.5), m.wood());
     cab.position.set(cx, 0.475, bbZ);
-    const cabTop = new THREE.Mesh(new THREE.BoxGeometry(len + 0.1, 0.05, 0.56), m.woodPolished());
+    const cabTop = new THREE.Mesh(bevelBox(len + 0.1, 0.05, 0.56), m.woodPolished());
     cabTop.position.set(cx, 0.97, bbZ);
     root.add(cab, cabTop);
     const backGlow = new THREE.Mesh(new THREE.PlaneGeometry(len - 0.4, 1.9), new THREE.MeshBasicMaterial({
@@ -513,7 +514,7 @@ export class BarScene {
 
     const shelfYs = [1.25, 1.75, 2.25];
     for (const y of shelfYs) {
-      const shelf = new THREE.Mesh(new THREE.BoxGeometry(len - 0.4, 0.04, 0.32), m.get('glassShelf', { color: 0x3a2a1a, roughness: 0.2, metalness: 0.3, emissive: 0x2a1404 }));
+      const shelf = new THREE.Mesh(bevelBox(len - 0.4, 0.04, 0.32), m.get('glassShelf', { color: 0x3a2a1a, roughness: 0.2, metalness: 0.3, emissive: 0x2a1404 }));
       shelf.position.set(cx, y, BACK + 0.2);
       root.add(shelf);
       const bottles = bottleRow(m, len - 0.6, Math.floor(y * 100));
@@ -528,11 +529,11 @@ export class BarScene {
       arch.position.set(bx, 2.75, BACK + 0.15);
       arch.scale.y = 0.6;
       root.add(arch);
-      const key = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.24, 0.16), m.get('giltCap', { color: 0x6a4a1c, metalness: 0.6, roughness: 0.4 }));
+      const key = new THREE.Mesh(bevelBox(0.16, 0.24, 0.16), m.get('giltCap', { color: 0x6a4a1c, metalness: 0.6, roughness: 0.4 }));
       key.position.set(bx, 2.75 + (bayW / 2) * 0.6, BACK + 0.2);
       root.add(key);
       if (i > 0) {
-        const post = new THREE.Mesh(new THREE.BoxGeometry(0.18, 1.85, 0.2), m.wood());
+        const post = new THREE.Mesh(bevelBox(0.18, 1.85, 0.2), m.wood());
         post.position.set(x0 + 0.2 + bayW * i, 1.9, BACK + 0.2);
         root.add(post);
       }
@@ -544,11 +545,11 @@ export class BarScene {
       }
       root.add(garland(m, new THREE.CatmullRomCurve3(pts), this.low ? 24 : 46));
     }
-    const entab = new THREE.Mesh(new THREE.BoxGeometry(len + 0.3, 0.32, 0.36), m.woodDark());
+    const entab = new THREE.Mesh(bevelBox(len + 0.3, 0.32, 0.36), m.woodDark());
     entab.position.set(cx, 3.95, BACK + 0.18);
     root.add(entab);
     for (const sx of [x0 - 0.05, x1 + 0.05]) {
-      const end = new THREE.Mesh(new THREE.BoxGeometry(0.24, 3.0, 0.4), m.wood());
+      const end = new THREE.Mesh(bevelBox(0.24, 3.0, 0.4), m.wood());
       end.position.set(sx, 2.45, BACK + 0.2);
       root.add(end);
     }
@@ -561,7 +562,7 @@ export class BarScene {
 
     // old CRT television on a bracket, showing the local news
     const tv = new THREE.Group();
-    const box = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.55, 0.5), m.get('tvBody', { color: 0x221a14, roughness: 0.5 }));
+    const box = new THREE.Mesh(bevelBox(0.7, 0.55, 0.5), m.get('tvBody', { color: 0x221a14, roughness: 0.5 }));
     const tvCanvas = document.createElement('canvas');
     tvCanvas.width = 256; tvCanvas.height = 192;
     const tvTex = new THREE.CanvasTexture(tvCanvas);
@@ -573,7 +574,7 @@ export class BarScene {
     tv.add(box, screen, tvGlow);
     tv.position.set(-5.55, 3.15, BACK + 0.9);
     tv.rotation.set(0.18, 0.25, 0);
-    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.7), m.black());
+    const arm = new THREE.Mesh(bevelBox(0.06, 0.06, 0.7), m.black());
     arm.position.set(-5.55, 3.45, BACK + 0.35);
     root.add(tv, arm);
     this.tv = { canvas: tvCanvas, ctx: tvCanvas.getContext('2d'), tex: tvTex, t: 0, glow: tvGlow };
@@ -581,13 +582,13 @@ export class BarScene {
 
     // service door between bar and lounge
     const sd = new THREE.Group();
-    const sdoor = new THREE.Mesh(new THREE.BoxGeometry(0.86, 2.2, 0.06), m.woodDark());
+    const sdoor = new THREE.Mesh(bevelBox(0.86, 2.2, 0.06), m.woodDark());
     sdoor.position.y = 1.1;
     const porthole = new THREE.Mesh(new THREE.CircleGeometry(0.13, 20), m.get('porthole', { color: 0, emissive: 0xffc890, emissiveIntensity: 0.9 }));
     porthole.position.set(0, 1.55, 0.035);
     const ring = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.02, 6, 20), m.brass());
     ring.position.set(0, 1.55, 0.04);
-    const kick = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.22, 0.01), m.brass());
+    const kick = new THREE.Mesh(bevelBox(0.8, 0.22, 0.01), m.brass());
     kick.position.set(0, 0.13, 0.035);
     sd.add(sdoor, porthole, ring, kick);
     sd.position.set(5.55, 0, BACK + 0.04);
@@ -612,7 +613,7 @@ export class BarScene {
   buildMoose() {
     const m = this.mats;
     const g = new THREE.Group();
-    const plaque = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.06, 6), m.woodPolished());
+    const plaque = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.06, 16), m.woodPolished());
     plaque.rotation.x = Math.PI / 2;
     plaque.scale.set(0.8, 1, 1.2);
     const fur = m.get('mooseFur', { color: 0x3a2617, roughness: 1 });
@@ -620,13 +621,13 @@ export class BarScene {
     neck.scale.set(1, 1.1, 0.9); neck.position.set(0, -0.05, 0.2);
     const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 14, 10), fur);
     head.scale.set(0.9, 1.0, 1.5); head.position.set(0, -0.1, 0.48);
-    const snout = new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 10), m.get('mooseNose', { color: 0x2a1a10, roughness: 1 }));
+    const snout = new THREE.Mesh(new THREE.SphereGeometry(0.15, 14, 10), m.get('mooseNose', { color: 0x2a1a10, roughness: 1 }));
     snout.scale.set(0.9, 0.9, 1.3); snout.position.set(0, -0.2, 0.72);
     const bell = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.28, 8), fur);
     bell.position.set(0, -0.42, 0.42); bell.rotation.x = Math.PI;
     g.add(plaque, neck, head, snout, bell);
     for (const s of [-1, 1]) {
-      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.022, 6, 6), m.get('eye', { color: 0x050505, roughness: 0.1, metalness: 0.3 }));
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.022, 14, 10), m.get('eye', { color: 0x050505, roughness: 0.1, metalness: 0.3 }));
       eye.position.set(s * 0.15, -0.02, 0.56);
       const ear = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.2, 6), fur);
       ear.position.set(s * 0.2, 0.12, 0.42); ear.rotation.z = -s * 1.1;
@@ -666,7 +667,7 @@ export class BarScene {
     root.add(wallLeo);
 
     // banquette with tufted back
-    const seat = new THREE.Mesh(new THREE.BoxGeometry(lw - 0.2, 0.45, 0.62), m.velvet());
+    const seat = new THREE.Mesh(bevelBox(lw - 0.2, 0.45, 0.62), m.velvet());
     seat.position.set(lcx, 0.225, BACK + 0.62);
     const backGeo = new THREE.BoxGeometry(lw - 0.2, 0.75, 0.2, 40, 6, 1);
     const pos = backGeo.attributes.position;
@@ -679,7 +680,7 @@ export class BarScene {
     backGeo.computeVertexNormals();
     const back = new THREE.Mesh(backGeo, m.velvetDark());
     back.position.set(lcx, 0.85, BACK + 0.24);
-    const piping = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, lw - 0.2, 8), m.velvet());
+    const piping = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, lw - 0.2, 16), m.velvet());
     piping.rotation.z = Math.PI / 2; piping.position.set(lcx, 1.24, BACK + 0.28);
     root.add(seat, back, piping);
     this.colliders.push({ x: lcx, z: BACK + 0.62, r: 0.1, box: { minX: lx0, maxX: lx1, minZ: BACK, maxZ: BACK + 1.0 } });
@@ -737,16 +738,16 @@ export class BarScene {
     // arched frame: rectangle + half-torus top
     const fm = m.get('mirrorFrame', { color: 0x0e0b09, roughness: 0.4, metalness: 0.4 });
     const gilt = m.get('gilt', { color: 0x8a6428, roughness: 0.35, metalness: 0.8, emissive: 0x1a0e02 });
-    const side = new THREE.BoxGeometry(0.1, h - w / 2, 0.08);
+    const side = bevelBox(0.1, h - w / 2, 0.08);
     for (const s of [-1, 1]) {
       const b = new THREE.Mesh(side, fm);
       b.position.set(s * (w / 2 + 0.05), -w / 4, 0.04);
       g.add(b);
-      const gl = new THREE.Mesh(new THREE.BoxGeometry(0.02, h - w / 2, 0.09), gilt);
+      const gl = new THREE.Mesh(bevelBox(0.02, h - w / 2, 0.09), gilt);
       gl.position.set(s * (w / 2 + 0.005), -w / 4, 0.045);
       g.add(gl);
     }
-    const bottom = new THREE.Mesh(new THREE.BoxGeometry(w + 0.2, 0.1, 0.08), fm);
+    const bottom = new THREE.Mesh(bevelBox(w + 0.2, 0.1, 0.08), fm);
     bottom.position.set(0, -h / 2 - 0.05, 0.04);
     const arc = new THREE.Mesh(new THREE.TorusGeometry(w / 2 + 0.05, 0.05, 6, 30, Math.PI), fm);
     arc.position.set(0, h / 2 - w / 2, 0.04);
@@ -806,7 +807,7 @@ export class BarScene {
     const k1 = tumbler(m); k1.position.set(1.85, 0.76, 0.2); root.add(k1);
     // Julian's glass placeholder (whisky), the coupe is added by the story
     const j1 = tumbler(m, 0x6a3a10); j1.position.set(1.32, 0.76, 0.28); root.add(j1);
-    const menu = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.01, 0.3), m.get('menu', { color: 0x6a1018, roughness: 0.7 }));
+    const menu = new THREE.Mesh(bevelBox(0.22, 0.01, 0.3), m.get('menu', { color: 0x6a1018, roughness: 0.7 }));
     menu.position.set(1.5, 0.765, 0.05); menu.rotation.y = 0.3;
     root.add(menu);
     const chairJ = bentwoodChair(m, 1); chairJ.position.set(0.82, 0, 0.36); root.add(chairJ);
@@ -906,7 +907,7 @@ export class BarScene {
     L.chandeliers = chandX.map((x, i) => {
       const ch = chandelier(this.mats);
       ch.position.set(x, 3.55, -0.9);
-      const chain = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 0.6, 4), this.mats.brass());
+      const chain = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 0.6, 16), this.mats.brass());
       chain.position.set(x, CEIL - 0.3 + 0.0, -0.9);
       root.add(ch, chain);
       // light goes strictly down: a wide spot under each chandelier + a soft visible cone

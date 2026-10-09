@@ -284,3 +284,4 @@
 .cf-sheet { box-shadow: 0 24px 50px rgba(0,0,0,.8), 10px 12px 0 -2px #b8a888, 18px 22px 0 -4px #9a8a6a !important; }
 .cf-list { color: #120c08; }
 .cf-desk::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse 46% 40% at 50% 46%, rgba(255,196,120,.16), transparent 72%); }
+.cf-hand.small { font-size: calc(var(--f) * 1.5); line-height: 1.15; }
