@@ -221,7 +221,8 @@ export class CaseFiles {
   lizzyPhone(body) {
     body.innerHTML = '';
     const ph = el('div', 'cf-lphone', body);
-    el('div', 'crack', ph, crackSVG());
+    const cr = el('div', 'crack', ph);
+    cr.style.backgroundImage = `url(${crackTexture()})`;
     el('i', 'glare', ph);
     el('div', 'time', ph, LIZZY_PHONE.time);
     el('div', 'date', ph, LIZZY_PHONE.date);
@@ -283,6 +284,49 @@ function strings(holder, lines) {
 }
 
 /** Magnifier, envelope, blood drops: desk dressing around the board. */
+/** Shattered glass: an impact point with chips, radial cracks of varying width, broken rings. */
+let crackURL = null;
+function crackTexture() {
+  if (crackURL) return crackURL;
+  const W = 360, H = 640, c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const x = c.getContext('2d');
+  let s = 91;
+  const r = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+  const cx = W * 0.3, cy = H * 0.62;
+  const rays = [];
+  for (let i = 0; i < 13; i++) {
+    const a = (i / 13) * Math.PI * 2 + r() * 0.3, L = 120 + r() * 420;
+    const pts = [[cx, cy]];
+    let px = cx, py = cy, ang = a;
+    for (let k = 0; k < 9; k++) { ang += (r() - 0.5) * 0.35; px += Math.cos(ang) * L / 9; py += Math.sin(ang) * L / 9; pts.push([px, py]); }
+    rays.push(pts);
+  }
+  const stroke = (pts, w, col) => { x.strokeStyle = col; x.lineWidth = w; x.beginPath(); pts.forEach(([a, b], i) => (i ? x.lineTo(a, b) : x.moveTo(a, b))); x.stroke(); };
+  x.lineJoin = 'miter';
+  // shadow under every crack (refraction), then the bright edge, tapering away from the impact
+  for (const p of rays) for (let k = 0; k < p.length - 1; k++) {
+    const w = Math.max(0.6, 3.2 - k * 0.32);
+    stroke([p[k], p[k + 1]], w + 1.6, 'rgba(0,0,0,0.55)');
+    stroke([[p[k][0] - 0.8, p[k][1] - 0.8], [p[k + 1][0] - 0.8, p[k + 1][1] - 0.8]], w, 'rgba(240,246,252,0.85)');
+  }
+  // broken concentric rings between neighbouring rays
+  for (const ring of [1, 2, 4]) for (let i = 0; i < rays.length; i++) {
+    if (r() < 0.35) continue;
+    const a = rays[i][ring], b = rays[(i + 1) % rays.length][ring];
+    stroke([a, [(a[0] + b[0]) / 2 + (r() - 0.5) * 10, (a[1] + b[1]) / 2 + (r() - 0.5) * 10], b], 1.1, 'rgba(235,242,250,0.7)');
+  }
+  // the impact: crushed glass, small chips with light and dark facets
+  for (let i = 0; i < 26; i++) {
+    const a = r() * Math.PI * 2, d = r() * 26;
+    x.fillStyle = r() < 0.5 ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.45)';
+    x.beginPath(); x.moveTo(cx + Math.cos(a) * d, cy + Math.sin(a) * d);
+    x.lineTo(cx + Math.cos(a + 0.4) * (d + 8), cy + Math.sin(a + 0.4) * (d + 8)); x.lineTo(cx + Math.cos(a - 0.3) * (d + 6), cy + Math.sin(a - 0.3) * (d + 6)); x.fill();
+  }
+  crackURL = c.toDataURL();
+  return crackURL;
+}
+
 /** A spider-web crack from one impact point (lower left of the screen). */
 function crackSVG() {
   const cx = 30, cy = 70, rays = [[-170, 40], [-120, 65], [-75, 80], [-35, 95], [5, 75], [40, 60], [80, 35], [120, 40], [160, 30]];

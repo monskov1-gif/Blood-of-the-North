@@ -424,9 +424,9 @@ const methods = {
     // they close in to a couple of metres: two behind, Quinn in front (nearest the camera)
     const clampZ = (z) => Math.max(-2.1, Math.min(1.55, z));
     const stops = [
-      { x: Math.max(-10.5, tx - 1.9), z: clampZ(tz - 0.6) },
-      { x: Math.max(-10.5, tx - 2.6), z: clampZ(tz - 1.2) },
-      { x: Math.max(-10.5, tx - 1.35), z: clampZ(tz + 0.5) },
+      { x: Math.max(-10.5, tx - 2.0), z: clampZ(tz - 0.25) },
+      { x: Math.max(-10.5, tx - 2.8), z: clampZ(tz - 0.95) },
+      { x: Math.max(-10.5, tx - 1.3), z: clampZ(tz + 0.55) },
     ];
     const walks = offs.map((o, i) => o.walkTo([{ x: -11.4, z: -1.2 + i * 0.6 }, stops[i]], { speed: 2.2 }));
     g.cameraSys.setShot({ x: tx - 1.6, y: 1.85, z: 6.6, lookX: tx - 1.6, lookY: 1.2, lookZ: -0.2, fov: 36 }, 0.8);
@@ -441,11 +441,10 @@ const methods = {
     await g.view.flash('officer2', 'Отойдите от тел! Руки — так, чтобы я их видел!', 2600);
     if (S !== this.session) return;
     // Quinn recognises him
-    const Q = offs[2];
-    Q.setPose('idle');
+    const Q = offs[2];   // keeps aiming: she recognises him over the sights
     // the camera finds her: Quinn lowers the gun, between him and the others
     const q = Q.position;
-    g.cameraSys.setShot({ x: (q.x + tx) / 2 - 0.3, y: 2.05, z: q.z + 4.4, lookX: (q.x + tx) / 2 - 0.3, lookY: 1.62, lookZ: q.z - 0.6, fov: 36 }, 0.9);
+    g.cameraSys.setShot({ x: (q.x + tx) / 2 - 0.3, y: 2.3, z: q.z + 4.4, lookX: (q.x + tx) / 2 - 0.3, lookY: 1.78, lookZ: q.z - 0.6, fov: 36 }, 0.9);
     await g.view.flash('quinn', 'Джул?.. Господи. Джул, это ты?', 2200);
     await g.view.flash('officer2', 'Торрес, держи дистанцию. Он среди тел — значит, подозреваемый.', 2600);
     Q.setPose('aim');

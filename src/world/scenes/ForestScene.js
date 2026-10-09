@@ -135,7 +135,7 @@ const riverTex = () => PX('river', 64, 32, (ctx, w, h) => {
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
     const water = Math.abs(y - h / 2 + Math.sin(x * 0.15) * 3) < 9;
     const n = (r() - 0.5) * 10;
-    ctx.fillStyle = water ? rgb(34 + n, 44 + n, 52 + n) : rgb(176 + n, 190 + n, 200 + n);
+    ctx.fillStyle = water ? rgb(78 + n, 96 + n, 112 + n) : rgb(186 + n, 198 + n, 208 + n);
     ctx.fillRect(x, y, 1, 1);
   }
   for (let i = 0; i < 20; i++) { ctx.fillStyle = 'rgba(230,240,248,0.6)'; ctx.fillRect(r() * w, r() * h, 3 + r() * 6, 1); }
@@ -261,6 +261,14 @@ export class ForestScene extends LocationBase {
     const e = new THREE.Euler();
     tufts.forEach(([x, z, lean, s], i) => { q.setFromEuler(e.set(0, r() * 3, lean)); m.compose(new THREE.Vector3(x, 0.14 * s, z), q, new THREE.Vector3(1, s, 1)); tim.setMatrixAt(i, m); });
     this.root.add(tim);
+    // tracks on the trail: boots (the investigators, weeks ago) and, closer to the site, paws
+    const prints = [];
+    for (let x = -12; x < 13; x += 0.36) prints.push([x, 0.15 + ((x * 2.78) % 2 > 1 ? 0.12 : -0.12), 0.11, 0.05]);
+    for (let x = -4; x < 30; x += 0.55) prints.push([x + r() * 0.1, 1.05 + Math.sin(x) * 0.15, 0.07, 0.07]);
+    const pim = new THREE.InstancedMesh(new THREE.CircleGeometry(1, 7), this.mat('trailPrint', { color: 0x8a96a6, roughness: 1, transparent: true, opacity: 0.8, depthWrite: false }), prints.length);
+    const qq = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0));
+    prints.forEach(([x, z, sx, sz], i) => { m.compose(new THREE.Vector3(x, 0.012, z), qq, new THREE.Vector3(sx, sz * 2, 1)); pim.setMatrixAt(i, m); });
+    this.root.add(pim);
   }
 
   buildRiver() {
@@ -324,13 +332,13 @@ export class ForestScene extends LocationBase {
     const open = (x) => (x > -3.5 && x < 10.5) || (x > 19 && x < 28.5); // the site, the clearing: river in view
     // first row behind the lane: sparse, pale trunks and a few spruces
     for (let x = -16; x < 48; x += 2.4 + r() * 2.2) {
-      if (open(x)) continue;
+      if (open(x) || x > 31) continue;
       const z = -3.9 - r() * 1.6;
       if (r() < 0.45) this.spruce(x, z, 0.75 + r() * 0.3); else this.bare(x, z, 0.95 + r() * 0.3, r() < 0.5 ? 1 : 2);
     }
     // second row, deeper and hazier
     for (let x = -16; x < 48; x += 1.6 + r() * 1.6) {
-      if ((x > 18 && x < 29.5) || (open(x) && r() < 0.7)) continue;
+      if ((x > 18 && x < 29.5) || x > 31 || (open(x) && r() < 0.7)) continue;
       this.spruce(x, -6.6 - r() * 2.4 - (open(x) ? 3 : 0), 0.8 + r() * 0.45);
     }
     // the far bank: a dark wall of spruce, birches between
@@ -389,8 +397,8 @@ export class ForestScene extends LocationBase {
     for (let k = 0; k < 6; k++) { const rib = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.02, 4, 10, Math.PI), bone); rib.position.set(5.2 + k * 0.1, 0.02, -4.2); rib.rotation.set(0, Math.PI / 2, 0); root.add(rib); }
     // the clawed aspen: thicker, right by the tape
     this.bare(7.4, -3.0, 1.12, 1);
-    const claws = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.62), this.mat('claws', { map: clawTex(), transparent: true, alphaTest: 0.5, color: 0xffffff, roughness: 0.9 }));
-    claws.position.set(7.4, 2.15, -2.8); root.add(claws);
+    const claws = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.95), this.mat('claws', { map: clawTex(), transparent: true, alphaTest: 0.5, color: 0xffffff, roughness: 0.9 }));
+    claws.position.set(7.4, 2.05, -2.86); root.add(claws);
     this.anchors.claws = new THREE.Vector3(7.4, 2.2, -2.8);
     // a weathered "MISSING" flyer stapled to a spruce at the trailhead
     const flyer = this.textSign('ПРОПАЛА', { w: 0.32, h: 0.42, bg: '#e8e2d4', fg: '#1a1a1a', font: 'bold 34px sans-serif' });
@@ -406,14 +414,26 @@ export class ForestScene extends LocationBase {
   buildClearing() {
     // a fallen spruce Julian can crouch behind, small dead animals in the clearing
     const trunk = this.mat('fallen', { map: barkTex(1), color: 0x9a8a78, roughness: 1 });
-    const log = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.28, 4.2, 8), trunk);
-    log.rotation.z = Math.PI / 2; log.rotation.y = 0.15; log.position.set(17.8, 0.22, -0.7); this.root.add(log);
-    const cap = new THREE.Mesh(new THREE.BoxGeometry(4.0, 0.06, 0.26), this.mat('logSnow', { color: 0xdfe6ee, roughness: 1 }));
-    cap.rotation.y = 0.15; cap.position.set(17.8, 0.47, -0.7); this.root.add(cap);
-    const end = new THREE.Mesh(new THREE.CircleGeometry(0.27, 10), this.mat('logEnd', { color: 0xc8a878, roughness: 1, side: THREE.DoubleSide }));
-    end.position.set(17.8 + Math.cos(0.15) * 2.11, 0.22, -0.7 - Math.sin(0.15) * 2.11); end.rotation.y = Math.PI / 2 + 0.15; this.root.add(end);
-    for (const [dx, a] of [[-1.2, 0.6], [0.4, -0.5], [1.5, 0.9]]) { const br = this.B(0.05, 0.7, 0.05, this.mat('twigF', { color: 0x3e342c, roughness: 1 }), 17.8 + dx, 0.6, -0.6); br.rotation.z = a; }
-    this.colliders.push({ x: 17.0, z: -0.8, r: 0.35 }, { x: 18.6, z: -0.9, r: 0.35 });
+    const log = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.4, 4.4, 9), trunk);
+    log.rotation.z = Math.PI / 2; log.rotation.y = 0.15; log.position.set(17.8, 0.36, -0.7); this.root.add(log);
+    const dir = new THREE.Vector3(Math.cos(0.15), 0, -Math.sin(0.15));
+    const along = (t, y, dz = 0) => new THREE.Vector3(17.8, y, -0.7 + dz).addScaledVector(dir, t);
+    // darker bark bands
+    const band = this.mat('logBand', { color: 0x4a4038, roughness: 1 });
+    for (const t of [-1.6, -0.7, 0.3, 1.2]) { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.39, 0.39, 0.08, 9), band); b.rotation.z = Math.PI / 2; b.rotation.y = 0.15; b.position.copy(along(t, 0.36)); b.scale.setScalar(1 - (t + 2.2) * 0.02); this.root.add(b); }
+    // snow along the top, in clumps
+    const snowM = this.mat('logSnow', { color: 0xdfe6ee, roughness: 1, flatShading: true });
+    for (let k = 0; k < 7; k++) { const c = new THREE.Mesh(new THREE.DodecahedronGeometry(0.28, 0), snowM); c.position.copy(along(-1.9 + k * 0.62, 0.68)); c.scale.set(1.3, 0.35, 0.9); this.root.add(c); }
+    // the broken root plate at the right end: a ragged disc of earth and roots
+    const plate = new THREE.Mesh(new THREE.CircleGeometry(0.8, 9), this.mat('rootPlate', { color: 0x4a3a2c, roughness: 1, side: THREE.DoubleSide }));
+    plate.position.copy(along(-2.25, 0.62)); plate.rotation.y = Math.PI / 2 + 0.15; plate.scale.set(1, 0.95, 1); this.root.add(plate);
+    const root = this.mat('rootF', { color: 0x3a2e24, roughness: 1 });
+    for (let k = 0; k < 8; k++) { const a = (k / 8) * Math.PI * 2; const rb = this.B(0.06, 0.9, 0.06, root, 0, 0, 0); rb.position.copy(along(-2.32, 0.62 + Math.sin(a) * 0.8, Math.cos(a) * 0.8)); rb.rotation.set(a, 0.15, 0); }
+    const end = new THREE.Mesh(new THREE.CircleGeometry(0.32, 10), this.mat('logEnd', { color: 0xc8a878, roughness: 1, side: THREE.DoubleSide }));
+    end.position.copy(along(2.21, 0.36)); end.rotation.y = Math.PI / 2 + 0.15; this.root.add(end);
+    // snapped branch stubs
+    for (const [t, a, L] of [[-1.3, 0.5, 0.5], [-0.2, -0.4, 0.6], [0.9, 0.7, 0.45], [1.6, -0.3, 0.35]]) { const br = this.B(0.07, L, 0.07, this.mat('twigF', { color: 0x3e342c, roughness: 1 }), 0, 0, 0); br.position.copy(along(t, 0.7 + L * 0.35, 0.05)); br.rotation.z = a; this.root.add(br); }
+    this.colliders.push({ x: 16.6, z: -0.65, r: 0.55 }, { x: 18.0, z: -0.85, r: 0.55 }, { x: 19.4, z: -1.05, r: 0.55 });
     this.hares = new THREE.Group();
     const hr = rng(370);
     for (let i = 0; i < 5; i++) {
@@ -434,13 +454,13 @@ export class ForestScene extends LocationBase {
     const r = rng(380);
     // the slope: big jumbled boulders rising to the right, a cliff behind
     const snowCap = this.mat('rockSnow', { color: 0xdfe6ee, roughness: 1, flatShading: true });
-    for (let i = 0; i < 22; i++) {
-      const x = 31 + r() * 16, z = -4.4 - r() * 2.6, s = 0.45 + r() * 0.9 + (x - 31) * 0.05;
-      if (x > 40.4 && x < 44.0) continue; // keep the mouth clear
-      const b = new THREE.Mesh(new THREE.DodecahedronGeometry(s, 0), rock);
-      b.position.set(x, s * 0.4, z); b.rotation.set(r() * 3, r() * 3, r() * 3); b.scale.y = 0.65 + r() * 0.4; g.add(b);
-      const c = new THREE.Mesh(new THREE.DodecahedronGeometry(s * 0.72, 0), snowCap);
-      c.position.set(x, s * 0.4 + s * 0.42, z + 0.05); c.scale.set(1, 0.28, 1); c.rotation.y = r() * 3; g.add(c);
+    const slab = (x, y, z, w, h, d, rx, ry, rz, m = rock) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); b.rotation.set(rx, ry, rz); g.add(b); return b; };
+    for (let i = 0; i < 16; i++) {
+      const x = 31.5 + r() * 15, z = -4.6 - r() * 2.4;
+      if (x > 40.2 && x < 44.2) continue; // keep the mouth clear
+      const w = 0.8 + r() * 2.2, h = 0.4 + r() * 1.4 + (x - 31) * 0.05, d = 0.8 + r() * 1.2;
+      slab(x, h * 0.45, z, w, h, d, (r() - 0.5) * 0.3, (r() - 0.5) * 0.8, (r() - 0.5) * 0.35);
+      if (r() < 0.6) slab(x + (r() - 0.5) * 0.3, h * 0.92, z + 0.1, w * 0.8, 0.07, d * 0.7, 0, (r() - 0.5) * 0.5, 0, snowCap);
     }
     // the cliff: a dark faceted slope (big low-poly blocks), spruces on top
     const cliffMat = this.mat('cliffF', { color: 0x5e5c5c, roughness: 1, flatShading: true });
@@ -450,20 +470,21 @@ export class ForestScene extends LocationBase {
     }
     for (let i = 0; i < 6; i++) this.spruce(33.5 + i * 2.6 + r(), -8.6 - r(), 0.6 + r() * 0.3, g);
     // footprints in the snow, leading inside: bare feet, and paws
-    const fp = this.mat('caveFp', { color: 0x6a7280, roughness: 1, transparent: true, opacity: 0.7, depthWrite: false });
-    for (let k = 0; k < 12; k++) { const t = k / 11, f = new THREE.Mesh(new THREE.CircleGeometry(0.07, 6), fp); f.rotation.x = -Math.PI / 2; f.scale.y = 1.8; f.position.set(39.4 + t * 2.8 + (k % 2) * 0.12, 0.02, -2.6 - t * 1.9); g.add(f); }
-    // the mouth: a black arch with a lintel of rock
-    const mouth = new THREE.Mesh(new THREE.CircleGeometry(1.5, 16, 0, Math.PI), new THREE.MeshBasicMaterial({ color: 0x020203 }));
-    mouth.scale.set(1, 1.55, 1); mouth.position.set(42.2, 0.0, -5.78); g.add(mouth);
-    const inner = new THREE.Mesh(new THREE.PlaneGeometry(3, 2.4), new THREE.MeshBasicMaterial({ color: 0x050506 }));
-    inner.position.set(42.2, 1.0, -5.79); inner.visible = false; g.add(inner);
-    for (const [dx, s] of [[-1.9, 1.1], [1.9, 1.2], [-1.2, 0.8], [1.3, 0.9]]) {
-      const b = new THREE.Mesh(new THREE.DodecahedronGeometry(s, 0), rock); b.position.set(42.2 + dx, s * 0.5 + (Math.abs(dx) < 1.5 ? 2.1 : 0), -5.2); g.add(b);
-    }
-    // the brow over the mouth: jumbled blocks, not a slab
-    for (const [dx, dy, sz] of [[-1.3, 2.75, 0.85], [0, 3.0, 1.0], [1.35, 2.7, 0.8], [-0.6, 3.6, 0.7], [0.8, 3.55, 0.75]]) {
-      const b = new THREE.Mesh(new THREE.DodecahedronGeometry(sz, 0), rock); b.position.set(42.2 + dx, dy, -5.5); b.rotation.set(dx, dy, dx * dy); b.scale.y = 0.7; g.add(b);
-    }
+    const fp = this.mat('caveFp', { color: 0x3a4250, roughness: 1, transparent: true, opacity: 0.85, depthWrite: false });
+    for (let k = 0; k < 12; k++) { const t = k / 11, f = new THREE.Mesh(new THREE.CircleGeometry(0.07, 6), fp); f.rotation.x = -Math.PI / 2; f.scale.y = 1.8; f.position.set(39.4 + t * 2.8 + (k % 2) * 0.14, 0.02, -2.4 - t * 2.9); g.add(f); }
+    // the mouth: a pitch-black arch framed by two leaning slabs and a lintel, frost on the rim
+    const mouth = new THREE.Mesh(new THREE.CircleGeometry(1.4, 18, 0, Math.PI), new THREE.MeshBasicMaterial({ color: 0x000000 }));
+    mouth.scale.set(1, 1.6, 1); mouth.position.set(42.2, 0.0, -5.74); g.add(mouth);
+    const jamb = this.mat('jambF', { color: 0x7a7670, roughness: 1, flatShading: true });
+    const rockAt = (x, y, z, sx, sy, sz, rx, ry, rz) => { const b = new THREE.Mesh(new THREE.DodecahedronGeometry(1, 0), jamb); b.position.set(x, y, z); b.scale.set(sx, sy, sz); b.rotation.set(rx, ry, rz); g.add(b); };
+    rockAt(40.45, 1.2, -5.5, 0.75, 1.5, 0.8, 0.2, 0.4, -0.15);
+    rockAt(43.95, 1.1, -5.5, 0.85, 1.4, 0.8, -0.3, 0.9, 0.2);
+    rockAt(41.6, 2.75, -5.45, 1.3, 0.55, 0.85, 0.4, 0.2, 0.18);
+    rockAt(42.9, 2.7, -5.45, 1.25, 0.6, 0.85, -0.2, 0.7, -0.2);
+    rockAt(42.2, 3.3, -5.6, 1.6, 0.5, 0.9, 0.1, 1.2, 0.05);
+    const cap = new THREE.Mesh(new THREE.DodecahedronGeometry(1, 0), snowCap); cap.position.set(42.2, 3.72, -5.5); cap.scale.set(1.4, 0.16, 0.7); g.add(cap);
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(1.42, 0.04, 4, 20, Math.PI), this.mat('frostRim', { color: 0xdfe8f2, roughness: 1, emissive: 0x1a2230 }));
+    rim.scale.set(1, 1.6, 1); rim.position.set(42.2, 0.0, -5.7); g.add(rim);
     // cold breath from the dark: faint mist at the mouth
     this.caveMist = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: 0x8a96a8, transparent: true, opacity: 0.18, depthWrite: false }));
     this.caveMist.scale.set(4, 2, 1); this.caveMist.position.set(42.2, 0.7, -5.0); g.add(this.caveMist);
@@ -506,8 +527,11 @@ export class ForestScene extends LocationBase {
     sun.position.set(-8, 10, 6);
     // a cold key that stays with Julian at dusk (he must stay readable)
     const key = new THREE.PointLight(0x9ab0d8, 0, 7, 1.4);
-    this.root.add(hemi, sun, key);
-    this.lights = { hemi, sun, key };
+    // dusk: the last warm light low behind the far bank — a rim on the wolf and on Julian
+    const rim = new THREE.DirectionalLight(0xe0905a, 0);
+    rim.position.set(30, 3, -30);
+    this.root.add(hemi, sun, key, rim);
+    this.lights = { hemi, sun, key, rim };
   }
 
   setState(name) {
@@ -521,6 +545,7 @@ export class ForestScene extends LocationBase {
     L.sun.color.set(night ? 0x8aa4d4 : 0xf0ece4); L.sun.intensity = night ? 0.7 : 0.9;
     L.sun.position.set(night ? 14 : -8, 10, night ? -4 : 6);
     L.key.intensity = night ? 3.2 : 0;
+    L.rim.intensity = night ? 0.9 : 0;
     if (this.caveLight) this.caveLight.intensity = night ? 14 : 4;
     this.background = night ? 0x1a2232 : 0xa8b2bc;
     if (night) this.paintSky([[0, '#0c1222'], [0.45, '#22304e'], [0.6, '#46507a'], [0.68, '#7a6278'], [0.74, '#b07c5e'], [0.8, '#8a6258'], [1, '#3a3446']]);
