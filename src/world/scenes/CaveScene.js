@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { LocationBase } from '../LocationBase.js';
 import { canvasTexture, rng, glowTexture } from '../../render/textures.js';
 import { glow } from '../props.js';
-import { fbm3, noise3, rockGeometry, rockMaterial, rockDetailTexture, roundedBox, reliefSheet, smoothNormals } from '../nature.js';
+import { fbm3, noise3, mergeGeos, rockGeometry, rockMaterial, rockDetailTexture, roundedBox, reliefSheet } from '../nature.js';
 
 export const sat = (v) => Math.max(0, Math.min(1, v));
 
@@ -59,10 +59,12 @@ export const dragTex = () => PX('drag', 64, 16, (ctx, w, h) => {
   const r = rng(781);
   ctx.clearRect(0, 0, w, h);
   for (const y0 of [5, 10]) for (let x = 0; x < w; x++) {
-    const y = Math.round(y0 + Math.sin(x * 0.2 + y0) * 1.2);
-    ctx.fillStyle = rgb(60, 44, 32, 0.75); ctx.fillRect(x, y, 1, 2);
-    ctx.fillStyle = rgb(176, 150, 116, 0.5); ctx.fillRect(x, y - 1, 1, 1);
-    if (r() < 0.12) { ctx.fillStyle = rgb(90, 14, 10, 0.7); ctx.fillRect(x, y, 2, 2); }
+    const fade = Math.min(1, x / 12, (w - 1 - x) / 12) * (0.55 + 0.45 * Math.sin(x * 0.13 + y0));   // the furrows come and go
+    if (r() > fade + 0.15) continue;
+    const y = Math.round(y0 + Math.sin(x * 0.2 + y0) * 1.2 + Math.sin(x * 0.05) * 1.5);
+    ctx.fillStyle = rgb(50, 40, 32, 0.7 * fade); ctx.fillRect(x, y, 1, 2);
+    ctx.fillStyle = rgb(150, 136, 116, 0.35 * fade); ctx.fillRect(x, y - 1, 1, 1);
+    if (r() < 0.1) { ctx.fillStyle = rgb(70, 14, 10, 0.6 * fade); ctx.fillRect(x, y, 2, 2); }
   }
 });
 
@@ -169,11 +171,11 @@ export function wallHeight(x, y, fine = false, ox = 0) {
 const ROCK = {
   cave: { a: [92, 84, 76], b: [54, 50, 48], dip: 0.42, seed: 3, rust: 0.5 },
   cave_den: { a: [96, 82, 68], b: [56, 48, 42], dip: -0.52, seed: 11, rust: 0.7 },
-  cave_deep: { a: [80, 82, 82], b: [42, 46, 48], dip: 0.66, seed: 23, wet: 1, amb: 0.22 },
+  cave_deep: { a: [80, 82, 82], b: [42, 46, 48], dip: 0.66, seed: 23, wet: 1, amb: 0.34 },
   cave_altar: { a: [92, 70, 62], b: [48, 34, 32], dip: -0.34, seed: 37, rust: 1 },
   cave_store: { a: [86, 82, 76], b: [50, 48, 46], dip: 0.3, seed: 41, rust: 0.3 },
   cave_tunnel: { a: [74, 78, 84], b: [42, 44, 50], dip: -0.62, seed: 53, cold: 12.5 },
-  cave_rift: { a: [70, 74, 82], b: [36, 38, 46], dip: 0.82, seed: 67, wet: 1, coldX: [-1.2], amb: 0.16 },
+  cave_rift: { a: [70, 74, 82], b: [36, 38, 46], dip: 0.82, seed: 67, wet: 1, coldX: [-1.2], amb: 0.26 },
 };
 const hash1 = (n, s) => { const v = Math.sin(n * 127.1 + s * 311.7) * 43758.5453; return v - Math.floor(v); };
 
@@ -200,10 +202,10 @@ function rockDetail(x, y, st) {
   const id = row * 131 + seg;
   const hb = hash1(id, st.seed + 2);
   // bedding-plane crack: long, but it closes up in places
-  const bedOpen = sat((noise3(u * 0.3, row * 1.7, 2, st.seed + 9) - 0.52) * 4) * (hr > 0.5 ? 0.012 + hr * 0.035 : 0);
+  const bedOpen = sat((noise3(u * 0.3, row * 1.7, 2, st.seed + 9) - 0.52) * 14) * (hr > 0.5 ? 0.028 + hr * 0.04 : 0);
   const dv = Math.min(fv, 1 - fv) * bt;
   const cBed = bedOpen > 0 ? 1 - sat(dv / bedOpen) : 0;
-  const jointOn = hb > 0.62 ? (0.01 + hash1(id, st.seed + 3) * 0.03) : 0;
+  const jointOn = hb > 0.62 ? (0.024 + hash1(id, st.seed + 3) * 0.03) : 0;
   const fw = fu + (noise3(x * 3, y * 3, 5, st.seed + 15) - 0.5) * 0.25;
   const du = Math.min(Math.abs(fw), Math.abs(1 - fw)) * bl;
   const cJoint = jointOn ? 1 - sat(du / jointOn) : 0;
@@ -265,7 +267,7 @@ const wallBakedTex = (key, w, h, xmin, width, hf, mf, st, lights) => canvasTextu
       const rust = st.rust ? sat((fbm3(x * 5, y * 0.25, 4, st.seed + 6, 3) - 0.62) * 4) * sat(fbm3(x * 0.3, y * 0.3, 2, st.seed + 7, 2) * 2 - 0.6) * st.rust : 0;
       const wet = st.wet ? sat((fbm3(x * 3, y * 0.4, 6, st.seed + 8, 3) - 0.58) * 5) : 0;
       const cw = L > 0 ? warm / L : 0, cc = L > 0 ? cold / L : 0;
-      const tint = [1.0 + 0.12 * cw - 0.1 * cc, 0.97 + 0.02 * cw, 0.95 - 0.08 * cw + 0.2 * cc];
+      const tint = [0.92 + 0.32 * cw - 0.1 * cc, 0.94 + 0.06 * cw, 0.98 - 0.26 * cw + 0.2 * cc];
       const spec = wet ? wet * Math.pow(dif, 8) * Math.min(1, L) * 90 : 0;
       for (let c = 0; c < 3; c++) {
         let v = A[c] + (B[c] - A[c]) * k;
@@ -322,6 +324,31 @@ export const fabricTex = (kind = 'nylon') => canvasTexture(`cave-fabric-${kind}`
   }
   ctx.putImageData(img, 0, 0);
 }, { aniso: 4 });
+
+/**
+ * Collapse a little prop built from many parts into one mesh per material (draw calls): the
+ * parts keep their place; the group stays where it was.
+ */
+export function collapse(group) {
+  group.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(group.matrixWorld).invert(), m = new THREE.Matrix4();
+  const by = new Map();
+  group.traverse((o) => {
+    if (!o.isMesh || o === group) return;
+    let geo = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
+    for (const k of Object.keys(geo.attributes)) if (!['position', 'normal', 'uv', 'color'].includes(k)) geo.deleteAttribute(k);
+    if (!geo.attributes.uv) geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count * 2), 2));
+    if (!geo.attributes.normal) geo.computeVertexNormals();
+    if (o.material.vertexColors && !geo.attributes.color) geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count * 3).fill(1), 3));
+    if (!o.material.vertexColors && geo.attributes.color) geo.deleteAttribute('color');
+    geo.applyMatrix4(m.multiplyMatrices(inv, o.matrixWorld));
+    if (!by.has(o.material)) by.set(o.material, []);
+    by.get(o.material).push(geo);
+  });
+  for (const ch of [...group.children]) group.remove(ch);
+  for (const [mat, geos] of by) group.add(new THREE.Mesh(mergeGeos(geos), mat));
+  return group;
+}
 
 /** A tube that tapers from r0 to r1 along a curve (antler tines, ribs): reads as bone, not pipe. */
 export function taperTube(pts, r0, r1, seg = 10, rad = 6) {
@@ -513,15 +540,17 @@ export class CaveBase extends LocationBase {
     const texW = Math.round(W * (this.low ? 36 : 48));
     wallMat.map = wallBakedTex(this.id, texW, this.low ? 240 : 310, cx - W / 2, W, (x, y, f) => this.wallH(x, y, f), (x, y) => this.darkMask(x, y), this.rockStyle, lightsAt);
     wallMat.map.wrapS = wallMat.map.wrapT = THREE.ClampToEdgeWrapping;
+    // the bake is the fire light itself: let it show even where the moving lights are weak
+    wallMat.emissive = new THREE.Color(0xffffff); wallMat.emissiveMap = wallMat.map; wallMat.emissiveIntensity = 0.2;
     // fine grain over the baked rock (its own tiling, 1.3 m): keeps the wall crisp up close
     const det = rockDetailTexture();
-    wallMat.onBeforeCompile = (sh) => {
+    if (!this.low) wallMat.onBeforeCompile = (sh) => {
       sh.uniforms.uDetail = { value: det };
       sh.uniforms.uDetRep = { value: new THREE.Vector2(W / 1.3, 6.4 / 1.3) };
       sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform sampler2D uDetail; uniform vec2 uDetRep;')
         .replace('#include <map_fragment>', '#include <map_fragment>\n  { vec3 dt = texture2D(uDetail, vMapUv * uDetRep).rgb; vec3 dt2 = texture2D(uDetail, vMapUv * uDetRep * 3.7 + 0.31).rgb; diffuseColor.rgb *= (dt * 0.75 + dt2 * 0.55) * 0.95; }');
     };
-    wallMat.customProgramCacheKey = () => 'caveWallDetail';
+    if (!this.low) wallMat.customProgramCacheKey = () => 'caveWallDetail';
     this.wallMat = wallMat;
     const wall = new THREE.Mesh(wgeo, wallMat);
     wall.position.set(cx, 3.2, BACK - 0.5); root.add(wall);
@@ -659,6 +688,7 @@ export class CaveBase extends LocationBase {
     }
     g.updateMatrixWorld(true);
     const top = V3(0, len + 0.1, 0).applyMatrix4(g.matrixWorld);
+    collapse(g);
     // soot licked up the rock above the flame
     const soot = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 1.1), new THREE.MeshBasicMaterial({ map: glowTexture(), color: 0x000000, transparent: true, opacity: 0.55, depthWrite: false }));
     soot.position.set(top.x + rz * -0.2, top.y + 0.45, Math.max(this.wallZ(top.x, top.y + 0.45) + 0.06, zw - 0.05)); root.add(soot);
@@ -757,6 +787,7 @@ export class CaveBase extends LocationBase {
     const nose = new THREE.Mesh(new THREE.ConeGeometry(0.011, 0.03, 4), hole); nose.position.set(0, -0.06, 0.106); nose.rotation.x = Math.PI; g.add(nose);
     const teeth = new THREE.Mesh(roundedBox(0.06, 0.016, 0.02, 0.006, 1), this.mat('teeth', { color: 0x9a8a6a, roughness: 0.7 })); teeth.position.set(0, -0.1, 0.092); g.add(teeth);
     if (hash1(sd, 42) > 0.45) { const jaw = new THREE.Mesh(roundedBox(0.09, 0.03, 0.07, 0.012, 1), m); jaw.position.set(0, -0.125, 0.07); jaw.rotation.x = 0.15; g.add(jaw); }
+    collapse(g);
     g.rotation.set((hash1(sd, 43) - 0.5) * 0.5, (hash1(sd, 44) - 0.5) * 1.6, (hash1(sd, 45) - 0.5) * 0.6);
     g.position.set(x, y, z);
     return g;
@@ -799,6 +830,7 @@ export class CaveBase extends LocationBase {
       const burr = new THREE.Mesh(new THREE.TorusGeometry(0.032, 0.012, 5, 9), m); burr.position.set(s * 0.06, 0.02, 0); burr.rotation.set(Math.PI / 2, 0, s * 0.6); g.add(burr);
     }
     const skull = this.deerSkull(m); skull.position.set(0, 0.0, 0.04); g.add(skull);
+    collapse(g);
     // lashed to a peg driven into a crack (these two stay last: the den hides them on the floor)
     const strap = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.012, 5, 12), this.mat('rawhide', { color: 0x3a2a1c, roughness: 1 })); strap.position.set(0, 0.07, -0.02); strap.rotation.x = 0.4; g.add(strap);
     const peg = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.12, 12), this.mat('peg', { color: 0x2a1a10 })); peg.rotation.x = Math.PI / 2; peg.position.set(0, 0.1, -0.08); g.add(peg);
@@ -838,6 +870,7 @@ export class CaveBase extends LocationBase {
   /** A heap of bones with a skull or two on top. */
   bonePile(x, z, n = 9, parent = this.root, skulls = 1) {
     const bone = this.boneMat();
+    const top = parent; parent = new THREE.Group();
     for (let i = 0; i < n; i++) {
       const b = this.longBone(bone, 0.6 + hash1(i + x * 3, 61) * 0.8);
       b.position.set(x + Math.sin(i * 1.7) * 0.32, 0.04 + (i % 4) * 0.025, z + Math.cos(i * 2.3) * 0.22);
@@ -848,6 +881,7 @@ export class CaveBase extends LocationBase {
       rb.position.set(x + Math.cos(a) * 0.3, 0.02, z + Math.sin(a) * 0.2); rb.rotation.y = a; parent.add(rb);
     }
     for (let k = 0; k < skulls; k++) parent.add(this.skull(x + 0.2 * k - 0.1, 0.14, z + 0.1 * k, bone));
+    top.add(collapse(parent));
   }
 
   /** A crate knocked together from boards: gaps, corner posts, every board its own tone. */
@@ -864,12 +898,12 @@ export class CaveBase extends LocationBase {
     const post = this.mat('cratePost', { color: 0x4a3622, roughness: 1 });
     for (const sx of [-1, 1]) for (const sz of [-1, 1]) { const p = new THREE.Mesh(roundedBox(0.04, h, 0.04, 0.008, 1), post); p.position.set(sx * (w / 2 - 0.02), h / 2, sz * (d / 2 - 0.02)); g.add(p); }
     const lid = new THREE.Mesh(roundedBox(w - 0.03, 0.015, d - 0.03, 0.005, 1), this.mat('crateIn', { color: 0x1a140e, roughness: 1 })); lid.position.y = h * 0.75; g.add(lid);
-    return g;
+    return collapse(g);
   }
 
   /** A pelt / blanket thrown on the floor: soft, lumpy, uneven edge. */
   pelt(x, z, rot, parent = this.root, color = 0x4a3a2c, scale = 0.12, sx = 0.65, sz = 0.42) {
-    const m = new THREE.Mesh(rockGeometry(990 + Math.round(x * 3), { detail: 3, rough: 0.55, sharp: 0.4, flat: -0.05, colA: 0xffffff, colB: 0x9a9088, dark: 0.45 }), this.mat(`pelt${color}`, { color, map: furTex(), roughness: 1, vertexColors: true }));
+    const m = new THREE.Mesh(rockGeometry(990 + Math.round(x * 3), { detail: 3, rough: 0.55, sharp: 0.4, flat: -0.05, colA: 0xffffff, colB: 0x9a9088, dark: 0.45 }), this.mat(`pelt${color}`, { color: new THREE.Color(color).multiplyScalar(2.6), map: furTex(), roughness: 1, vertexColors: true }));
     m.position.set(x, 0.0, z); m.scale.set(sx, scale, sz); m.rotation.y = rot;
     parent.add(m);
     return m;
@@ -922,6 +956,7 @@ export class CaveBase extends LocationBase {
     this.lights.rake.intensity = (L5 ? 0.6 : N ? 0.5 : name === 'L4' ? 0.85 : 1.1) * k;
     this.lights.rake.color.set(L5 || N ? 0x9ab0d0 : 0xe8c8a0);
     for (const t of this.torches) t.intensity = L5 ? 2.6 : N ? 2.4 : 5;
+    if (this.wallMat) this.wallMat.emissiveIntensity = (L5 || N ? 0.26 : 0.16) * (this.rockStyle.amb ? 1.2 : 1);
     this.roomState(name);
   }
 

@@ -49,7 +49,7 @@ export class CaveDenScene extends CaveBase {
         g.add(new THREE.Mesh(taperTube(br ? pts.slice(0, 3) : pts, 0.016, 0.007, 8, 5), bone));
       }
     }
-    const meat = new THREE.Mesh(rockGeometry(1205, { detail: 3, rough: 0.4, flat: -1, colA: 0x6a2a1c, colB: 0x3a1410, dark: 0.5 }), this.mat('meatV', { vertexColors: true, color: 0xffffff, roughness: 0.6 }));
+    const meat = new THREE.Mesh(rockGeometry(1205, { detail: 3, rough: 0.4, flat: -1, colA: 0x4a2418, colB: 0x22100a, dark: 0.6 }), this.mat('meatV', { vertexColors: true, color: 0xffffff, roughness: 0.6 }));
     meat.scale.set(0.5, 0.12, 0.25); meat.position.set(cx + 0.1, 0.06, cz); g.add(meat);
     const head = this.antlers(cx + 0.95, 0.2, cz + 0.2, bone); head.rotation.set(-1.2, 0.4, 0.2);
     head.children.slice(-2).forEach((m) => { m.visible = false; });   // no plaque and peg on the floor
@@ -291,7 +291,7 @@ export class CaveStoreScene extends CaveBase {
     const poleM = this.mat('tentPole', { color: 0x5a5e62, metalness: 0.6, roughness: 0.5 });
     tent.add(new THREE.Mesh(taperTube([V3(-0.85, 0, 0.1), V3(-0.5, 0.5, 0.05), V3(0, 0.57, 0), V3(0.35, 0.42, -0.05)], 0.008, 0.008, 12, 4), poleM));
     tent.add(new THREE.Mesh(taperTube([V3(0.35, 0.42, -0.05), V3(0.55, 0.62, 0.1), V3(0.62, 0.78, 0.2)], 0.008, 0.007, 6, 4), poleM));   // snapped, sticking out
-    tent.add(new THREE.Mesh(taperTube([V3(-0.6, 0.3, 0.45), V3(-0.9, 0.12, 0.8), V3(-1.1, 0.0, 1.05)], 0.003, 0.003, 6, 3), this.mat('guyline', { color: 0x8a8070, roughness: 1 })));
+    tent.add(new THREE.Mesh(taperTube([V3(-0.6, 0.3, 0.45), V3(-0.9, 0.12, 0.8), V3(-1.1, 0.0, 1.05)], 0.003, 0.003, 6, 3), this.mat('guyline', { color: 0x3a362e, roughness: 1 })));
     this.colliders.push({ x: 1.9, z: -2.5, r: 0.55 });
     const boot = new THREE.Mesh(roundedBox(0.3, 0.12, 0.12, 0.05), this.mat('boot', { color: 0x3a2a1c, roughness: 0.9 })); boot.position.set(-1.3, 0.06, -1.5); boot.rotation.y = 0.6; g.add(boot);
     const shaft = new THREE.Mesh(roundedBox(0.11, 0.18, 0.12, 0.04), this.mats.cache.get('boot')); shaft.position.set(-0.08, 0.12, 0); boot.add(shaft);
