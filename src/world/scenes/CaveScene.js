@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { LocationBase } from '../LocationBase.js';
 import { canvasTexture, rng, glowTexture } from '../../render/textures.js';
 import { glow } from '../props.js';
-import { fbm3, noise3, rockGeometry, rockMaterial, roundedBox, reliefSheet, smoothNormals } from '../nature.js';
+import { fbm3, noise3, rockGeometry, rockMaterial, rockDetailTexture, roundedBox, reliefSheet, smoothNormals } from '../nature.js';
 
 export const sat = (v) => Math.max(0, Math.min(1, v));
 
@@ -150,8 +150,8 @@ function strata(x, y, ox = 0) {
 /** `ox`: the chamber's own origin in the rock field (keeps the bedding planes gentle far from 0). */
 export function wallHeight(x, y, fine = false, ox = 0) {
   let d = (fbm3(x * 0.32, y * 0.32, 0, 23, 4) - 0.5) * 1.5;
-  d -= Math.max(0, fbm3(x * 0.7, y * 0.7, 5, 25, 3) - 0.5) * 3.6;                   // scallops
-  d -= Math.pow(Math.max(0, fbm3(x * 1.1, y * 1.4, 6, 29, 3) - 0.52), 1.5) * 4.0;      // smaller wind-carved cups
+  d -= Math.max(0, fbm3(x * 0.7, y * 0.7, 5, 25, 3) - 0.5) * 2.2;                   // scallops
+  d -= Math.pow(Math.max(0, fbm3(x * 1.1, y * 1.4, 6, 29, 3) - 0.52), 1.5) * 2.4;      // smaller cups
   const fr = strata(x, y, ox);                                                       // cross-bedded layers
   const lay = fr < 0.75 ? fr / 0.75 : (1 - fr) / 0.25;
   d += lay * lay * (3 - 2 * lay) * 0.06;
@@ -185,16 +185,22 @@ const hash1 = (n, s) => { const v = Math.sin(n * 127.1 + s * 311.7) * 43758.5453
 function rockDetail(x, y, st) {
   const cd = Math.cos(st.dip), sd = Math.sin(st.dip);
   const u = y * cd + x * sd + (fbm3(x * 0.18, y * 0.18, 9, st.seed, 2) - 0.5) * 1.3;
-  const bedF = u * 1.7, bi = Math.floor(bedF), bf = bedF - bi;
+  const bedF = u * 1.5 + Math.sin(u * 0.7 + st.seed) * 0.9, bi = Math.floor(bedF), bf = bedF - bi;
   const hb = hash1(bi, st.seed);
   const a2 = st.dip + (hb - 0.5) * 1.6;
   const lam = (y * Math.cos(a2) + x * Math.sin(a2)) * (9 + hb * 8);
   const lf = lam - Math.floor(lam);
-  let h = bf * (0.05 + hb * 0.05) + Math.abs(lf - 0.5) * 0.012;
+  const led = bf < 0.85 ? bf / 0.85 : (1 - bf) / 0.15;                 // each bed a ledge with a short face
+  let h = led * (0.06 + hb * 0.08) + Math.abs(lf - 0.5) * 0.014;
+  // angular facets: ridged noise, sharpened — broken faces, not soft blobs
+  const rdg = 1 - Math.abs(noise3(x * 1.3, y * 1.6, 11, st.seed + 3) - 0.5) * 2;
+  const rdg2 = 1 - Math.abs(noise3(x * 3.1, y * 3.4, 13, st.seed + 6) - 0.5) * 2;
+  h += rdg * rdg * 0.09 + rdg2 * rdg2 * 0.03;
   // joints: near-vertical set and an oblique set, thin and sharp
   const j1 = 1 - Math.abs(noise3(x * 1.6, y * 0.32, 3, st.seed + 1) - 0.5) * 2;
   const j2 = 1 - Math.abs(noise3((x * sd - y * cd) * 0.9, (x * cd + y * sd) * 0.25, 7, st.seed + 2) - 0.5) * 2;
-  const crack = Math.max(sat((j1 - 0.955) / 0.035), sat((j2 - 0.965) / 0.03) * 0.8) * sat(fbm3(x * 0.4, y * 0.4, 1, st.seed + 4, 2) * 2.4 - 0.75);
+  const crack = Math.max(sat((j1 - 0.972) / 0.02) * sat((noise3(x * 0.9, y * 0.5, 5, st.seed + 4) - 0.55) * 6),
+    sat((j2 - 0.978) / 0.018) * 0.8 * sat((noise3(x * 0.6, y * 0.6, 8, st.seed + 5) - 0.6) * 6));
   h -= crack * 0.06;
   return [h, crack, bi, bf, hb];
 }
@@ -218,14 +224,15 @@ const wallBakedTex = (key, w, h, xmin, width, hf, mf, st, lights) => canvasTextu
     for (let i = 0; i < w; i++) {
       const x = xmin + i * sx;
       const hc = rowH[i], hx = rowH[i + 1], hy = prevH[i];
-      let nx = -(hx - hc) / sx * 0.7, ny = -(hy - hc) / sy * 0.7, nz = 1;
+      let nx = -(hx - hc) / sx * 0.9, ny = -(hy - hc) / sy * 0.9, nz = 1;
+      nx = Math.max(-1.4, Math.min(1.4, nx)); ny = Math.max(-1.4, Math.min(1.4, ny));
       const nl = Math.hypot(nx, ny, nz); nx /= nl; ny /= nl; nz /= nl;
       const [, crack, bi, bf, hb] = rockDetail(x, y, st);
       // light: the sum of the fires, with the direction it comes from
       let L = 0.035, lx = 0.3, ly = 0.5, lz = 0.5, warm = 0, cold = 0;
       for (const [px, py, k] of lights) {
         const dx = px - x, dy = py - y, d2 = dx * dx + dy * dy * 1.3;
-        const e = k * Math.exp(-d2 / 5.5);
+        const e = k * Math.exp(-d2 / 4.2);
         if (e < 0.004) continue;
         L += e; const dl = Math.hypot(dx, dy, 1.4); lx += dx / dl * e * 3; ly += dy / dl * e * 3; lz += 1.4 / dl * e * 3;
         if (st.cold != null && px > st.cold) cold += e; else warm += e;
@@ -235,15 +242,15 @@ const wallBakedTex = (key, w, h, xmin, width, hf, mf, st, lights) => canvasTextu
       const t = fbm3(x * 0.5, y * 0.5, 3, 21 + st.seed, 3);
       const k = sat(t * 1.8 - 0.4 + (hb - 0.5) * 0.5);
       const m = mf(x, y);
-      const hollow = Math.max(0, Math.min(0.85, -hc * 0.6 - 0.15)) * Math.min(1, y * 1.5);
-      const under = bf < 0.08 ? 0.55 : 1;                       // the shadowed underside of each bed
-      let shade = Math.min(1.25, L) * (0.25 + 1.05 * dif) * under * (1 - crack * 0.85) * (1 - hollow) * (1 - m);
+      const hollow = Math.max(0, Math.min(0.6, -hc * 0.35 - 0.15)) * Math.min(1, y * 1.5);
+      const under = bf < 0.03 + hb * 0.06 && hb > 0.4 && noise3(x * 0.8, y * 0.8, 2, st.seed + 9) > 0.48 ? 0.62 : 1;   // the shadowed underside of a bed, here and there
+      let shade = Math.min(1.25, L) * (0.1 + 1.25 * Math.pow(dif, 1.4)) * under * (1 - crack * 0.85) * (1 - hollow) * (1 - m);
       const o = (j * w + i) * 4;
       const sand = sat((0.45 - y + (fbm3(x * 0.8, 0, 5, 83, 2) - 0.5) * 0.5) * 2.2) * (1 - m);   // grit drifted up the wall
       const rust = st.rust ? sat((fbm3(x * 5, y * 0.25, 4, st.seed + 6, 3) - 0.62) * 4) * sat(fbm3(x * 0.3, y * 0.3, 2, st.seed + 7, 2) * 2 - 0.6) * st.rust : 0;
       const wet = st.wet ? sat((fbm3(x * 3, y * 0.4, 6, st.seed + 8, 3) - 0.58) * 5) : 0;
       const cw = L > 0 ? warm / L : 0, cc = L > 0 ? cold / L : 0;
-      const tint = [1.0 + 0.32 * cw - 0.12 * cc, 0.92 + 0.04 * cw, 0.86 - 0.12 * cw + 0.22 * cc];
+      const tint = [1.0 + 0.14 * cw - 0.1 * cc, 0.96 + 0.02 * cw, 0.94 - 0.08 * cw + 0.2 * cc];
       for (let c = 0; c < 3; c++) {
         let v = A[c] + (B[c] - A[c]) * k;
         v *= 0.86 + ((bi * 0.37 + hb) % 1) * 0.28;               // beds differ a little in tone
@@ -338,7 +345,7 @@ export class CaveBase extends LocationBase {
     this.ox = (cfg.x0 + cfg.x1) / 2 + (cfg.nx || 0);
     this.rockStyle = ROCK[cfg.id] || ROCK.cave;
     const c3 = (v, k) => new THREE.Color(v[0] * k / 255, v[1] * k / 255, v[2] * k / 255).getHex();
-    this.stoneA = c3(this.rockStyle.a, 1.25); this.stoneB = c3(this.rockStyle.b, 1.2);
+    this.stoneA = c3(this.rockStyle.a, 0.8); this.stoneB = c3(this.rockStyle.b, 0.75);
   }
 
   // ------------------------------------------------------------------ the rock
@@ -389,8 +396,16 @@ export class CaveBase extends LocationBase {
   boulder(seed, x, z, sx, sy, sz, parent = this.root, o = {}) {
     const b = new THREE.Mesh(rockGeometry(seed, { detail: this.low ? 3 : 4, rough: 0.46, sharp: 0.45 + (seed % 5) * 0.08, strata: 1.2, flat: -0.1, colA: this.stoneA, colB: this.stoneB, dark: 0.6, ...o }), this.sandMat);
     b.position.set(x, -0.3 * sy, z); b.scale.set(sx, sy * 0.85, sz); b.rotation.y = seed * 1.3;
+    if (!o.keepLight) { const ca = b.geometry.attributes.color, k = this.lightAt(x); for (let i = 0; i < ca.array.length; i++) ca.array[i] *= k; }
     parent.add(b);
     return b;
+  }
+
+  /** How much fire light reaches x (0.3 in the dark … 1 by a torch): baked into rock colours. */
+  lightAt(x) {
+    let l = 0.18;
+    for (const [lx, , k] of this.lightsAt || []) l += k * 0.9 * Math.exp(-((x - lx) ** 2) / 7);
+    return Math.min(1, l);
   }
 
   /** A boulder that blocks the way: geometry + colliders covering its footprint. */
@@ -438,7 +453,7 @@ export class CaveBase extends LocationBase {
     this.sandMat = rockMaterial(this.low, { roughness: 0.95 });
     const W = c.x1 - c.x0 + 6, cx = (c.x0 + c.x1) / 2;
     this.cx = cx;
-    const lightsAt = [...(c.torches || []).map((x) => [x, 2.1, 1.0]), ...(c.lights || [])];
+    const lightsAt = this.lightsAt = [...(c.torches || []).map((x) => [x, 2.1, 1.0]), ...(c.lights || [])];
     // floor: packed sand and grit, darker towards the walls; it runs on into the passages
     const ft = floorTex().clone(); ft.needsUpdate = true; ft.wrapS = ft.wrapT = THREE.RepeatWrapping; ft.repeat.set(W / 1.28, 9 / 1.28);
     const fgeo = new THREE.PlaneGeometry(W, 9, Math.round(W * 4), 36); fgeo.rotateX(-Math.PI / 2);
@@ -464,12 +479,21 @@ export class CaveBase extends LocationBase {
     const segX = Math.round(W * (this.low ? 3.2 : 4.4)), segY = this.low ? 30 : 44;
     const wgeo = reliefSheet(W, 6.4, segX, segY, (x, y) => this.wallH(x + cx, y + 3.2), (col, x, y, d) => {
       const wx = x + cx, wy = y + 3.2;
-      col.setScalar(1.5 * (1 - sat(-d * 0.5 - 0.2) * 0.4) * (1 - 0.98 * this.darkMask(wx, wy)));
+      col.setScalar(1.15 * (1 - sat(-d * 0.5 - 0.2) * 0.4) * (1 - 0.98 * this.darkMask(wx, wy)));
     });
     const wallMat = rockMaterial(this.low, { roughness: 0.95 });
     const texW = Math.round(W * (this.low ? 30 : 42));
     wallMat.map = wallBakedTex(this.id, texW, this.low ? 214 : 286, cx - W / 2, W, (x, y, f) => this.wallH(x, y, f), (x, y) => this.darkMask(x, y), this.rockStyle, lightsAt);
     wallMat.map.wrapS = wallMat.map.wrapT = THREE.ClampToEdgeWrapping;
+    // fine grain over the baked rock (its own tiling, 1.3 m): keeps the wall crisp up close
+    const det = rockDetailTexture();
+    wallMat.onBeforeCompile = (sh) => {
+      sh.uniforms.uDetail = { value: det };
+      sh.uniforms.uDetRep = { value: new THREE.Vector2(W / 1.3, 6.4 / 1.3) };
+      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform sampler2D uDetail; uniform vec2 uDetRep;')
+        .replace('#include <map_fragment>', '#include <map_fragment>\n  { vec3 dt = texture2D(uDetail, vMapUv * uDetRep).rgb; vec3 dt2 = texture2D(uDetail, vMapUv * uDetRep * 3.7 + 0.31).rgb; diffuseColor.rgb *= (dt * 0.75 + dt2 * 0.55) * 0.95; }');
+    };
+    wallMat.customProgramCacheKey = () => 'caveWallDetail';
     this.wallMat = wallMat;
     const wall = new THREE.Mesh(wgeo, wallMat);
     wall.position.set(cx, 3.2, BACK - 0.5); root.add(wall);
@@ -522,7 +546,7 @@ export class CaveBase extends LocationBase {
     const nD = Math.round(W);
     const drift = new THREE.InstancedMesh(rockGeometry(880 + (c.nx || 0) % 7, { detail: 3, rough: 0.2, flat: -0.05, colA: 0x8a8076, colB: 0x6a625a, dark: 0.25 }), this.sandMat, nD);
     { const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
-      for (let i = 0; i < nD; i++) { let x = cx - W / 2 + i * 0.95 + r() * 0.5; if (nearOpening(x, 0.1)) x = cx - W / 2 - 4; q.setFromEuler(e.set(0, r() * 6, 0)); m.compose(V3(x, -0.04, BACK + 0.15 + r() * 0.5), q, V3(1.0 + r() * 0.9, 0.18 + r() * 0.3, 0.6 + r() * 0.4)); drift.setMatrixAt(i, m); } }
+      for (let i = 0; i < nD; i++) { let x = cx - W / 2 + i * 0.95 + r() * 0.5; if (nearOpening(x, 0.1)) x = cx - W / 2 - 4; q.setFromEuler(e.set(0, r() * 6, 0)); m.compose(V3(x, -0.04, BACK + 0.15 + r() * 0.5), q, V3(1.0 + r() * 0.9, 0.18 + r() * 0.3, 0.6 + r() * 0.4)); drift.setMatrixAt(i, m); drift.setColorAt(i, new THREE.Color().setScalar(this.lightAt(x))); } }
     root.add(drift);
     // broken rock: angular slabs and chips fallen from the beds, round cobbles, flat flakes —
     // three shapes, every piece its own size, squash, tilt and tone; clustered at the wall, sparse on the floor
@@ -546,7 +570,7 @@ export class CaveBase extends LocationBase {
         q.setFromEuler(e.set((r() - 0.5) * (kI === 1 ? 0.3 : 1.2), r() * 6.3, (r() - 0.5) * (kI === 1 ? 0.3 : 1.2)));
         m.compose(V3(x, sc * flatK * 0.25, z), q, V3(sc * (0.8 + r() * 0.9), sc * flatK, sc * (0.7 + r() * 0.6)));
         im.setMatrixAt(i, m);
-        const v = 0.6 + r() * 0.55; im.setColorAt(i, col.setRGB(v * (0.96 + r() * 0.1), v, v * (0.9 + r() * 0.12)));
+        const v = (0.6 + r() * 0.55) * this.lightAt(x); im.setColorAt(i, col.setRGB(v * (0.96 + r() * 0.1), v, v * (0.9 + r() * 0.12)));
       }
       root.add(im);
     });
@@ -562,7 +586,7 @@ export class CaveBase extends LocationBase {
     // decals added by the story (blood)
     this.decals = new THREE.Group(); root.add(this.decals);
     // light
-    const hemi = new THREE.HemisphereLight(0xb4a08a, 0x3a2a1e, 0.95);
+    const hemi = new THREE.HemisphereLight(0x9c9a98, 0x2a2420, 0.95);
     root.add(hemi);
     // light raking along the wall from the right: it is what makes the eroded relief read
     const rake = new THREE.DirectionalLight(0xf0d0a8, 2.0);
@@ -608,7 +632,7 @@ export class CaveBase extends LocationBase {
     const fl = new THREE.Sprite(new THREE.SpriteMaterial({ map: flameTex(), color: 0xffc070, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
     fl.scale.set(0.16 * fs, 0.3 * fs, 1); fl.position.set(top.x, top.y + 0.1 * fs, top.z + 0.06); root.add(fl);
     this.flames.push({ s: fl, ph: x * 5.3, k: fs });
-    const l = new THREE.PointLight(0xff8a40, 5, 7, 1.4); l.position.set(x, y - 0.12, -1.4); root.add(l);
+    const l = new THREE.PointLight(0xffaa70, 5, 7, 1.4); l.position.set(x, y - 0.12, -1.4); root.add(l);
     this.torches.push(l);
     return l;
   }
@@ -663,7 +687,7 @@ export class CaveBase extends LocationBase {
     flame.scale.set(0.7 * s, 0.9 * s, 1); flame.position.y = 0.35 * s; g.add(flame);
     const core = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: 0xffe0a0, transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending }));
     core.scale.set(0.3 * s, 0.45 * s, 1); core.position.y = 0.22 * s; g.add(core);
-    const light = new THREE.PointLight(0xff8a40, 7 * s, 7 * s, 1.4); light.position.y = 0.7; g.add(light);
+    const light = new THREE.PointLight(0xffa060, 7 * s, 7 * s, 1.4); light.position.y = 0.7; g.add(light);
     // the cold ring of stones stays when the fire is out
     const ash = new THREE.Mesh(new THREE.CircleGeometry(0.36 * s, 18), this.mat('ash', { color: 0x2a2420, roughness: 1 }));
     ash.rotation.x = -Math.PI / 2; ash.position.set(x, 0.01, z); parent.add(ash);
@@ -683,32 +707,68 @@ export class CaveBase extends LocationBase {
     for (const ch of f.g.children) if (ch.isMesh && ch.geometry.type === 'CylinderGeometry') ch.material = on ? this.mat('fireLog', { color: 0x2a1c12, roughness: 1 }) : this.mat('fireLogCold', { color: 0x1a1612, roughness: 1 });
   }
 
+  /** A human skull: cranium, brow, cheekbones, sockets, the nose hole, teeth; sometimes no jaw. */
   skull(x, y, z, m = this.boneMat()) {
     const g = new THREE.Group();
-    g.scale.setScalar(1.5);
-    const cr = new THREE.Mesh(new THREE.SphereGeometry(0.1, 14, 10), m); cr.scale.set(1, 0.85, 1.15); g.add(cr);
-    const sn = new THREE.Mesh(roundedBox(0.09, 0.07, 0.1, 0.025), m); sn.position.set(0, -0.05, 0.09); g.add(sn);
-    const eye = new THREE.MeshBasicMaterial({ color: 0x0a0806 });
-    for (const sx of [-0.035, 0.035]) { const e = new THREE.Mesh(new THREE.CircleGeometry(0.022, 10), eye); e.position.set(sx, 0.0, 0.112); g.add(e); }
+    const sd = Math.round(x * 31 + z * 17 + y * 7);
+    g.scale.setScalar(1.15 + hash1(sd, 41) * 0.35);
+    const cGeo = new THREE.SphereGeometry(0.1, 14, 10);
+    { const p = cGeo.attributes.position; for (let i = 0; i < p.count; i++) { const yy = p.getY(i), zz = p.getZ(i); p.setXYZ(i, p.getX(i) * (yy < -0.03 ? 0.85 : 0.92), yy, zz + (zz < 0 && yy > -0.02 ? -0.02 : 0)); } cGeo.computeVertexNormals(); }
+    const cr = new THREE.Mesh(cGeo, m); cr.scale.set(1, 0.92, 1.12); g.add(cr);
+    const face = new THREE.Mesh(roundedBox(0.105, 0.075, 0.07, 0.025, 2), m); face.position.set(0, -0.06, 0.07); g.add(face);
+    for (const s of [-1, 1]) { const ck = new THREE.Mesh(new THREE.SphereGeometry(0.026, 8, 6), m); ck.position.set(s * 0.05, -0.05, 0.075); ck.scale.set(1, 0.7, 1); g.add(ck); }
+    const hole = this.mat('skullHole', { color: 0x120e0a, roughness: 1 });
+    for (const s of [-1, 1]) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.023, 8, 6), hole); e.position.set(s * 0.032, -0.022, 0.1); e.scale.set(1.05, 0.9, 0.45); g.add(e); }
+    const nose = new THREE.Mesh(new THREE.ConeGeometry(0.011, 0.03, 4), hole); nose.position.set(0, -0.06, 0.106); nose.rotation.x = Math.PI; g.add(nose);
+    const teeth = new THREE.Mesh(roundedBox(0.06, 0.016, 0.02, 0.006, 1), this.mat('teeth', { color: 0x9a8a6a, roughness: 0.7 })); teeth.position.set(0, -0.1, 0.092); g.add(teeth);
+    if (hash1(sd, 42) > 0.45) { const jaw = new THREE.Mesh(roundedBox(0.09, 0.03, 0.07, 0.012, 1), m); jaw.position.set(0, -0.125, 0.07); jaw.rotation.x = 0.15; g.add(jaw); }
+    g.rotation.set((hash1(sd, 43) - 0.5) * 0.5, (hash1(sd, 44) - 0.5) * 1.6, (hash1(sd, 45) - 0.5) * 0.6);
     g.position.set(x, y, z);
     return g;
   }
 
-  boneMat() { return this.mat('caveBone', { color: 0xcfc4b0, roughness: 0.8 }); }
+  boneMat() { return this.mat('caveBone2', { color: 0xb8ad94, map: boneTex(), roughness: 0.85 }); }
 
+  /** A deer skull seen from the front: narrow cranium, long face tapering down to the muzzle. */
+  deerSkull(m) {
+    const g = new THREE.Group();
+    const cr = new THREE.Mesh(new THREE.SphereGeometry(0.075, 12, 9), m); cr.scale.set(1.15, 0.85, 0.9); g.add(cr);
+    const fgeo = new THREE.CylinderGeometry(0.06, 0.022, 0.3, 10, 4); fgeo.translate(0, -0.15, 0);
+    { const p = fgeo.attributes.position; for (let i = 0; i < p.count; i++) p.setZ(i, p.getZ(i) * 0.55 + Math.abs(p.getY(i)) * 0.15); fgeo.computeVertexNormals(); }
+    const face = new THREE.Mesh(fgeo, m); face.position.set(0, -0.02, 0.03); g.add(face);
+    const hole = this.mat('skullHole', { color: 0x120e0a, roughness: 1 });
+    for (const s of [-1, 1]) {
+      const orb = new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 6), m); orb.position.set(s * 0.07, -0.05, 0.03); g.add(orb);
+      const e = new THREE.Mesh(new THREE.SphereGeometry(0.02, 8, 6), hole); e.position.set(s * 0.078, -0.05, 0.05); e.scale.set(0.9, 1, 0.5); g.add(e);
+    }
+    const nas = new THREE.Mesh(new THREE.SphereGeometry(0.016, 6, 5), hole); nas.position.set(0, -0.28, 0.06); nas.scale.set(1.2, 1.6, 0.5); g.add(nas);
+    return g;
+  }
+
+  /** Antlers on a deer skull: tapering beams and tines, every pair its own spread and points. */
   antlers(x, y, z, m = this.boneMat()) {
     const g = new THREE.Group();
-    const tube = (pts, r) => new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts.map(([a, b, c]) => V3(a, b, c))), 16, r, 8), m);
+    const sd = Math.round(x * 13 + y * 7 + 50);
+    const spread = 0.8 + hash1(sd, 51) * 0.45, tall = 0.8 + hash1(sd, 52) * 0.4, tines = 2 + Math.floor(hash1(sd, 53) * 3);
     for (const s of [-1, 1]) {
-      g.add(tube([[s * 0.05, 0, 0], [s * 0.22, 0.12, 0.04], [s * 0.34, 0.36, 0.06], [s * 0.36, 0.66, 0.02], [s * 0.3, 0.86, -0.02]], 0.034));
-      for (const [t0, len, lean] of [[0.12, 0.22, 0.4], [0.36, 0.26, 0.2], [0.6, 0.2, 0.1]]) {
-        const bx = s * (0.22 + t0 * 0.2), by = 0.12 + t0 * 0.9;
-        g.add(tube([[bx, by, 0.03], [bx + s * 0.04, by + len * 0.5, 0.05], [bx - s * lean * 0.2, by + len, 0.04]], 0.02));
+      const asym = 1 + (hash1(sd + s, 54) - 0.5) * 0.18;
+      const beam = [[s * 0.05, 0.02, 0], [s * 0.2 * spread, 0.1, 0.05], [s * 0.34 * spread, 0.34 * tall, 0.07], [s * 0.36 * spread, 0.64 * tall * asym, 0.02], [s * 0.27 * spread, 0.86 * tall * asym, -0.04]].map(([a, b, c]) => V3(a, b, c));
+      g.add(new THREE.Mesh(taperTube(beam, 0.03, 0.007, 14, 7), m));
+      const curve = new THREE.CatmullRomCurve3(beam);
+      for (let k = 0; k < tines; k++) {
+        const t0 = 0.12 + k * (0.65 / tines) + hash1(sd + k * 3 + s, 55) * 0.06;
+        const b0 = curve.getPointAt(t0), len = (0.16 + hash1(sd + k + s, 56) * 0.14) * tall;
+        const lean = (k === 0 ? 0.6 : 0.15) * s;
+        g.add(new THREE.Mesh(taperTube([b0, V3(b0.x + lean * len * 0.3, b0.y + len * 0.5, b0.z + 0.05), V3(b0.x - s * len * 0.12 + lean * len * 0.2, b0.y + len, b0.z + 0.07)], 0.017, 0.003, 7, 5), m));
       }
+      const burr = new THREE.Mesh(new THREE.TorusGeometry(0.032, 0.012, 5, 9), m); burr.position.set(s * 0.06, 0.02, 0); burr.rotation.set(Math.PI / 2, 0, s * 0.6); g.add(burr);
     }
-    const skull = this.skull(0, -0.04, 0.04, m); skull.scale.setScalar(1.5); g.add(skull);
-    const plaque = new THREE.Mesh(roundedBox(0.42, 0.55, 0.05, 0.02), this.mat('plaque', { color: 0x4a3020, roughness: 0.8 })); plaque.position.set(0, 0.0, -0.05); g.add(plaque);
-    const peg = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.12, 12), this.mat('peg', { color: 0x2a1a10 })); peg.rotation.x = Math.PI / 2; peg.position.set(0, 0.22, -0.08); g.add(peg);
+    const skull = this.deerSkull(m); skull.position.set(0, 0.0, 0.04); g.add(skull);
+    // lashed to a peg driven into a crack (these two stay last: the den hides them on the floor)
+    const strap = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.012, 5, 12), this.mat('rawhide', { color: 0x3a2a1c, roughness: 1 })); strap.position.set(0, 0.07, -0.02); strap.rotation.x = 0.4; g.add(strap);
+    const peg = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.12, 12), this.mat('peg', { color: 0x2a1a10 })); peg.rotation.x = Math.PI / 2; peg.position.set(0, 0.1, -0.08); g.add(peg);
+    g.rotation.z = (hash1(sd, 57) - 0.5) * 0.25;
+    g.scale.setScalar(0.85 + hash1(sd, 58) * 0.3);
     g.position.set(x, y, z);
     return g;
   }
@@ -729,18 +789,47 @@ export class CaveBase extends LocationBase {
     return m;
   }
 
-  longBone(m = this.boneMat()) {
+  /** A long bone: a slightly bent, tapering shaft with knobbly ends; length varies. */
+  longBone(m = this.boneMat(), k = 1) {
     const g = new THREE.Group();
-    g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.36, 16), m));
-    for (const s of [-1, 1]) { const k = new THREE.Mesh(new THREE.SphereGeometry(0.03, 14, 10), m); k.position.y = s * 0.18; k.scale.set(1.2, 0.8, 1); g.add(k); }
+    const L = 0.36 * k, bend = (k - 1) * 0.05 + 0.012;
+    g.add(new THREE.Mesh(taperTube([V3(0, -L / 2, 0), V3(bend, 0, 0), V3(0, L / 2, 0)], 0.02 * Math.sqrt(k), 0.015 * Math.sqrt(k), 6, 6), m));
+    for (const s of [-1, 1]) {
+      for (const dx of [-0.012, 0.014]) { const kn = new THREE.Mesh(new THREE.SphereGeometry(0.022 * Math.sqrt(k), 8, 6), m); kn.position.set(dx, s * L / 2, 0); kn.scale.set(1, 0.8, 0.9); g.add(kn); }
+    }
     return g;
   }
 
   /** A heap of bones with a skull or two on top. */
   bonePile(x, z, n = 9, parent = this.root, skulls = 1) {
     const bone = this.boneMat();
-    for (let i = 0; i < n; i++) { const b = this.longBone(bone); b.position.set(x + Math.sin(i * 1.7) * 0.32, 0.04 + (i % 4) * 0.025, z + Math.cos(i * 2.3) * 0.22); b.rotation.set(Math.PI / 2, 0, i * 0.9); parent.add(b); }
+    for (let i = 0; i < n; i++) {
+      const b = this.longBone(bone, 0.6 + hash1(i + x * 3, 61) * 0.8);
+      b.position.set(x + Math.sin(i * 1.7) * 0.32, 0.04 + (i % 4) * 0.025, z + Math.cos(i * 2.3) * 0.22);
+      b.rotation.set(Math.PI / 2 + (hash1(i, 62) - 0.5) * 0.4, 0, i * 0.9); parent.add(b);
+    }
+    for (let i = 0; i < Math.round(n / 3); i++) {           // ribs and shards among them
+      const a = i * 2.1 + x, rb = new THREE.Mesh(taperTube([V3(0, 0, 0), V3(0.08, 0.04, 0.02), V3(0.16, 0.0, 0.04)], 0.008, 0.004, 6, 4), bone);
+      rb.position.set(x + Math.cos(a) * 0.3, 0.02, z + Math.sin(a) * 0.2); rb.rotation.y = a; parent.add(rb);
+    }
     for (let k = 0; k < skulls; k++) parent.add(this.skull(x + 0.2 * k - 0.1, 0.14, z + 0.1 * k, bone));
+  }
+
+  /** A crate knocked together from boards: gaps, corner posts, every board its own tone. */
+  plankCrate(w, h, d) {
+    const g = new THREE.Group();
+    const n = Math.max(3, Math.round(h / 0.11)), bh = h / n;
+    for (let i = 0; i < n; i++) {
+      const c = new THREE.Color(0x6a5034).multiplyScalar(0.75 + hash1(i + w * 10, 71) * 0.45);
+      const mm = this.mat(`crateBoard${i % 3}`, { color: c, roughness: 1 });
+      for (const [bw, bd, rot] of [[w, d, 0], [d, w, Math.PI / 2]]) {
+        for (const s of [-1, 1]) { const b = new THREE.Mesh(roundedBox(bw, bh - 0.012, 0.018, 0.005, 1), mm); b.position.set(rot ? s * (w / 2 - 0.009) : 0, bh * (i + 0.5), rot ? 0 : s * (d / 2 - 0.009)); b.rotation.y = rot; g.add(b); }
+      }
+    }
+    const post = this.mat('cratePost', { color: 0x4a3622, roughness: 1 });
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) { const p = new THREE.Mesh(roundedBox(0.04, h, 0.04, 0.008, 1), post); p.position.set(sx * (w / 2 - 0.02), h / 2, sz * (d / 2 - 0.02)); g.add(p); }
+    const lid = new THREE.Mesh(roundedBox(w - 0.03, 0.015, d - 0.03, 0.005, 1), this.mat('crateIn', { color: 0x1a140e, roughness: 1 })); lid.position.y = h * 0.75; g.add(lid);
+    return g;
   }
 
   /** A pelt / blanket thrown on the floor: soft, lumpy, uneven edge. */
@@ -851,7 +940,7 @@ export class CaveScene extends CaveBase {
     stick(-8.1, 0, -7.75, 1.05); stick(-7.45, 0, -7.8, 1.05); stick(-6.95, 0, -6.6, 1.05); stick(-6.3, 0, -6.65, 1.05); stick(-8.0, 1.0, -6.4, 1.0);
     this.meat = new THREE.Mesh(rockGeometry(905, { detail: 3, rough: 0.35, flat: -2, colA: 0x7a3420, colB: 0x4a1a10, dark: 0.5 }), this.mat('meatV', { vertexColors: true, color: 0xffffff, roughness: 0.6 }));
     this.meat.scale.set(0.45, 0.22, 0.22); this.meat.position.set(-7.2, 0.92, -1.5); g.add(this.meat);
-    const crate = new THREE.Mesh(roundedBox(0.6, 0.4, 0.4, 0.03), this.mat('crate', { color: 0x7a5a34, roughness: 1 })); crate.position.set(-4.9, 0.2, -2.6); crate.rotation.y = 0.3; g.add(crate);
+    const crate = this.plankCrate(0.6, 0.4, 0.4); crate.position.set(-4.9, 0, -2.6); crate.rotation.y = 0.3; g.add(crate);
     const can = this.mat('can', { color: 0xa8b0b8, metalness: 0.7, roughness: 0.3 });
     for (let i = 0; i < 5; i++) { const c = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.12, 16), can); c.position.set(-4.4 + i * 0.16, 0.05, -2.2 + (i % 2) * 0.14); c.rotation.z = i % 2 ? Math.PI / 2 : 0; if (!(i % 2)) c.position.y = 0.06; g.add(c); }
     this.colliders.push({ x: -4.9, z: -2.6, r: 0.38 });

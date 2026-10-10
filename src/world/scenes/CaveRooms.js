@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { flareSource } from '../../fx/WindowLight.js';
 import { glowTexture } from '../../render/textures.js';
 import { glow } from '../props.js';
-import { fbm3, rockGeometry, roundedBox, shaftTexture, smoothNormals } from '../nature.js';
-import { CaveBase, BACK, V3, sat, bloodTex, dragTex, outsideTex, archMask } from './CaveScene.js';
+import { fbm3, rockGeometry, roundedBox, shaftTexture } from '../nature.js';
+import { CaveBase, BACK, V3, sat, bloodTex, dragTex, outsideTex, archMask, fabricTex, taperTube } from './CaveScene.js';
 
 /**
  * The chambers around the hall (see CaveScene.js for the map and the construction).
@@ -40,12 +40,13 @@ export class CaveDenScene extends CaveBase {
     // a deer carcass: spine, ribs, the head with its antlers on the sand
     const bone = this.boneMat();
     const cz = -2.3, cx = -3.9;
-    const spine = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.03, 1.3, 16), bone); spine.rotation.z = Math.PI / 2; spine.position.set(cx, 0.32, cz); g.add(spine);
+    const spine = new THREE.Mesh(taperTube([V3(0, -0.65, 0), V3(0.03, 0, 0.01), V3(0, 0.65, 0)], 0.04, 0.022, 12, 7), bone); spine.rotation.z = Math.PI / 2; spine.position.set(cx, 0.32, cz); g.add(spine);
     for (let i = 0; i < 8; i++) {
       const x = cx - 0.45 + i * 0.13;
       for (const s of [-1, 1]) {
-        const curve = new THREE.CatmullRomCurve3([V3(x, 0.32, cz), V3(x + 0.02, 0.26, cz + s * 0.2), V3(x + 0.04, 0.08, cz + s * 0.28), V3(x + 0.05, 0.0, cz + s * 0.22)]);
-        g.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 10, 0.014, 6), bone));
+        const k = 0.75 + Math.sin(i * 0.9) * 0.25, br = i === 2 && s > 0;    // one rib snapped off
+        const pts = [V3(x, 0.32, cz), V3(x + 0.02, 0.26, cz + s * 0.2 * k), V3(x + 0.04, 0.08 + (1 - k) * 0.1, cz + s * 0.28 * k), V3(x + 0.05, 0.0 + (1 - k) * 0.08, cz + s * 0.22 * k)];
+        g.add(new THREE.Mesh(taperTube(br ? pts.slice(0, 3) : pts, 0.016, 0.007, 8, 5), bone));
       }
     }
     const meat = new THREE.Mesh(rockGeometry(1205, { detail: 3, rough: 0.4, flat: -1, colA: 0x6a2a1c, colB: 0x3a1410, dark: 0.5 }), this.mat('meatV', { vertexColors: true, color: 0xffffff, roughness: 0.6 }));
@@ -57,7 +58,7 @@ export class CaveDenScene extends CaveBase {
     // their clothes, folded: jackets, jeans, boots — for when they walk on two legs
     const cl = [0x3a4a5a, 0x5a3a2a, 0x2a2a2a, 0x3a4a6a, 0x6a5a3a, 0x4a2a2a];
     cl.forEach((c, i) => {
-      const m = new THREE.Mesh(roundedBox(0.5, 0.07, 0.36, 0.03), this.mat(`cloth${c}`, { color: c, roughness: 1 }));
+      const m = new THREE.Mesh(roundedBox(0.5 - (i % 3) * 0.04, 0.07, 0.36, 0.03), this.mat(`cloth${c}`, { color: c, map: fabricTex(), roughness: 1 }));
       m.position.set(1.5 + (i % 2) * 0.08, 0.04 + i * 0.07, -2.55 + (i % 3) * 0.03); m.rotation.y = (i % 3 - 1) * 0.15; g.add(m);
     });
     for (let i = 0; i < 3; i++) {
@@ -170,20 +171,24 @@ export class CaveAltarScene extends CaveBase {
 
   buildRoom() {
     const g = this.root;
-    const sgeo = roundedBox(2.6, 0.55, 1.3, 0.07, 4);
-    { const p = sgeo.attributes.position; const col = new Float32Array(p.count * 3); const c = new THREE.Color();
+    // a slab of rock laid across two stones: a natural flat top, broken edges, chisel bites,
+    // the old blood soaked into the top and run down the side
+    const SX = -1.6, SZ = -1.3;
+    const sgeo = rockGeometry(1405, { detail: this.low ? 3 : 4, rough: 0.2, sharp: 0.7, strata: 1.4, flat: -0.6, top: 0.5, colA: 0x7a7470, colB: 0x4a4644, dark: 0.55 });
+    { const p = sgeo.attributes.position, col = sgeo.attributes.color; const c = new THREE.Color(), bl = new THREE.Color(0x3a1210), bl2 = new THREE.Color(0x24100c);
       for (let i = 0; i < p.count; i++) {
         const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
-        const k = (fbm3(x * 2.5, y * 2.5, z * 2.5, 61, 3) - 0.5) * 0.16;
-        p.setXYZ(i, x * (1 + k), y + (y > 0.2 ? k * 0.3 : 0), z * (1 + k));
-        c.setHex(0x8a7868).lerp(new THREE.Color(0x5a4a40), sat(fbm3(x, y, z, 62, 3) * 1.5 - 0.3));
-        if (y > 0.25 && fbm3(x * 1.5, 0, z * 1.5, 63, 3) > 0.52) c.lerp(new THREE.Color(0x3a1410), 0.7);   // old blood soaked into the stone
-        col.set([c.r, c.g, c.b], i * 3);
-      }
-      sgeo.setAttribute('color', new THREE.BufferAttribute(col, 3)); smoothNormals(sgeo); }
-    const SX = -1.6, SZ = -1.3;
+        c.fromArray(col.array, i * 3);
+        const top = sat((y - 0.3) * 4);
+        const pool = fbm3(x * 1.8, 0, z * 1.8, 63, 3);
+        if (top > 0 && pool > 0.5) c.lerp(bl, Math.min(0.85, (pool - 0.5) * 6) * top);
+        const run = sat((fbm3(x * 9, 0, z * 2, 64, 2) - 0.6) * 5) * sat(0.6 - Math.abs(y)) * (z > 0.3 ? 1 : 0);
+        if (run > 0) c.lerp(bl2, run * 0.8);                                   // runs down the front face
+        col.setXYZ(i, c.r, c.g, c.b);
+      } }
     const slab = new THREE.Mesh(sgeo, this.sandMat);
-    slab.position.set(SX, 0.275, SZ); slab.rotation.y = 0.04; g.add(slab);
+    slab.scale.set(1.36, 0.22, 0.7); slab.position.set(SX, 0.42, SZ); slab.rotation.y = 0.04; g.add(slab);
+    for (const s of [-1, 1]) this.boulder(1406 + s, SX + s * 0.85, SZ + 0.05, 0.42, 0.42, 0.55, g, { colA: 0x5e5854, colB: 0x34302e, sharp: 0.9 });
     this.colliders.push({ box: { minX: SX - 1.35, maxX: SX + 1.35, minZ: SZ - 0.68, maxZ: SZ + 0.68 }, pushX: false });
     const bone = this.boneMat();
     for (const [dx, dz] of [[-1.1, -0.5], [1.15, 0.45]]) g.add(this.skull(SX + dx, 0.62, SZ + dz, bone));
@@ -235,27 +240,71 @@ export class CaveStoreScene extends CaveBase {
 
   buildRoom() {
     const g = this.root;
-    const packs = [0x2a4a6a, 0x7a2a2a, 0x3a5a2a, 0xb07a20, 0x4a3a5a, 0x2a5a5a];
-    const packGeo = roundedBox(0.36, 0.5, 0.22, 0.08), pocketGeo = roundedBox(0.26, 0.18, 0.08, 0.04);
+    // backpacks: faded, dusty nylon, slumped; lids, straps, side pockets
+    const packs = [0x3a4c5e, 0x6e3e36, 0x46523a, 0x8a7040, 0x4a4454, 0x3a5656];
+    const slump = (geo, seed, k = 0.05) => {
+      const p = geo.attributes.position;
+      for (let i = 0; i < p.count; i++) {
+        const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+        const n = fbm3(x * 6 + seed, y * 6, z * 6, seed, 2) - 0.5;
+        p.setXYZ(i, x * (1 + n * 0.4) + Math.sin(y * 18 + seed) * k * 0.15, y - Math.max(0, y) * k * (1 + n), z * (1 + n * 0.5 + Math.sin(x * 20 + seed) * k * 0.4));
+      }
+      geo.computeVertexNormals(); return geo;
+    };
+    const fab = fabricTex();
+    const strapM = this.mat('packStrap', { color: 0x1e1c1a, roughness: 1 });
     this.extraPack = null;
     packs.forEach((c, i) => {
-      const pm = this.mat(`hpack${i}`, { color: c, roughness: 0.9 });
+      const pm = this.mat(`hpack${i}`, { color: c, map: fab, roughness: 0.95 });
       const x = -3.7 + i * 0.75, z = -2.55 + (i % 2) * 0.3;
-      const b = new THREE.Mesh(packGeo, pm); b.position.set(x, 0.25, z); b.rotation.set(0, i, i % 2 ? 0.3 : -0.2); g.add(b);
-      const pk = new THREE.Mesh(pocketGeo, pm); pk.position.set(0, -0.08, 0.12); b.add(pk);
+      const b = new THREE.Mesh(slump(roundedBox(0.36, 0.5, 0.22, 0.08, 3), 400 + i, 0.08), pm);
+      b.position.set(x, 0.25, z); b.rotation.set(i % 3 === 2 ? -1.2 : 0, i, i % 2 ? 0.3 : -0.2); g.add(b);
+      if (i % 3 === 2) b.position.y = 0.13;                                         // fallen on its back
+      const pk = new THREE.Mesh(slump(roundedBox(0.26, 0.18, 0.08, 0.04, 2), 420 + i, 0.03), pm); pk.position.set(0, -0.08, 0.12); b.add(pk);
+      const lid = new THREE.Mesh(slump(roundedBox(0.34, 0.1, 0.24, 0.05, 2), 440 + i, 0.02), pm); lid.position.set(0, 0.22, 0.01); lid.rotation.x = 0.15; b.add(lid);
+      for (const sx of [-0.09, 0.09]) { const st = new THREE.Mesh(roundedBox(0.035, 0.42, 0.015, 0.006, 1), strapM); st.position.set(sx, 0.0, -0.115); st.rotation.x = 0.06; b.add(st); }
+      const side = new THREE.Mesh(roundedBox(0.06, 0.16, 0.14, 0.03, 2), pm); side.position.set(i % 2 ? 0.2 : -0.2, -0.1, 0); b.add(side);
       if (i === 5) this.extraPack = b;   // the newest one (L4)
       this.colliders.push({ x, z, r: 0.24 });
     });
-    // a torn orange tent, a boot, a sleeping bag, a camp pot, a phone
-    const tentGeo = new THREE.ConeGeometry(0.9, 0.9, 16, 6, true);
-    { const tp = tentGeo.attributes.position; for (let i = 0; i < tp.count; i++) { const k = 1 + (fbm3(tp.getX(i) * 3, tp.getY(i) * 3, tp.getZ(i) * 3, 41, 2) - 0.5) * 0.5; tp.setX(i, tp.getX(i) * k); tp.setZ(i, tp.getZ(i) * k); } tentGeo.computeVertexNormals(); }
-    const tent = new THREE.Mesh(tentGeo, this.mat('torntent', { color: 0xc86a1c, roughness: 0.9, side: THREE.DoubleSide }));
-    tent.position.set(1.9, 0.4, -2.55); tent.rotation.set(0.2, 0.5, 0.35); g.add(tent);
+    // a torn, collapsed dome tent: faded orange nylon in folds, a snapped pole, the door gaping
+    const tentGeo = new THREE.SphereGeometry(0.9, 36, 14, 0, Math.PI * 2, 0, Math.PI / 2);
+    { const tp = tentGeo.attributes.position;
+      for (let i = 0; i < tp.count; i++) {
+        const x = tp.getX(i), y = tp.getY(i), z = tp.getZ(i), a = Math.atan2(z, x);
+        const fold = Math.sin(a * 9 + fbm3(x * 2, y * 2, z * 2, 43, 2) * 6) * 0.06 * (0.3 + y);
+        const sag = Math.max(0, x) * 0.45 * y + fbm3(x * 3, y * 3, z * 3, 41, 2) * 0.25 * y;   // the right half has fallen in
+        const k = 1 + fold;
+        tp.setXYZ(i, x * k, Math.max(0.0, y * 0.62 - sag * 0.6), z * k * 0.8);
+      }
+      tentGeo.computeVertexNormals(); }
+    const tentMat = this.mat('torntent2', { color: 0x9a5e34, map: fab, roughness: 0.9, side: THREE.DoubleSide });
+    const tent = new THREE.Group(); tent.position.set(1.9, 0.0, -2.55); tent.rotation.set(0, 0.5, 0); g.add(tent);
+    tent.add(new THREE.Mesh(tentGeo, tentMat));
+    const fly = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.5, 6, 4), this.mat('tentFly', { color: 0x5a5a4a, map: fab, roughness: 1, side: THREE.DoubleSide }));
+    { const fp = fly.geometry.attributes.position; for (let i = 0; i < fp.count; i++) fp.setZ(i, Math.sin(fp.getX(i) * 9) * 0.04 + fp.getY(i) * fp.getY(i) * 0.4); fly.geometry.computeVertexNormals(); }
+    fly.position.set(-0.45, 0.32, 0.25); fly.rotation.set(-0.9, -0.6, 0.3); tent.add(fly);
+    const door = new THREE.Mesh(new THREE.CircleGeometry(0.22, 12, 0, Math.PI), this.mat('tentDoor', { color: 0x120e0c, roughness: 1, side: THREE.DoubleSide }));
+    door.scale.set(1, 1.3, 1); door.position.set(-0.15, 0.02, 0.7); door.rotation.y = -0.2; tent.add(door);
+    const poleM = this.mat('tentPole', { color: 0x5a5e62, metalness: 0.6, roughness: 0.5 });
+    tent.add(new THREE.Mesh(taperTube([V3(-0.85, 0, 0.1), V3(-0.5, 0.5, 0.05), V3(0, 0.57, 0), V3(0.35, 0.42, -0.05)], 0.008, 0.008, 12, 4), poleM));
+    tent.add(new THREE.Mesh(taperTube([V3(0.35, 0.42, -0.05), V3(0.55, 0.62, 0.1), V3(0.62, 0.78, 0.2)], 0.008, 0.007, 6, 4), poleM));   // snapped, sticking out
+    tent.add(new THREE.Mesh(taperTube([V3(-0.6, 0.3, 0.45), V3(-0.9, 0.12, 0.8), V3(-1.1, 0.0, 1.05)], 0.003, 0.003, 6, 3), this.mat('guyline', { color: 0x8a8070, roughness: 1 })));
     this.colliders.push({ x: 1.9, z: -2.5, r: 0.55 });
     const boot = new THREE.Mesh(roundedBox(0.3, 0.12, 0.12, 0.05), this.mat('boot', { color: 0x3a2a1c, roughness: 0.9 })); boot.position.set(-1.3, 0.06, -1.5); boot.rotation.y = 0.6; g.add(boot);
     const shaft = new THREE.Mesh(roundedBox(0.11, 0.18, 0.12, 0.04), this.mats.cache.get('boot')); shaft.position.set(-0.08, 0.12, 0); boot.add(shaft);
-    const bag = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.75, 18), this.mat('sleepbag', { color: 0x2a4a3a, roughness: 0.9 }));
-    bag.rotation.z = Math.PI / 2; bag.rotation.y = 0.4; bag.position.set(-0.4, 0.15, -1.95); g.add(bag);
+    // a sleeping bag, half unrolled, quilted, flattened by whoever slept on it
+    const bagGeo = new THREE.CylinderGeometry(0.17, 0.15, 0.8, 18, 10);
+    { const bp = bagGeo.attributes.position;
+      for (let i = 0; i < bp.count; i++) {
+        const x = bp.getX(i), y = bp.getY(i), z = bp.getZ(i);
+        const n = fbm3(x * 5, y * 5, z * 5, 47, 2) - 0.5;
+        bp.setXYZ(i, x * (0.55 + n * 0.3) + Math.sin(y * 12) * 0.01, y, z * (1 + n * 0.3));
+      }
+      bagGeo.computeVertexNormals(); }
+    const bag = new THREE.Mesh(bagGeo, this.mat('sleepbag2', { color: 0x4a5444, map: fabricTex('quilt'), roughness: 0.95 }));
+    bag.rotation.set(0, 0.4, Math.PI / 2); bag.position.set(-0.4, 0.09, -1.95); g.add(bag);
+    const sack = new THREE.Mesh(slump(new THREE.CylinderGeometry(0.08, 0.09, 0.22, 10, 3), 48, 0.02), this.mat('stuffsack', { color: 0x2e3436, map: fab, roughness: 1 })); sack.position.set(-0.05, 0.08, -2.25); sack.rotation.set(0.2, 0, 1.3); g.add(sack);
     this.colliders.push({ x: -0.4, z: -1.95, r: 0.3 });
     const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.1, 0.14, 20), this.mat('camppot', { color: 0x7a7a74, metalness: 0.6, roughness: 0.45 })); pot.position.set(0.9, 0.07, -1.6); pot.rotation.z = 1.2; g.add(pot);
     const phone = new THREE.Mesh(roundedBox(0.075, 0.012, 0.15, 0.006), this.mat('deadphone', { color: 0x141618, metalness: 0.3, roughness: 0.25 }));
@@ -306,8 +355,8 @@ export class CaveTunnelScene extends CaveBase {
     const g = this.root;
     // the tunnel narrows towards the mouth
     this.solidBoulder(1601, 9.6, -2.3, 0.8, 1.1, 0.6);
-    this.solidBoulder(1602, 12.5, -2.25, 0.7, 2.2, 0.6, g, { colA: 0x4a3828, colB: 0x2a1e16 });
-    this.solidBoulder(1603, 15.4, -2.2, 0.8, 2.4, 0.6, g, { colA: 0x4a3828, colB: 0x2a1e16 });
+    this.solidBoulder(1602, 12.5, -2.25, 0.7, 2.2, 0.6, g, { colA: 0x3e3e42, colB: 0x1e1e22 });
+    this.solidBoulder(1603, 15.4, -2.2, 0.8, 2.4, 0.6, g, { colA: 0x3e3e42, colB: 0x1e1e22 });
     for (let i = 0; i < 5; i++) this.boulder(950 + i, 9 + i * 1.3, 1.25 + (i % 2) * 0.3, 0.5, 0.45, 0.35);
     this.stalagmite(1604, -1.2, 0.5, 1.0, 0.24);
     this.stalagmite(1605, 6.2, -1.7, 1.3, 0.28);
@@ -315,10 +364,10 @@ export class CaveTunnelScene extends CaveBase {
     // the mouth: the night outside through a ragged arch, more of it round the last bend
     const mouthOpen = new THREE.Mesh(new THREE.PlaneGeometry(2.3, 2.6), new THREE.MeshBasicMaterial({ map: outsideTex(), alphaMap: archMask(), transparent: true, depthWrite: false }));
     mouthOpen.position.set(14.0, 1.25, BACK - 1.0); g.add(mouthOpen);
-    const lintel = this.boulder(962, 14.0, BACK + 0.8, 1.6, 0.5, 0.6, g, { colA: 0x4a3828, colB: 0x2a1e16 }); lintel.position.y = 2.45;
+    const lintel = this.boulder(962, 14.0, BACK + 0.8, 1.6, 0.5, 0.6, g, { colA: 0x3e3e42, colB: 0x1e1e22 }); lintel.position.y = 2.45;
     const outside = new THREE.Mesh(new THREE.PlaneGeometry(7, 4.4), new THREE.MeshBasicMaterial({ map: outsideTex() }));
     outside.position.set(17.6, 1.9, -1.0); outside.rotation.y = -Math.PI / 2; g.add(outside);
-    for (const [z, h] of [[-3.6, 3.4], [1.6, 2.6]]) this.boulder(1610 + Math.round(z), 17.0, z, 0.9, h, 1.0, g, { colA: 0x3a2c20, colB: 0x22180f });
+    for (const [z, h] of [[-3.6, 3.4], [1.6, 2.6]]) this.boulder(1610 + Math.round(z), 17.0, z, 0.9, h, 1.0, g, { colA: 0x2e2e32, colB: 0x18181c });
     const pool = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 2.4), new THREE.MeshBasicMaterial({ map: glowTexture(), color: 0x6a88c0, transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending }));
     pool.rotation.x = -Math.PI / 2; pool.position.set(14.4, 0.03, -1.0); g.add(pool);
     const mg = glow(0xa8b8d8, 4.0, 0.35); mg.position.set(15.4, 1.3, -0.8); g.add(mg);
