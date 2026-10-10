@@ -431,7 +431,7 @@ async function paintPhoto(kind, atlas) {
   const W = 240, H = 180;
   const c = document.createElement('canvas');
   c.width = W; c.height = H;
-  const x = c.getContext('2d');
+  const x = c.getContext('2d', { willReadFrequently: true });
   const r = mulberry(kind.length * 977 + 3), n = valueNoise(kind.length * 31 + 5);
   const sprite = (name, dx, dy, k = 1) => {
     if (!atlas?.has(name)) return;
@@ -484,7 +484,7 @@ async function paintPhoto(kind, atlas) {
         x.fillStyle = '#3e2c22'; x.beginPath(); x.ellipse(0, 0, 22, 8, 0, 0, 7); x.fill();                        // the body
         x.beginPath(); x.ellipse(-24, -3, 7, 4.5, -0.4, 0, 7); x.fill(); x.fillRect(-20, -6, 6, 6);               // neck + head
         x.strokeStyle = '#3e2c22'; x.lineWidth = 2.6; x.lineCap = 'round';
-        for (const [lx, a] of [[-14, 1.05], [-9, 1.2], [9, 1.0], [14, 1.18]]) { x.beginPath(); x.moveTo(lx, 5); x.lineTo(lx + Math.cos(a) * 9, 5 + Math.sin(a) * 9); x.lineTo(lx + Math.cos(a) * 9 + 3, 5 + Math.sin(a) * 9 + 8); x.stroke(); }  // stiff legs, all to one side
+        for (const [lx, a] of [[-13, -1.9], [-8, -1.7], [9, -1.35], [14, -1.15]]) { x.beginPath(); x.moveTo(lx, -5); x.lineTo(lx + Math.cos(a) * 15, -5 + Math.sin(a) * 15); x.stroke(); }  // stiff legs in the air: dead on its back
         x.fillStyle = '#7a1c16'; x.beginPath(); x.ellipse(2, -1, 11, 5, 0, 0, 7); x.fill();                        // the opened flank
         x.strokeStyle = '#d8c8b8'; x.lineWidth = 1.1; for (let k2 = 0; k2 < 6; k2++) { x.beginPath(); x.arc(2 + k2 * 2.6 - 6, 3, 5, 3.6, 5.6); x.stroke(); }
         x.strokeStyle = '#5a4a3a'; x.lineWidth = 1.2; x.beginPath(); x.moveTo(-28, -6); x.lineTo(-34, -16); x.lineTo(-38, -14); x.moveTo(-33, -14); x.lineTo(-30, -20); x.stroke(); // antler

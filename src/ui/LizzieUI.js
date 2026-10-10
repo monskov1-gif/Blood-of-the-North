@@ -106,10 +106,10 @@ export class LizzieUI {
       const grid = el('div', 'cc-grid', w);
       const note = el('div', 'lz-map-hint', w, `Найдите, что не так на записях (${need})`);
       let found = 0;
-      frames.forEach((f) => {
+      frames.forEach((f, i) => {
         const c = el('button', 'cc-frame', grid);
         const cv = document.createElement('canvas'); cv.width = 480; cv.height = 300; c.appendChild(cv);
-        requestAnimationFrame(() => paintCCTV(cv, f));
+        setTimeout(() => paintCCTV(cv, f), 60 + i * 90); // one still per tick, so the panel opens at once
         el('span', 'cc-mark', c);
         c.addEventListener('click', () => {
           if (c.classList.contains('seen')) return;

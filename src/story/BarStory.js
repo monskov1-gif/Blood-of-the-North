@@ -99,11 +99,14 @@ export class BarStory {
     J.placeAt(this.scene.spawns.player.x, this.scene.spawns.player.z, 1);
     K.sit(a.kaydenSeat, -1); K.setPose('idle'); K.setVisible(true);
     this.owen.sit(a.owenSeat, -1); this.owen.setPose('idle'); this.owen.setVisible(true);
+    this.owenShade?.setVisible(false);
     this.waiter.stand(); this.waiter.placeAt(4.8, -2.15, -1); this.waiter.setPose('idle'); this.waiter.setVisible(true);
     this.bartender.placeAt(-2.6, -4.2, -1); this.bartender.setPose('idle');
     this.bartender.shadow.visible = false;
-    this.patronB.sit({ x: STOOLS_X[1], z: STOOL_Z }, 1); this.patronB.setPose('idle');
-    this.patronB.root.position.y = STOOL_LIFT;
+    // Chris stands at the bar, elbow on the counter (no seated frame for him: the patched-on legs
+    // of the old one read as fake)
+    this.patronB.stand(); this.patronB.placeAt(STOOLS_X[1] + 0.25, STOOL_Z + 0.35, 1); this.patronB.setPose('idle');
+    this.patronB.root.position.y = 0;
     this.placeCrowd();
     this.waiter2.stand(); this.waiter2.placeAt(8.8, -2.2, 1); this.waiter2.setVisible(true);
     this.coupe.visible = false;
@@ -370,6 +373,17 @@ export class BarStory {
     this.owen.sit({ x: -8.98, z: -1.2 }, 1);
     this.owen.setPose('look');
     this.owen.setVisible(true);
+    // …and his black silhouette in the foreground, between Julian and the camera, watching him go
+    if (!this.owenShade) {
+      this.owenShade = new Character2D(g.atlas, { ...CHARACTERS.owen, id: 'owenShade', tint: 0x000000, selfLight: 0x000000 });
+      this.chars.set('owenShade', this.owenShade);
+    }
+    const sh = this.owenShade;
+    this.scene.root.add(sh.root);
+    sh.setVisible(true); sh.stand(); sh.shadow.visible = false;
+    sh.placeAt(a.julianSeat.x - 3.2, 2.6, 1);
+    sh.setPose('idle');
+    sh.root.scale.setScalar(1.08);
     g.cameraSys.setShot(null, 0.8);
     g.cameraSys.snap();
     g.state.set('objective', 'air');
@@ -388,8 +402,9 @@ export class BarStory {
     g.player.enabled = false;
     g.hud.show(false);
     // the stranger flickers out of existence
-    for (let i = 0; i < 6; i++) { this.owen.setVisible(i % 2 === 1); await sleep(0.09 + Math.random() * 0.1); }
+    for (let i = 0; i < 6; i++) { this.owen.setVisible(i % 2 === 1); this.owenShade?.setVisible(i % 2 === 0); await sleep(0.09 + Math.random() * 0.1); }
     this.owen.setVisible(false);
+    this.owenShade?.setVisible(false);
     g.hallucination.setPhase(6);
     g.audio.play('sfx.shatter');
     await sleep(0.4);

@@ -74,8 +74,8 @@ export const scratchTex = (kind) => PX(`scratch-${kind}`, 48, 48, (ctx, w, h) =>
     const n = Math.ceil(Math.hypot(x1 - x0, y1 - y0));
     for (let i = 0; i <= n; i++) {
       const t = i / n, x = Math.round(x0 + (x1 - x0) * t), y = Math.round(y0 + (y1 - y0) * t);
-      ctx.fillStyle = rgb(40, 26, 18, 0.9); ctx.fillRect(x, y, 1, 1);
-      ctx.fillStyle = rgb(220, 196, 160, 0.55); ctx.fillRect(x + 1, y, 1, 1);
+      ctx.fillStyle = rgb(46, 30, 20, 0.75); ctx.fillRect(x, y, 1, 1);
+      ctx.fillStyle = rgb(150, 120, 90, 0.3); ctx.fillRect(x + 1, y, 1, 1);
     }
   };
   if (kind === 'tally') {

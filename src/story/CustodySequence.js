@@ -118,6 +118,56 @@ const methods = {
     if (STAGE_MUSIC[stage]) g.audio.music(STAGE_MUSIC[stage], 2.5);
   },
 
+  /**
+   * The water comes straight back out: a spray of droplets from his mouth that arcs down onto the
+   * floor and the seat in front, and a dark wet patch that stays a while.
+   */
+  spitSpray() {
+    const g = this.g, J = this.julian;
+    const root = g.world.root;
+    const head = J.root.getWorldPosition(new THREE.Vector3());
+    root.worldToLocal(head);
+    head.y += (J.frameH || 1.3) * (J.seated ? 0.86 : 0.9);
+    head.x += J.facing * 0.12;
+    head.z += 0.04;
+    const n = 34;
+    const geo = new THREE.SphereGeometry(0.009, 6, 5);
+    const mat = new THREE.MeshBasicMaterial({ color: 0xcfe0ea, transparent: true, opacity: 0.85, depthWrite: false });
+    const drops = new THREE.InstancedMesh(geo, mat, n);
+    drops.frustumCulled = false;
+    root.add(drops);
+    const P = [], V = [];
+    for (let i = 0; i < n; i++) {
+      P.push(head.clone().add(new THREE.Vector3((Math.random() - 0.5) * 0.02, (Math.random() - 0.5) * 0.02, (Math.random() - 0.5) * 0.02)));
+      const sp = 1.2 + Math.random() * 1.6;
+      const a = (Math.random() - 0.5) * 0.7;
+      V.push(new THREE.Vector3(J.facing * sp * Math.cos(a), 0.4 + Math.random() * 0.9, sp * Math.sin(a) * 0.6));
+    }
+    const floorY = Math.max(0, J.root.position.y + 0.02);
+    const m = new THREE.Matrix4();
+    let t = 0, last = performance.now();
+    const step = () => {
+      const now = performance.now(); const dt = Math.min(0.05, (now - last) / 1000); last = now; t += dt;
+      for (let i = 0; i < n; i++) {
+        if (P[i].y > floorY) { V[i].y -= 9.8 * dt; P[i].addScaledVector(V[i], dt); }
+        const s = P[i].y <= floorY ? 0.6 : 1;
+        m.makeScale(s, s, s).setPosition(P[i]);
+        drops.setMatrixAt(i, m);
+      }
+      drops.instanceMatrix.needsUpdate = true;
+      mat.opacity = Math.max(0, 0.85 - Math.max(0, t - 0.7) * 1.4);
+      if (t < 1.4) requestAnimationFrame(step); else { drops.removeFromParent(); geo.dispose(); mat.dispose(); }
+    };
+    requestAnimationFrame(step);
+    // the wet patch on the floor in front of him
+    const wet = new THREE.Mesh(new THREE.CircleGeometry(0.16, 20), new THREE.MeshBasicMaterial({ color: 0x0a0c10, transparent: true, opacity: 0, depthWrite: false }));
+    wet.rotation.x = -Math.PI / 2; wet.scale.set(1.6, 0.8, 1);
+    wet.position.set(head.x + J.facing * 0.55, floorY + 0.005, head.z);
+    root.add(wet);
+    setTimeout(() => { wet.material.opacity = 0.35; }, 450);
+    setTimeout(() => wet.removeFromParent(), 40000);
+  },
+
   /** Coat or hospital gown: sprites, lying frame and the VN portrait. */
   setOutfit(name) {
     const o = JULIAN_OUTFITS[name];
@@ -162,6 +212,7 @@ const methods = {
         await sleep(1.0);
         g.audio.play('sfx.spit');
         g.cameraSys.shake = 0.5;
+        this.spitSpray();
         if (w.bottle) w.bottle.visible = false;
         this.julian.setPose('idle');
         await sleep(0.6);

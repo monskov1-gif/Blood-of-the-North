@@ -385,7 +385,7 @@ function drawScene(x, cam, cfg, opts = {}) {
 /** light map: ambient + pools under every pendant + the window glow; multiplied over the scene */
 function lightScene(x, cam, cfg, W, H) {
   const L = document.createElement('canvas'); L.width = W; L.height = H;
-  const l = L.getContext('2d');
+  const l = L.getContext('2d', { willReadFrequently: true });
   l.fillStyle = gray(cfg.day ? 168 : 92); l.fillRect(0, 0, W, H);
   if (!cfg.day) { // the camera's own IR illuminator: a hot spot on the near floor, falling off with distance
     const ir = l.createRadialGradient(W / 2, H * 1.05, 0, W / 2, H * 1.05, H * 1.1); ir.addColorStop(0, gray(150)); ir.addColorStop(0.55, gray(60)); ir.addColorStop(1, gray(0));
@@ -484,12 +484,12 @@ function cast(kind, day) {
  * One CCTV still (frame = the story's { cam, tc, kind }); paints into the canvas as it is sized.
  */
 export function paintCCTV(cv, frame) {
-  const W = cv.width, H = cv.height, out = cv.getContext('2d');
+  const W = cv.width, H = cv.height, out = cv.getContext('2d', { willReadFrequently: true });
   const hour = parseInt(frame.tc, 10) || 0, day = hour >= 5 && hour < 12, kind = frame.kind;
   const seed = (frame.cam * 977 + (frame.tc || '').split('').reduce((a, c) => a * 31 + c.charCodeAt(0), 7)) >>> 0;
   const r = mulberry(seed);
   const S = document.createElement('canvas'); S.width = W; S.height = H;
-  const x = S.getContext('2d');
+  const x = S.getContext('2d', { willReadFrequently: true });
   const camN = CAMS[frame.cam] ? frame.cam : 1;
   const cam = CAMS[kind === 'mirror' ? 'mirror' : kind === 'cocktail' ? 2 : camN](W, H);
   const cfg = { day, kind, people: cast(kind, day) };
@@ -503,7 +503,7 @@ export function paintCCTV(cv, frame) {
     let reflection = null;
     if (kind === 'mirror' || kind === 'cocktail' || camN === 2) {
       const mc = cam.mirror(MIRROR.x), R = document.createElement('canvas'); R.width = W; R.height = H;
-      const rx = R.getContext('2d'); drawScene(rx, mc, cfg, { mirror: true }); bloom(rx, mc, cfg);
+      const rx = R.getContext('2d', { willReadFrequently: true }); drawScene(rx, mc, cfg, { mirror: true }); bloom(rx, mc, cfg);
       reflection = R;
     }
     drawScene(x, cam, cfg, { reflection });
@@ -620,7 +620,7 @@ const CLIFF = curve([[70, 7.5], [76, 6], [82, 5.6], [87, 4.6]], 8).concat(curve(
 /** height in metres at map units (mx, my), from the precomputed grid + fine detail */
 export function paintValleyMap(cv, opts = {}) {
   const W = (cv.width = 1200), H = (cv.height = 840), U = W / 100;
-  const x = cv.getContext('2d');
+  const x = cv.getContext('2d', { willReadFrequently: true });
   const julian = !!opts.julian;
   const R = mulberry(julian ? 417 : 1104), n1 = valueNoise(11), n2 = valueNoise(23), n3 = valueNoise(37), n4 = valueNoise(51);
   const river = riverPts();
@@ -657,7 +657,7 @@ export function paintValleyMap(cv, opts = {}) {
     const k = py * W + px, mx = px / U, my = py / U, h = Hh[k];
     const hx = Hh[k + (px < W - 1 ? 1 : 0)] - Hh[k - (px > 0 ? 1 : 0)], hy = Hh[k + (py < H - 1 ? W : 0)] - Hh[k - (py > 0 ? W : 0)];
     const shade = clamp(1 + (-hx * 0.7 - hy * 0.7) * 0.012, 0.86, 1.08);
-    const grain = 1 + (fbm(n2, px * 0.05, py * 0.05, 3) - 0.5) * 0.07 + (R() - 0.5) * 0.045;
+    const grain = 1 + (n2(px * 0.05, py * 0.05) - 0.5) * 0.07 + (R() - 0.5) * 0.045;
     const t = smooth(700, 1150, h);
     let cr = base[0] * (1 - t * 0.02) + t * 4, cg = base[1] * (1 - t * 0.07), cb = base[2] * (1 - t * 0.16);
     cg *= 1 + (1 - t) * 0.012;
@@ -850,7 +850,7 @@ export function paintValleyMap(cv, opts = {}) {
     pencilCircle(35, 18.6, 2.2, 1.6); hand('?', 37.6, 17.4, 0.1, 30);
     hand('мост — камера ДОТ', 5.5, 61.5, -0.03, 22);
     // round evidence stamp, faded: drawn on its own sheet, eroded, then pressed onto the map
-    const st = document.createElement('canvas'), sr = 5.6 * U; st.width = st.height = Math.ceil(sr * 2.4); const y = st.getContext('2d');
+    const st = document.createElement('canvas'), sr = 5.6 * U; st.width = st.height = Math.ceil(sr * 2.4); const y = st.getContext('2d', { willReadFrequently: true });
     y.translate(st.width / 2, st.height / 2); y.strokeStyle = '#4a3a8a'; y.fillStyle = '#4a3a8a'; y.lineWidth = 3; y.beginPath(); y.arc(0, 0, sr, 0, 7); y.stroke(); y.lineWidth = 1.2; y.beginPath(); y.arc(0, 0, sr * 0.7, 0, 7); y.stroke();
     y.font = 'bold 11px "Courier New", monospace'; const ring = 'КККП · УАЙТХОРС · ОТДЕЛ ТЯЖКИХ ПРЕСТУПЛЕНИЙ · ';
     [...ring].forEach((ch, i) => { y.save(); y.rotate((i / ring.length) * Math.PI * 2); y.fillText(ch, -3, -sr * 0.78); y.restore(); });

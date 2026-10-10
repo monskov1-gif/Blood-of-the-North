@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { flareSource } from '../../fx/WindowLight.js';
 import { bevelBox, spruceStand, roundedBox } from '../nature.js';
 import { LocationBase } from '../LocationBase.js';
 import { canvasTexture, rng, glowTexture } from '../../render/textures.js';
@@ -406,7 +405,9 @@ export class PoliceCarScene extends LocationBase {
     // painted VN backdrop: from the back seat, past the cage to the dash and the road
     this.shots = { car: { pos: [-1.05, 1.32, 0.05], look: [0.7, 1.05, -0.9], fov: 64 } };
     this.vnHide = [];
-    this.windowLights = [flareSource('LOWSUN', new THREE.Vector3(14, 10, -66), { always: true, intensity: 0.55, flareSize: 0.7 })];
+    // no lens flare in the car: the sun sits behind the dark roof line, and a star burning out of a
+    // dark part of the frame read as a sticker (owner, after 0.13)
+    this.windowLights = [];
     return this.root;
   }
 

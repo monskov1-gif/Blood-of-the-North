@@ -245,12 +245,38 @@ export class LocationBase {
     c.width = 256; c.height = 160;
     const tex = new THREE.CanvasTexture(c);
     tex.colorSpace = THREE.SRGBColorSpace;
-    this.box(0.5, 0.36, 0.16, this.mat('monitorBody', { color: 0x2a2e32, roughness: 0.5 }), 0, 0, -0.06, g);
-    const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.44, 0.28), new THREE.MeshBasicMaterial({ map: tex }));
-    screen.position.z = 0.025;
+    // housing: a rounded shell, a lighter bezel with the screen set into it, keys and a knob
+    // under the screen, a carry handle on top (the screen sits clearly in front of every face —
+    // a coplanar screen z-fought with the shell into a black slab)
+    const shell = new THREE.Mesh(roundedBox(0.52, 0.42, 0.13, 0.03, 3), this.mat('monitorShell', { color: 0x3a3f44, roughness: 0.55 }));
+    shell.position.set(0, -0.02, -0.075);
+    g.add(shell);
+    const bezel = new THREE.Mesh(roundedBox(0.49, 0.38, 0.02, 0.012, 2), this.mat('monitorBezel', { color: 0x9aa2a6, roughness: 0.45 }));
+    bezel.position.set(0, -0.02, -0.004);
+    g.add(bezel);
+    const recess = new THREE.Mesh(new THREE.PlaneGeometry(0.45, 0.29), this.mat('monitorRecess', { color: 0x0c0e10, roughness: 0.8 }));
+    recess.position.set(0, 0.015, 0.0075);
+    g.add(recess);
+    const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.43, 0.27), new THREE.MeshBasicMaterial({ map: tex }));
+    screen.position.set(0, 0.015, 0.009);
     g.add(screen);
-    const halo = glow(0x40ff90, 0.9, 0.22);
-    halo.position.z = 0.1;
+    const keyM = this.mat('monitorKey', { color: 0x2a2e32, roughness: 0.4 });
+    for (let i = 0; i < 5; i++) {
+      const k = new THREE.Mesh(roundedBox(0.035, 0.016, 0.008, 0.004, 1), keyM);
+      k.position.set(-0.17 + i * 0.05, -0.17, 0.008);
+      g.add(k);
+    }
+    const knob = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.02, 0.014, 18), this.mat('monitorKnob', { color: 0x1e2226, roughness: 0.35, metalness: 0.3 }));
+    knob.rotation.x = Math.PI / 2; knob.position.set(0.18, -0.17, 0.01);
+    g.add(knob);
+    const led = new THREE.Mesh(new THREE.CircleGeometry(0.005, 10), new THREE.MeshBasicMaterial({ color: 0x40ff90 }));
+    led.position.set(0.12, -0.17, 0.0075);
+    g.add(led);
+    const handle = new THREE.Mesh(new THREE.TorusGeometry(0.07, 0.009, 8, 20, Math.PI), this.mat('monitorShell', { color: 0x3a3f44, roughness: 0.55 }));
+    handle.position.set(0, 0.185, -0.075); handle.scale.y = 0.55;
+    g.add(handle);
+    const halo = glow(0x40ff90, 0.55, 0.16);
+    halo.position.z = 0.06;
     g.add(halo);
     g.position.set(x, y, z);
     this.root.add(g);

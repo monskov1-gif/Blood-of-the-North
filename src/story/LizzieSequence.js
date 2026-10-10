@@ -651,7 +651,7 @@ const methods = {
     phase = 'night';
     this.lzCaveSetState('L3N');
     girlsAsleep();
-    L.placeAt(5.0, -0.8, 1);
+    L.placeAt(3.9, -0.4, 1);
     g.cameraSys.snap();
     await g.fader.to(false, 1200);
     if (!(await this.lines(g.dialogue.dialogues.l3_night))) return;
@@ -749,7 +749,7 @@ const methods = {
     const A = () => g.world.anchors;
     g.narrative.tickDays(19);
     g.narrative.setChar('lizzie', 'captive');
-    L.placeAt(5.0, -0.7, -1);
+    L.placeAt(3.9, -0.4, 1);
     const ol = this.lzCastIn('olivia', 'lz_olivia', 6.4, -1.5, -1);
     const vi = this.lzCastIn('vikki', 'lz_vikki', 7.6, -1.2, -1);
     // the pack is spread through the chambers: by the fires, in the den, at the mouth; Bob in the store
@@ -831,7 +831,7 @@ const methods = {
     g.player.enabled = false;
     g.hud.show(false);
     this.endPlace();
-    await L.walkTo({ x: 5.2, z: -0.6 }, { speed: 1.4 });
+    await L.walkTo({ x: 4.1, z: -0.3 }, { speed: 1.4 });
     L.face(1);
     g.letterbox.set(true, 900);
     g.cameraSys.setShot({ x: 3.6, y: 1.8, z: 4.6, lookX: 3.4, lookY: 1.1, lookZ: -1.4, fov: 40 }, 1.4);

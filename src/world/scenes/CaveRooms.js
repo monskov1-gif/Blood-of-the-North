@@ -397,6 +397,8 @@ export class CaveRiftScene extends CaveBase {
     const st = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1.2), new THREE.MeshLambertMaterial({ map: bloodTex(2), transparent: true, alphaTest: 0.3, depthWrite: false }));
     st.rotation.x = -Math.PI / 2; st.position.set(-4.4, 0.013, -2.1); this.purielGroup.add(st);
     this.straw([[-4.6, -2.3]], this.purielGroup, 120, 745);
+    // a little cold light reaches the alcove from the crack, so what lies there can be seen
+    this.alcoveLight = new THREE.PointLight(0x9aa8c8, 3.5, 4.5, 1.3); this.alcoveLight.position.set(-4.0, 1.4, -0.9); g.add(this.alcoveLight);
     this.anchors.puriel = { x: -4.4, z: -2.15 };
     this.anchors.crack = V3(-1.2, 2.4, -1.2);
     this.anchors.pool = V3(1.6, 0.4, -0.9);
