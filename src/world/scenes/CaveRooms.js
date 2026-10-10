@@ -268,24 +268,26 @@ export class CaveStoreScene extends CaveBase {
       this.colliders.push({ x, z, r: 0.24 });
     });
     // a torn, collapsed dome tent: faded orange nylon in folds, a snapped pole, the door gaping
-    const tentGeo = new THREE.SphereGeometry(0.9, 36, 14, 0, Math.PI * 2, 0, Math.PI / 2);
+    const tentGeo = new THREE.SphereGeometry(0.9, 40, 16, 0, Math.PI * 2, 0, Math.PI / 2);
     { const tp = tentGeo.attributes.position;
       for (let i = 0; i < tp.count; i++) {
         const x = tp.getX(i), y = tp.getY(i), z = tp.getZ(i), a = Math.atan2(z, x);
-        const fold = Math.sin(a * 9 + fbm3(x * 2, y * 2, z * 2, 43, 2) * 6) * 0.06 * (0.3 + y);
-        const sag = Math.max(0, x) * 0.45 * y + fbm3(x * 3, y * 3, z * 3, 41, 2) * 0.25 * y;   // the right half has fallen in
+        const fold = Math.sin(a * 11 + fbm3(x * 2, y * 2, z * 2, 43, 2) * 9) * 0.07 * (0.2 + y) + (fbm3(x * 4, y * 4, z * 4, 44, 2) - 0.5) * 0.18;
+        const sag = sat(x + 0.2) * 0.75 * y + fbm3(x * 3, y * 3, z * 3, 41, 2) * 0.3 * y;   // the right half has fallen in
+        const dent = Math.exp(-((x - 0.15) ** 2 + z * z) * 6) * 0.25;                       // and the roof caved where the pole broke
         const k = 1 + fold;
-        tp.setXYZ(i, x * k, Math.max(0.0, y * 0.62 - sag * 0.6), z * k * 0.8);
+        tp.setXYZ(i, x * k * (1 + sat(x) * 0.25), Math.max(0.01, y * 0.7 - sag * 0.6 - dent * y), z * k * 0.85);
       }
       tentGeo.computeVertexNormals(); }
-    const tentMat = this.mat('torntent2', { color: 0x9a5e34, map: fab, roughness: 0.9, side: THREE.DoubleSide });
+    const tentMat = this.mat('torntent2', { color: 0x80583c, map: fab, roughness: 0.9, side: THREE.DoubleSide });
     const tent = new THREE.Group(); tent.position.set(1.9, 0.0, -2.55); tent.rotation.set(0, 0.5, 0); g.add(tent);
     tent.add(new THREE.Mesh(tentGeo, tentMat));
     const fly = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.5, 6, 4), this.mat('tentFly', { color: 0x5a5a4a, map: fab, roughness: 1, side: THREE.DoubleSide }));
     { const fp = fly.geometry.attributes.position; for (let i = 0; i < fp.count; i++) fp.setZ(i, Math.sin(fp.getX(i) * 9) * 0.04 + fp.getY(i) * fp.getY(i) * 0.4); fly.geometry.computeVertexNormals(); }
     fly.position.set(-0.45, 0.32, 0.25); fly.rotation.set(-0.9, -0.6, 0.3); tent.add(fly);
-    const door = new THREE.Mesh(new THREE.CircleGeometry(0.22, 12, 0, Math.PI), this.mat('tentDoor', { color: 0x120e0c, roughness: 1, side: THREE.DoubleSide }));
-    door.scale.set(1, 1.3, 1); door.position.set(-0.15, 0.02, 0.7); door.rotation.y = -0.2; tent.add(door);
+    const tear = new THREE.Mesh(new THREE.CircleGeometry(0.2, 7), this.mat('tentDoor', { color: 0x0e0b09, roughness: 1, side: THREE.DoubleSide }));
+    { const tp = tear.geometry.attributes.position; for (let i = 1; i < tp.count; i++) { const k = 0.5 + ((i * 7) % 5) * 0.15; tp.setXY(i, tp.getX(i) * k, tp.getY(i) * k * 1.4); } }
+    tear.scale.setScalar(0.6); tear.position.set(-0.32, 0.22, 0.62); tear.rotation.set(-0.6, -0.5, 0.3); tent.add(tear);
     const poleM = this.mat('tentPole', { color: 0x5a5e62, metalness: 0.6, roughness: 0.5 });
     tent.add(new THREE.Mesh(taperTube([V3(-0.85, 0, 0.1), V3(-0.5, 0.5, 0.05), V3(0, 0.57, 0), V3(0.35, 0.42, -0.05)], 0.008, 0.008, 12, 4), poleM));
     tent.add(new THREE.Mesh(taperTube([V3(0.35, 0.42, -0.05), V3(0.55, 0.62, 0.1), V3(0.62, 0.78, 0.2)], 0.008, 0.007, 6, 4), poleM));   // snapped, sticking out

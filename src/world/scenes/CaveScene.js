@@ -169,49 +169,56 @@ export function wallHeight(x, y, fine = false, ox = 0) {
 const ROCK = {
   cave: { a: [92, 84, 76], b: [54, 50, 48], dip: 0.42, seed: 3, rust: 0.5 },
   cave_den: { a: [96, 82, 68], b: [56, 48, 42], dip: -0.52, seed: 11, rust: 0.7 },
-  cave_deep: { a: [70, 72, 72], b: [36, 40, 42], dip: 0.66, seed: 23, wet: 1 },
+  cave_deep: { a: [80, 82, 82], b: [42, 46, 48], dip: 0.66, seed: 23, wet: 1, amb: 0.22 },
   cave_altar: { a: [92, 70, 62], b: [48, 34, 32], dip: -0.34, seed: 37, rust: 1 },
   cave_store: { a: [86, 82, 76], b: [50, 48, 46], dip: 0.3, seed: 41, rust: 0.3 },
   cave_tunnel: { a: [74, 78, 84], b: [42, 44, 50], dip: -0.62, seed: 53, cold: 12.5 },
-  cave_rift: { a: [64, 68, 76], b: [32, 34, 40], dip: 0.82, seed: 67, wet: 1 },
+  cave_rift: { a: [70, 74, 82], b: [36, 38, 46], dip: 0.82, seed: 67, wet: 1, coldX: [-1.2], amb: 0.16 },
 };
 const hash1 = (n, s) => { const v = Math.sin(n * 127.1 + s * 311.7) * 43758.5453; return v - Math.floor(v); };
 
 /**
- * The rock's own fracture pattern (texture only): blocks split along oblique bedding planes and
- * joints — an anisotropic Voronoi, every block a flat broken facet of its own tilt and tone, a
- * finer set of fractures inside. Fills RD with the facet slope, crack, edge, block and bed tone.
+ * The rock's own fracture pattern (texture only): long bedding planes at the chamber's dip, broken
+ * here and there; cross joints in some beds, leaning; every block between them a broken facet of
+ * its own tilt and tone; rough grain on top. Fills RD with slope, crack, edge, block and bed tone.
  */
 const RD = { gx: 0, gy: 0, crack: 0, tone: 0, row: 0, edge: 0 };
-const VO = { f: 0, id: 0, j: 0 }, VO2 = { f: 0, id: 0, j: 0 };
-function voro(U, V, s, out) {
-  const i0 = Math.floor(U), j0 = Math.floor(V);
-  let f1 = 9, f2 = 9, id = 0, rj = 0;
-  for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
-    const i = i0 + di, j = j0 + dj, h = i * 73 + j * 1291;
-    const px = i + 0.15 + hash1(h, s) * 0.7, py = j + 0.2 + hash1(h, s + 1) * 0.6;
-    const dx = U - px, dy = V - py, d = Math.sqrt(dx * dx + dy * dy);
-    if (d < f1) { f2 = f1; f1 = d; id = h; rj = j; } else if (d < f2) f2 = d;
-  }
-  out.f = f2 - f1; out.id = id; out.j = rj;
-  return out;
-}
 function rockDetail(x, y, st) {
   const cd = Math.cos(st.dip), sd = Math.sin(st.dip);
-  const wu = (fbm3(x * 0.35, y * 0.35, 9, st.seed, 2) - 0.5) * 0.9, wv = (fbm3(x * 0.5, y * 0.5, 4, st.seed + 1, 2) - 0.5) * 0.5;
-  const u = x * cd + y * sd + wu, v = -x * sd + y * cd + wv;
-  const bl = st.block || 0.9, bt = st.bed || 0.36;
-  voro(u / bl, v / bt, st.seed, VO);
-  voro(u / (bl * 0.38), v / (bt * 0.55), st.seed + 7, VO2);
-  const id = VO.id;
-  RD.gx = (hash1(id, st.seed + 2) - 0.5) * 1.3;
-  RD.gy = (hash1(id, st.seed + 3) - 0.35) * 1.1;
-  RD.tone = hash1(id, st.seed + 4);
-  RD.row = hash1(VO.j, st.seed + 5);
-  const open = 0.03 + hash1(id, st.seed + 6) * 0.07;                    // some joints gape, some are hairlines
-  RD.crack = 1 - sat(VO.f / open);
-  RD.edge = 1 - sat(VO.f / (open + 0.16));                             // the rounded, shadowed lip of each block
-  RD.crack = Math.max(RD.crack, (1 - sat(VO2.f / 0.035)) * 0.55 * (hash1(VO2.id, st.seed + 8) > 0.45 ? 1 : 0));
+  const wu = (fbm3(x * 0.3, y * 0.3, 9, st.seed, 2) - 0.5) * 1.2;
+  const u = x * cd + y * sd + wu;
+  const v0 = -x * sd + y * cd + (fbm3(x * 0.16, y * 0.3, 4, st.seed + 1, 3) - 0.5) * 1.3 + (noise3(x * 1.4, y * 1.4, 1, st.seed + 16) - 0.5) * 0.09;
+  const bt = st.bed || 0.42;
+  // beds of uneven thickness
+  const V = v0 / bt + (fbm3(v0 * 0.7, 0.5, 1, st.seed + 14, 2) - 0.5) * 5;
+  const row = Math.floor(V), fv = V - row;
+  const hr = hash1(row, st.seed + 5);
+  // cross joints: per bed their own spacing, offset and lean
+  const bl = (st.block || 1.1) * (0.6 + hr * 0.9);
+  const U = (u + (fv - 0.5) * bt * (hr - 0.5) * 2.2) / bl + hr * 7;
+  const seg = Math.floor(U), fu = U - seg;
+  const id = row * 131 + seg;
+  const hb = hash1(id, st.seed + 2);
+  // bedding-plane crack: long, but it closes up in places
+  const bedOpen = sat((noise3(u * 0.3, row * 1.7, 2, st.seed + 9) - 0.52) * 4) * (hr > 0.5 ? 0.012 + hr * 0.035 : 0);
+  const dv = Math.min(fv, 1 - fv) * bt;
+  const cBed = bedOpen > 0 ? 1 - sat(dv / bedOpen) : 0;
+  const jointOn = hb > 0.62 ? (0.01 + hash1(id, st.seed + 3) * 0.03) : 0;
+  const fw = fu + (noise3(x * 3, y * 3, 5, st.seed + 15) - 0.5) * 0.25;
+  const du = Math.min(Math.abs(fw), Math.abs(1 - fw)) * bl;
+  const cJoint = jointOn ? 1 - sat(du / jointOn) : 0;
+  // hairline fractures
+  const hl = 1 - Math.abs(noise3(x * 2.2, y * 0.8, 3, st.seed + 11) - 0.5) * 2;
+  const cHair = sat((hl - 0.975) / 0.02) * sat((noise3(x * 0.7, y * 0.7, 6, st.seed + 12) - 0.55) * 6) * 0.7;
+  RD.crack = Math.max(cBed, cJoint, cHair);
+  RD.edge = Math.max(bedOpen > 0 ? 1 - sat(dv / (bedOpen + 0.08)) : 0, jointOn ? 1 - sat(du / (jointOn + 0.06)) : 0);
+  // facet of the block + rough grain
+  const e = 0.03, g0 = fbm3(x * 2.4, y * 2.4, 7, st.seed + 13, 2);
+  const gxN = (fbm3((x + e) * 2.4, y * 2.4, 7, st.seed + 13, 2) - g0) / e, gyN = (fbm3(x * 2.4, (y + e) * 2.4, 7, st.seed + 13, 2) - g0) / e;
+  RD.gx = (hb - 0.5) * 0.9 + gxN * 0.14 + (fv - 0.5) * sd * 0.25;
+  RD.gy = (hash1(id, st.seed + 4) - 0.4) * 0.8 + gyN * 0.14 - (fv - 0.5) * cd * 0.25;   // each bed bulges a little
+  RD.tone = hb;
+  RD.row = hr;
   return RD;
 }
 
@@ -238,13 +245,13 @@ const wallBakedTex = (key, w, h, xmin, width, hf, mf, st, lights) => canvasTextu
       nx = Math.max(-1.6, Math.min(1.6, nx)); ny = Math.max(-1.6, Math.min(1.6, ny));
       const nl = Math.hypot(nx, ny, nz); nx /= nl; ny /= nl; nz /= nl;
       // light: the sum of the fires, with the direction it comes from
-      let L = 0.03, lx = 0.25, ly = 0.45, lz = 0.6, warm = 0, cold = 0;
+      let L = st.amb ?? 0.11, lx = 0.25, ly = 0.45, lz = 0.6, warm = 0, cold = L * 0.7;
       for (const [px, py, k] of lights) {
         const dx = px - x, dy = py - y, d2 = dx * dx + dy * dy * 1.3;
-        const e = k * Math.exp(-d2 / 4.2);
+        const e = k * Math.exp(-d2 / 5.2);
         if (e < 0.004) continue;
         L += e; const dl = Math.hypot(dx, dy, 1.2); lx += dx / dl * e * 3; ly += dy / dl * e * 3; lz += 1.2 / dl * e * 3;
-        if (st.cold != null && px > st.cold) cold += e; else warm += e;
+        if ((st.cold != null && px > st.cold) || st.coldX?.some((cx) => Math.abs(cx - px) < 0.05)) cold += e; else warm += e;
       }
       const ll = Math.hypot(lx, ly, lz);
       const dif = Math.max(0, (nx * lx + ny * ly + nz * lz) / ll);
@@ -274,6 +281,18 @@ const wallBakedTex = (key, w, h, xmin, width, hf, mf, st, lights) => canvasTextu
   }
   ctx.putImageData(img, 0, 0);
 }, { aniso: 4 });
+
+/** Fur: matted strands in clumps, lighter tips, darker hide showing through. */
+const furTex = () => canvasTexture('cave-fur', 128, 128, (ctx, w, h) => {
+  const r = rng(431);
+  ctx.fillStyle = '#8a8076'; ctx.fillRect(0, 0, w, h);
+  for (let i = 0; i < 2600; i++) {
+    const x = r() * w, y = r() * h, a = Math.sin(x * 0.05) * 0.8 + Math.cos(y * 0.07) * 0.6 + (r() - 0.5) * 0.5, L = 3 + r() * 7;
+    const v = 110 + r() * 145;
+    ctx.strokeStyle = `rgba(${v | 0},${(v * 0.92) | 0},${(v * 0.82) | 0},0.55)`; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(a) * L, y + Math.sin(a) * L); ctx.stroke();
+  }
+});
 
 /** Dirty old bone: yellow-grey, stained in the pores, darker where it lay in the dirt. */
 const boneTex = () => canvasTexture('cave-bone', 64, 64, (ctx, w, h) => {
@@ -353,8 +372,8 @@ export class CaveBase extends LocationBase {
     this.doors = [];
     this.ox = (cfg.x0 + cfg.x1) / 2 + (cfg.nx || 0);
     this.rockStyle = ROCK[cfg.id] || ROCK.cave;
-    const c3 = (v, k) => new THREE.Color(v[0] * k / 255, v[1] * k / 255, v[2] * k / 255).getHex();
-    this.stoneA = c3(this.rockStyle.a, 0.8); this.stoneB = c3(this.rockStyle.b, 0.75);
+    const c3 = (v, k) => (hex(v[0] * k) << 16) | (hex(v[1] * k) << 8) | hex(v[2] * k);   // sRGB, like the wall texture
+    this.stoneA = c3(this.rockStyle.a, 1.4); this.stoneB = c3(this.rockStyle.b, 1.3);
   }
 
   // ------------------------------------------------------------------ the rock
@@ -412,8 +431,8 @@ export class CaveBase extends LocationBase {
 
   /** How much fire light reaches x (0.3 in the dark … 1 by a torch): baked into rock colours. */
   lightAt(x) {
-    let l = 0.18;
-    for (const [lx, , k] of this.lightsAt || []) l += k * 0.9 * Math.exp(-((x - lx) ** 2) / 7);
+    let l = 0.32;
+    for (const [lx, , k] of this.lightsAt || []) l += k * 0.8 * Math.exp(-((x - lx) ** 2) / 8);
     return Math.min(1, l);
   }
 
@@ -491,8 +510,8 @@ export class CaveBase extends LocationBase {
       col.setScalar(1.15 * (1 - sat(-d * 0.5 - 0.2) * 0.4) * (1 - 0.98 * this.darkMask(wx, wy)));
     });
     const wallMat = rockMaterial(this.low, { roughness: 0.95 });
-    const texW = Math.round(W * (this.low ? 30 : 42));
-    wallMat.map = wallBakedTex(this.id, texW, this.low ? 214 : 286, cx - W / 2, W, (x, y, f) => this.wallH(x, y, f), (x, y) => this.darkMask(x, y), this.rockStyle, lightsAt);
+    const texW = Math.round(W * (this.low ? 36 : 48));
+    wallMat.map = wallBakedTex(this.id, texW, this.low ? 240 : 310, cx - W / 2, W, (x, y, f) => this.wallH(x, y, f), (x, y) => this.darkMask(x, y), this.rockStyle, lightsAt);
     wallMat.map.wrapS = wallMat.map.wrapT = THREE.ClampToEdgeWrapping;
     // fine grain over the baked rock (its own tiling, 1.3 m): keeps the wall crisp up close
     const det = rockDetailTexture();
@@ -553,7 +572,7 @@ export class CaveBase extends LocationBase {
     }
     // grit drifted against the foot of the wall (no hard seam)
     const nD = Math.round(W);
-    const drift = new THREE.InstancedMesh(rockGeometry(880 + (c.nx || 0) % 7, { detail: 3, rough: 0.2, flat: -0.05, colA: 0x8a8076, colB: 0x6a625a, dark: 0.25 }), this.sandMat, nD);
+    const drift = new THREE.InstancedMesh(rockGeometry(880 + (c.nx || 0) % 7, { detail: 3, rough: 0.45, sharp: 0.6, flat: -0.05, colA: this.stoneA, colB: this.stoneB, dark: 0.35 }), this.sandMat, nD);
     { const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
       for (let i = 0; i < nD; i++) { let x = cx - W / 2 + i * 0.95 + r() * 0.5; if (nearOpening(x, 0.1)) x = cx - W / 2 - 4; q.setFromEuler(e.set(0, r() * 6, 0)); m.compose(V3(x, -0.04, BACK + 0.15 + r() * 0.5), q, V3(1.0 + r() * 0.9, 0.18 + r() * 0.3, 0.6 + r() * 0.4)); drift.setMatrixAt(i, m); drift.setColorAt(i, new THREE.Color().setScalar(this.lightAt(x))); } }
     root.add(drift);
@@ -622,21 +641,28 @@ export class CaveBase extends LocationBase {
     const root = this.root;
     const n = this.torches.length, hs = hash1(x * 3.7 + n, 9);
     y += (hs - 0.5) * 0.4;
-    const len = 0.38 + hash1(x, 11) * 0.3, rx = -0.25 - hash1(x, 12) * 0.35, rz = (hash1(x, 13) - 0.5) * 0.7;
+    const len = [0.62, 0.42, 0.55, 0.36][n % 4] + hash1(x, 11) * 0.1, rx = -0.2 - hash1(x, 12) * 0.4, rz = [0.32, -0.42, 0.08, -0.2][n % 4] + (hash1(x, 13) - 0.5) * 0.2;
     const zw = Math.max(BACK + 0.55, Math.min(BACK + 1.3, this.wallZ(x, y) + 0.12));
     const g = new THREE.Group(); g.position.set(x, y - len, zw); g.rotation.set(rx, 0, rz); root.add(g);
-    const stickGeo = new THREE.CylinderGeometry(0.018, 0.03, len, 7, 3); stickGeo.translate(0, len / 2, 0);
+    const stickGeo = new THREE.CylinderGeometry(0.022, 0.034, len, 7, 3); stickGeo.translate(0, len / 2, 0);
     { const p = stickGeo.attributes.position; for (let i = 0; i < p.count; i++) { const t = p.getY(i) / len; p.setX(i, p.getX(i) + Math.sin(t * 3 + x) * 0.02); } stickGeo.computeVertexNormals(); }
     g.add(new THREE.Mesh(stickGeo, this.mat('torchStick', { color: 0x3a2c20, roughness: 1 })));
-    const head = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.035, 0.13, 8, 2), this.mat('torchHead', { color: 0x1a1410, roughness: 1, flatShading: true }));
+    const head = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.042, 0.16, 8, 2), this.mat('torchHead', { color: 0x1a1410, roughness: 1, flatShading: true }));
     head.position.y = len + 0.03; head.rotation.y = hs * 3; g.add(head);
-    for (let k = 0; k < 2; k++) { const w = new THREE.Mesh(new THREE.TorusGeometry(0.044, 0.008, 4, 10), this.mat('torchWrap', { color: 0x4a3a2a, roughness: 1 })); w.rotation.x = Math.PI / 2 + (k - 0.5) * 0.3; w.position.y = len - 0.02 + k * 0.07; g.add(w); }
+    for (let k = 0; k < 2; k++) { const w = new THREE.Mesh(new THREE.TorusGeometry(0.058, 0.01, 4, 10), this.mat('torchWrap', { color: 0x4a3a2a, roughness: 1 })); w.rotation.x = Math.PI / 2 + (k - 0.5) * 0.3; w.position.y = len - 0.02 + k * 0.07; g.add(w); }
+    if (n % 2 === 0) {                                         // an iron ring hammered into the rock
+      const iron = this.mat('torchIron', { color: 0x2a2826, metalness: 0.6, roughness: 0.6 });
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.045, 0.01, 5, 12), iron); ring.rotation.x = Math.PI / 2; ring.position.y = len * 0.55; g.add(ring);
+      const spike = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.012, 0.2, 5), iron); spike.rotation.x = Math.PI / 2; spike.position.set(0, len * 0.55, -0.1); g.add(spike);
+    } else {                                                   // or wedged with stones in a crack
+      for (let k = 0; k < 3; k++) this.rock((k - 1) * 0.05, 0.03 + k * 0.02, -0.02, 0.05, 0.035, 0.04, this.mat('torchWedge', { color: 0x4a4440, roughness: 1 }), g, k + n);
+    }
     g.updateMatrixWorld(true);
     const top = V3(0, len + 0.1, 0).applyMatrix4(g.matrixWorld);
     // soot licked up the rock above the flame
     const soot = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 1.1), new THREE.MeshBasicMaterial({ map: glowTexture(), color: 0x000000, transparent: true, opacity: 0.55, depthWrite: false }));
     soot.position.set(top.x + rz * -0.2, top.y + 0.45, Math.max(this.wallZ(top.x, top.y + 0.45) + 0.06, zw - 0.05)); root.add(soot);
-    const fs = 0.8 + hash1(x, 14) * 0.5;
+    const fs = [1.4, 1.05, 1.25, 0.9][n % 4] + hash1(x, 14) * 0.25;
     const t = glow(0xff9a48, 0.4 * fs, 0.28); t.position.set(top.x, top.y + 0.02, top.z + 0.08); root.add(t);
     const fl = new THREE.Sprite(new THREE.SpriteMaterial({ map: flameTex(), color: 0xffc070, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
     fl.scale.set(0.16 * fs, 0.3 * fs, 1); fl.position.set(top.x, top.y + 0.1 * fs, top.z + 0.06); root.add(fl);
@@ -741,8 +767,8 @@ export class CaveBase extends LocationBase {
   /** A deer skull seen from the front: narrow cranium, long face tapering down to the muzzle. */
   deerSkull(m) {
     const g = new THREE.Group();
-    const cr = new THREE.Mesh(new THREE.SphereGeometry(0.075, 12, 9), m); cr.scale.set(1.15, 0.85, 0.9); g.add(cr);
-    const fgeo = new THREE.CylinderGeometry(0.06, 0.022, 0.3, 10, 4); fgeo.translate(0, -0.15, 0);
+    const cr = new THREE.Mesh(new THREE.SphereGeometry(0.09, 12, 9), m); cr.scale.set(1.15, 0.85, 0.9); g.add(cr);
+    const fgeo = new THREE.CylinderGeometry(0.075, 0.026, 0.34, 10, 4); fgeo.translate(0, -0.15, 0);
     { const p = fgeo.attributes.position; for (let i = 0; i < p.count; i++) p.setZ(i, p.getZ(i) * 0.55 + Math.abs(p.getY(i)) * 0.15); fgeo.computeVertexNormals(); }
     const face = new THREE.Mesh(fgeo, m); face.position.set(0, -0.02, 0.03); g.add(face);
     const hole = this.mat('skullHole', { color: 0x120e0a, roughness: 1 });
@@ -762,13 +788,13 @@ export class CaveBase extends LocationBase {
     for (const s of [-1, 1]) {
       const asym = 1 + (hash1(sd + s, 54) - 0.5) * 0.18;
       const beam = [[s * 0.05, 0.02, 0], [s * 0.2 * spread, 0.1, 0.05], [s * 0.34 * spread, 0.34 * tall, 0.07], [s * 0.36 * spread, 0.64 * tall * asym, 0.02], [s * 0.27 * spread, 0.86 * tall * asym, -0.04]].map(([a, b, c]) => V3(a, b, c));
-      g.add(new THREE.Mesh(taperTube(beam, 0.03, 0.007, 14, 7), m));
+      g.add(new THREE.Mesh(taperTube(beam, 0.04, 0.009, 14, 7), m));
       const curve = new THREE.CatmullRomCurve3(beam);
       for (let k = 0; k < tines; k++) {
         const t0 = 0.12 + k * (0.65 / tines) + hash1(sd + k * 3 + s, 55) * 0.06;
         const b0 = curve.getPointAt(t0), len = (0.16 + hash1(sd + k + s, 56) * 0.14) * tall;
         const lean = (k === 0 ? 0.6 : 0.15) * s;
-        g.add(new THREE.Mesh(taperTube([b0, V3(b0.x + lean * len * 0.3, b0.y + len * 0.5, b0.z + 0.05), V3(b0.x - s * len * 0.12 + lean * len * 0.2, b0.y + len, b0.z + 0.07)], 0.017, 0.003, 7, 5), m));
+        g.add(new THREE.Mesh(taperTube([b0, V3(b0.x + lean * len * 0.3, b0.y + len * 0.5, b0.z + 0.05), V3(b0.x - s * len * 0.12 + lean * len * 0.2, b0.y + len, b0.z + 0.07)], 0.022, 0.004, 7, 5), m));
       }
       const burr = new THREE.Mesh(new THREE.TorusGeometry(0.032, 0.012, 5, 9), m); burr.position.set(s * 0.06, 0.02, 0); burr.rotation.set(Math.PI / 2, 0, s * 0.6); g.add(burr);
     }
@@ -843,7 +869,7 @@ export class CaveBase extends LocationBase {
 
   /** A pelt / blanket thrown on the floor: soft, lumpy, uneven edge. */
   pelt(x, z, rot, parent = this.root, color = 0x4a3a2c, scale = 0.12, sx = 0.65, sz = 0.42) {
-    const m = new THREE.Mesh(rockGeometry(990 + Math.round(x * 3), { detail: 3, rough: 0.4, flat: -0.05, colA: 0xffffff, colB: 0xb8b0a8, dark: 0.3 }), this.mat(`pelt${color}`, { color, roughness: 1, vertexColors: true }));
+    const m = new THREE.Mesh(rockGeometry(990 + Math.round(x * 3), { detail: 3, rough: 0.55, sharp: 0.4, flat: -0.05, colA: 0xffffff, colB: 0x9a9088, dark: 0.45 }), this.mat(`pelt${color}`, { color, map: furTex(), roughness: 1, vertexColors: true }));
     m.position.set(x, 0.0, z); m.scale.set(sx, scale, sz); m.rotation.y = rot;
     parent.add(m);
     return m;
@@ -893,7 +919,7 @@ export class CaveBase extends LocationBase {
     const L5 = name === 'L5', N = name === 'L3N';
     const k = this.cfg.ambient ?? 1;
     this.lights.hemi.intensity = (L5 ? 0.62 : N ? 0.36 : 0.95) * k;
-    this.lights.rake.intensity = (L5 ? 0.9 : N ? 0.75 : name === 'L4' ? 1.5 : 2.0) * k;
+    this.lights.rake.intensity = (L5 ? 0.6 : N ? 0.5 : name === 'L4' ? 0.85 : 1.1) * k;
     this.lights.rake.color.set(L5 || N ? 0x9ab0d0 : 0xe8c8a0);
     for (const t of this.torches) t.intensity = L5 ? 2.6 : N ? 2.4 : 5;
     this.roomState(name);
@@ -947,7 +973,7 @@ export class CaveScene extends CaveBase {
     const spit = this.mat('spit', { color: 0x3a2a1c, roughness: 1 });
     const stick = (x0, y0, x1, y1) => { const L = Math.hypot(x1 - x0, y1 - y0); const c = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.03, L, 16), spit); c.position.set((x0 + x1) / 2, (y0 + y1) / 2, -1.5); c.rotation.z = Math.atan2(x0 - x1, y1 - y0); g.add(c); };
     stick(-8.1, 0, -7.75, 1.05); stick(-7.45, 0, -7.8, 1.05); stick(-6.95, 0, -6.6, 1.05); stick(-6.3, 0, -6.65, 1.05); stick(-8.0, 1.0, -6.4, 1.0);
-    this.meat = new THREE.Mesh(rockGeometry(905, { detail: 3, rough: 0.35, flat: -2, colA: 0x7a3420, colB: 0x4a1a10, dark: 0.5 }), this.mat('meatV', { vertexColors: true, color: 0xffffff, roughness: 0.6 }));
+    this.meat = new THREE.Mesh(rockGeometry(905, { detail: 3, rough: 0.5, sharp: 0.5, flat: -2, colA: 0x6a3a22, colB: 0x24120a, dark: 0.7 }), this.mat('meatV', { vertexColors: true, color: 0xffffff, roughness: 0.6 }));
     this.meat.scale.set(0.45, 0.22, 0.22); this.meat.position.set(-7.2, 0.92, -1.5); g.add(this.meat);
     const crate = this.plankCrate(0.6, 0.4, 0.4); crate.position.set(-4.9, 0, -2.6); crate.rotation.y = 0.3; g.add(crate);
     const can = this.mat('can', { color: 0xa8b0b8, metalness: 0.7, roughness: 0.3 });
@@ -969,7 +995,7 @@ export class CaveScene extends CaveBase {
     const beds = [[3.6, -2.2], [5.0, -2.5], [6.4, -2.2]];
     this.straw(beds, n);
     this.pelt(5.0, -2.5, 0.2, n, 0x5a2a2a, 0.15);
-    const meat = this.mat('rawMeat', { color: 0x5a1c14, roughness: 0.7, flatShading: true });
+    const meat = this.mat('rawMeat', { color: 0x3e1610, roughness: 0.5 });
     const berry = this.mat('berries', { color: 0x3a2a5a, roughness: 0.6 });
     for (let i = 0; i < 6; i++) this.rock(7.7 + (i % 3) * 0.35, 0.1 + Math.floor(i / 3) * 0.14, -2.7 + (i % 2) * 0.2, 0.2, 0.1, 0.14, meat, n, i);
     for (let i = 0; i < 4; i++) { const b = this.longBone(); b.position.set(7.7 + i * 0.28, 0.24, -2.6 + (i % 2) * 0.15); b.rotation.set(0.3, i, 1.2); n.add(b); }
