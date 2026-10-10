@@ -119,6 +119,10 @@ export class Character2D {
    */
   showLie(amount, dir) {
     if (!this.lieFrameName) return false;
+    // settle the crossfade at its ends: a standing sprite left at 0.2 % hashed opacity showed as a
+    // dotted white outline around the lying frame
+    if (amount > 0.97) amount = 1;
+    if (amount < 0.03) amount = 0;
     if (!this.lieMesh) {
       const tex = this.atlas.texture.clone();
       tex.needsUpdate = true;

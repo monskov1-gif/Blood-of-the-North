@@ -780,6 +780,27 @@ for i, (src, hue) in enumerate([('npc_smoker_front', 0.06), ('npc_vest_side', 0.
 
 # the hospital beds are seen close up: the lying patients go on a 1.5× coarser grid
 # (1 px = 1.5 cm, stored small and drawn 1.5× larger — even pixels, no doubling)
+# v0.14: the lying frames kept a light fringe from their old background: silhouette-edge pixels
+# clearly lighter than their opaque neighbours read as a dotted white outline on the dark sheets
+def defringe(a, passes=2, k=0.12):
+    a = a.copy()
+    H, W = a.shape[:2]
+    for _ in range(passes):
+        op = a[..., 3] > 0
+        pad = np.pad(op, 1)
+        edge = op & ~(pad[:-2, 1:-1] & pad[2:, 1:-1] & pad[1:-1, :-2] & pad[1:-1, 2:])
+        lum = a[..., :3] @ np.array([0.299, 0.587, 0.114]) / 255.0
+        inner = op & ~edge
+        lw = np.pad(np.where(inner, lum, 0), 1); cn = np.pad(inner.astype(float), 1)
+        sl = sum(lw[1 + dy:1 + dy + H, 1 + dx:1 + dx + W] for dy in (-1, 0, 1) for dx in (-1, 0, 1))
+        sc = sum(cn[1 + dy:1 + dy + H, 1 + dx:1 + dx + W] for dy in (-1, 0, 1) for dx in (-1, 0, 1))
+        light = edge & (sc > 0) & (lum > sl / np.maximum(sc, 1) + k)
+        a[light, 3] = 0
+    return a
+
+
+for n in ['lie_julian', 'lie_julian_gown', 'lie_granny']:
+    if n in frames: frames[n] = defringe(frames[n])
 for n in ['lie_julian_gown', 'lie_granny']:
     frames[n] = coarser(frames[n], 1.5, keep_size=False)
     FRAME_SCALE[n] = 1.5
