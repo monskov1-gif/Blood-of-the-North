@@ -67,9 +67,10 @@ const methods = {
         g.player.enabled = false;
         jul.faceTowards(L.position.x); jul.setPose('talk');
         await g.dialogue.start('lh_julian');
+        this.vnPhotos([]);
         if (S !== this.session) return;
         jul.setPose('idle');
-        // he goes off to the shower: the folder stays open on the table
+        // he goes to his room to finish a report: the folder stays open on the table
         const bd = (w.doors || []).find((d) => d.id === 'to_bedroom');
         const gone = jul.walkTo({ x: bd ? bd.x : st.x + 3, z: bd ? bd.z : -2 }, { speed: 1.2, direct: true }).then(() => jul.setVisible(false));
         await this.lines(g.dialogue.dialogues.lh_after);
@@ -84,13 +85,31 @@ const methods = {
         g.player.enabled = false;
         g.hud.show(false);
         if (!(await this.lines(g.dialogue.dialogues.lh_night))) return;
+        await this.phoneChat('Девчонки', [
+          ['lizzy', 'Пятница. Столовая. У меня дело века.'],
+          ['Пуриэль', 'УБИЙСТВА?? я в деле'],
+          ['Викки', 'нет.'],
+          ['Викки', 'ладно. но я против, запишите'],
+          ['Оливия', 'а еду брать?'],
+          ['lizzy', 'бери всё. и пластыри'],
+          ['Пуриэль', 'у меня машина сестры до воскресенья 🚗'],
+        ]);
+        if (S !== this.session) return;
         await g.fader.to(true, 1400);
         this.endPlace();
         resolve(S === this.session);
       };
       this.setPlace({
         state: { apartment: 'evening', apt_bedroom: 'evening', apt_attic: 'evening' },
-        onEnter: (loc) => { if (loc === 'apartment') { this.homeShot(); jul.setVisible(!f().lh_talked); } },
+        onEnter: (loc) => {
+          if (loc === 'apartment') { this.homeShot(); g.world.root.add(jul.root); jul.setVisible(!f().lh_talked); }
+          // after the talk he is in his room, at the desk under his case board
+          if (loc === 'apt_bedroom' && f().lh_talked) {
+            const d = g.world.spots?.desk || { x: 1.5, z: -1.6 };
+            g.world.root.add(jul.root); jul.setVisible(true); jul.stop(); jul.stand();
+            jul.placeAt(d.x, d.z, d.facing ?? 1); jul.setPose('think');
+          }
+        },
         items: (loc) => {
           if (loc === 'apartment') {
             return this.homeItems([
@@ -100,7 +119,14 @@ const methods = {
               ['tv', 'Телевизор', say('lh_tv')], ['sofa', 'Диван', say('lh_sofa')],
             ]);
           }
-          if (loc === 'apt_bedroom') return this.homeItems([['board', 'Доска', say('lh_board')], ['mirror', 'Зеркало', say('lh_mirror')], ['bed', 'Кровать', say('lh_jbed')]]);
+          if (loc === 'apt_bedroom') {
+            const it = this.homeItems([['board', 'Доска', say('lh_board')], ['mirror', 'Зеркало', say('lh_mirror')], ['bed', 'Кровать', say('lh_jbed')]]);
+            if (f().lh_talked) {
+              const d = g.world.spots?.desk || { x: 1.5, z: -1.6 };
+              it.unshift({ id: 'home_bed_jul', label: 'Джул', at: { x: d.x - 0.6, z: d.z + 0.4 }, radius: 0.8, anchor: new THREE.Vector3(d.x, 2.0, d.z), run: async () => { jul.faceTowards(this.julian.position.x); jul.setPose('talk'); await g.dialogue.start('lh_jul_room'); jul.setPose('think'); jul.face(1); } });
+            }
+            return it;
+          }
           if (loc === 'apt_attic') {
             return this.homeItems([
               ['map', 'Карта', say('lh_map')], ['desk', 'Стол', say('lh_desk')], ['camera', 'Фотоаппарат', say('lh_camera')],
@@ -194,6 +220,71 @@ const methods = {
     if (night) return this.startStationReturn();
     const route = g.state.get('investigation_route');
     return route === 'WEREWOLF' ? this.startForest() : this.vampireChain();
+  },
+
+  /**
+   * Photos on the dialogue screen: the case prints Julian talks about, laid over the scene like
+   * polaroids on the table (`cmd: 'photos:carcass,claws'`; empty list clears them).
+   */
+  vnPhotos(kinds) {
+    const g = this.g;
+    const vn = g.view.vn;
+    vn.querySelector('.vn-photos')?.remove();
+    if (!kinds.length) return;
+    const row = document.createElement('div');
+    row.className = 'vn-photos';
+    vn.appendChild(row);
+    const CAP = { carcass: 'туши · Такхини', claws: 'кора · 2,1 м', track: 'слепок · 19 см', fur: 'шерсть', map: 'карта' };
+    kinds.forEach((k, i) => {
+      const p = document.createElement('div');
+      p.className = 'ph';
+      p.style.setProperty('--r', `${(i - (kinds.length - 1) / 2) * 5 + (i % 2 ? 2 : -2)}deg`);
+      p.style.animationDelay = `${i * 0.18}s`;
+      p.innerHTML = `<img alt=""><span>${CAP[k] || ''}</span>`;
+      row.appendChild(p);
+      g.cases.paint(k).then((url) => { p.querySelector('img').src = url; });
+    });
+  },
+
+  /** Lizzie's group chat on her phone screen: bubbles arrive one by one; click / key to put it away. */
+  phoneChat(title, msgs) {
+    const g = this.g;
+    return new Promise((resolve) => {
+      const root = document.getElementById('ui') || document.body;
+      const w = document.createElement('div');
+      w.className = 'lz-chat-wrap';
+      w.innerHTML = `<div class="lz-chat"><div class="bar"><b>${title}</b><small>Лиззи, Пуриэль, Викки, Оливия</small></div><div class="msgs"></div><div class="typing"><i></i><i></i><i></i></div></div><div class="hint">НАЖМИТЕ, ЧТОБЫ УБРАТЬ ТЕЛЕФОН</div>`;
+      root.appendChild(w);
+      g.bus.emit('panel', true);
+      const box = w.querySelector('.msgs');
+      let i = 0, done = false, timer = null;
+      const finish = () => {
+        if (done) return; done = true; clearTimeout(timer);
+        w.classList.add('out');
+        setTimeout(() => { w.remove(); g.bus.emit('panel', false); resolve(); }, 450);
+        window.removeEventListener('keydown', key, true);
+      };
+      const key = (e) => { if (i >= msgs.length) { e.preventDefault(); finish(); } };
+      const next = () => {
+        if (i >= msgs.length) { w.querySelector('.typing').style.visibility = 'hidden'; timer = setTimeout(finish, 6000 * (globalThis.__ts || 1)); return; }
+        const [who, text] = msgs[i++];
+        const me = who === 'lizzy';
+        const b = document.createElement('div');
+        b.className = `b ${me ? 'me' : ''}`;
+        b.innerHTML = `${me ? '' : `<em>${who}</em>`}${text}<s>${21 + Math.floor(i / 2)}:${String(10 + i * 3).padStart(2, '0')}</s>`;
+        box.appendChild(b);
+        box.scrollTop = box.scrollHeight;
+        g.audio.play('ui.hover', { volume: me ? 0.3 : 0.5 });
+        timer = setTimeout(next, (900 + text.length * 35) * (globalThis.__ts || 1));
+      };
+      w.addEventListener('pointerdown', () => { if (i >= msgs.length) finish(); });
+      window.addEventListener('keydown', key, true);
+      timer = setTimeout(next, 600 * (globalThis.__ts || 1));
+    });
+  },
+
+  homeCommands() {
+    return { photos: async (arg) => this.vnPhotos(arg ? String(arg).split(',').filter(Boolean) : []) };
   },
 
   async loadHome(stage) {

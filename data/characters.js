@@ -23,7 +23,7 @@ export const CHARACTERS = {
     poses: { idle: 'kayden_idle', talk: 'kayden_talk', think: 'kayden_think' },
     lie: 'lie_kayden',
   },
-  waiter: { height: 178,
+  waiter: { height: 178, portraitScale: 0.92,
     id: 'waiter', name: 'Официант', nameEn: 'WAITER', portrait: 'waiter', color: '#9a9aa8',
     poses: { idle: 'waiter_idle', talk: 'waiter_talk', bow: 'waiter_hands', offer: 'waiter_talk' },
     speed: 1.2,
@@ -54,7 +54,7 @@ export const CHARACTERS = {
   // Wyatt Nicholas Lewis — Julian doesn't know him; his name is never put on screen
   interrogator: { height: 188, id: 'interrogator', name: 'Офицер', nameEn: 'OFFICER', portrait: 'wyatt', poses: { idle: 'wyatt_side', sit: 'wyatt_seat' }, speed: 1.4 },
   investigator: { height: 183, id: 'investigator', name: 'Детектив Мэтт Ковальски', nameEn: 'DET. KOWALSKI', poses: { idle: 'npc_fedora_side', front: 'npc_fedora_front' }, speed: 1.2 },
-  survivorWaiter: { height: 178, id: 'survivorWaiter', name: 'Ноа, официант', nameEn: 'NOAH', portrait: 'waiter', poses: { idle: 'waiter_idle', talk: 'waiter_talk', hands: 'waiter_hands' } },
+  survivorWaiter: { height: 178, portraitScale: 0.92, id: 'survivorWaiter', name: 'Ноа, официант', nameEn: 'NOAH', portrait: 'waiter', poses: { idle: 'waiter_idle', talk: 'waiter_talk', hands: 'waiter_hands' } },
   survivorWaiter2: { height: 176, id: 'survivorWaiter2', name: 'Лео, официант', nameEn: 'LEO', poses: { idle: 'waiter2' } },
   chef: { height: 181, id: 'chef', name: 'Ги Ларош, шеф', nameEn: 'CHEF LAROCHE', poses: { idle: 'chef' } },
   dishwasher: { height: 174, id: 'dishwasher', name: 'Томми, посудомойщик', nameEn: 'TOMMY', poses: { idle: 'dishwasher' } },

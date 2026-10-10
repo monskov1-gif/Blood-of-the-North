@@ -755,10 +755,14 @@ export class ForestScene extends LocationBase {
     // site A (south, x −10…−5): cleaned up — bones left in the bushes, claw marks, a snapped sapling
     g.add(spruceStand(Array.from({ length: 6 }, (_, i) => ({ x: -9.6 + i * 0.9, z: -2.9 - r() * 0.4, s: 0.16 + r() * 0.1, kind: 'young' })), { low: this.low, snow: 0.6, variant: 1 }));
     for (let i = 0; i < 7; i++) { const b = this.B(0.45, 0.05, 0.05, bone, -9.2 + r() * 3.2, 0.06, -2.55 - r() * 0.3, g); b.rotation.y = r() * 3; }
+    // the scored spruce: a thick old trunk; the grooves start well above a girl's reach (≈2.3–3.1 m)
+    const trunkM = this.mat('clawSpruce', { map: barkTexture('spruce'), color: 0xc8beb4, roughness: 1 });
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.26, 7.5, 18, 6), trunkM);
+    trunk.position.set(-6.2, 3.75, -3.78); g.add(trunk);
     const claws = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.95), this.mats.cache.get('claws') || this.mat('claws', { transparent: true }));
-    claws.position.set(-6.2, 1.7, -3.55); g.add(claws);
+    claws.position.set(-6.2, 2.7, -3.55); g.add(claws);
     const sap = this.B(0.06, 1.2, 0.06, this.mat('twigF', { color: 0x3e342c, roughness: 1 }), -5.4, 0.35, -2.7, g); sap.rotation.z = 1.2;
-    this.anchors.siteA = { bones: new THREE.Vector3(-8.0, 0.4, -2.6), claws: new THREE.Vector3(-6.2, 1.8, -3.4), sapling: new THREE.Vector3(-5.4, 0.6, -2.6) };
+    this.anchors.siteA = { bones: new THREE.Vector3(-8.0, 0.4, -2.6), claws: new THREE.Vector3(-6.2, 2.75, -3.4), sapling: new THREE.Vector3(-5.4, 0.6, -2.6) };
     // site B (x 12…17): carcasses rotting, ravens
     const rot = this.mat('rotting', { color: 0x5a4234, roughness: 0.9, flatShading: true });
     const torn = this.mat('torn', { color: 0x6a1c16, roughness: 0.7, flatShading: true });

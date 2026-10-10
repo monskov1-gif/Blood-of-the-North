@@ -101,7 +101,7 @@ const methods = {
     const token = this.crowdToken = (this.crowdToken || 0) + 1;
     const S = this.session;
     const alive = () => this.crowdToken === token && this.session === S;
-    this.crowd = list.map((c, i) => {
+    this.extras = list.map((c, i) => {
       const ch = this.castIn(g.world, c.key, `crowd_${c.key}_${i}`);
       ch.root.scale.setScalar(ch.def?.scale || 1);
       ch.placeAt(c.x, c.z, c.facing ?? (Math.random() < 0.5 ? 1 : -1));
@@ -110,7 +110,7 @@ const methods = {
       this.crowdLife(ch, c, alive);
       return ch;
     });
-    return this.crowd;
+    return this.extras;
   },
 
   async crowdLife(ch, c, alive) {
@@ -142,8 +142,8 @@ const methods = {
 
   clearCrowd() {
     this.crowdToken = (this.crowdToken || 0) + 1;
-    for (const ch of this.crowd || []) { ch.stop(); ch.setVisible(false); ch.root.position.y = 0; ch.shadow.visible = true; }
-    this.crowd = [];
+    for (const ch of this.extras || []) { ch.stop(); ch.setVisible(false); ch.root.position.y = 0; ch.shadow.visible = true; }
+    this.extras = [];
   },
 
   /** The school's background life (corridor / cafeteria), laid out from the scene's spots. */

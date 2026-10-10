@@ -39,7 +39,7 @@ const FloorReflectionShader = {
     color: { value: null },
     tDiffuse: { value: null },
     textureMatrix: { value: null },
-    uStrength: { value: 0.32 },
+    uStrength: { value: 0.12 },   // soft, waxed oak — not a mirror
     uTime: { value: 0 },
   },
   vertexShader: /* glsl */`
@@ -128,7 +128,7 @@ export class BarScene {
 
   buildShell() {
     const m = this.mats;
-    const floorMat = m.get('floor', { map: plankTexture(), color: 0xb08870, roughness: 0.35, metalness: 0.0 });
+    const floorMat = m.get('floor2', { map: plankTexture(), color: 0xc09a80, roughness: 0.72, metalness: 0.0 });
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(X1 - X0 + 2, 13), floorMat);
     floor.rotation.x = -Math.PI / 2;
     floor.position.set(0, 0, 1.5);
@@ -458,7 +458,7 @@ export class BarScene {
       bracket.position.set(x, 0.22, frontZ + 0.08);
       root.add(bracket);
     }
-    const ledPool = lightPool(0xff2a2a, len, 0.9, 0.18);
+    const ledPool = lightPool(0xff2a2a, len, 0.9, 0.07);
     ledPool.rotation.x = -Math.PI / 2;
     ledPool.position.set(cx, 0.012, frontZ + 0.35);
     root.add(ledPool);

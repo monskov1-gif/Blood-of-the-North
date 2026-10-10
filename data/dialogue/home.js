@@ -7,6 +7,7 @@
 export const DIALOGUES = {
   // ============================================================ L1 prologue — the evening before
   lh_open: [
+    ['lthought', 'Начало ноября. До той ночи в баре — почти месяц. Тогда я ещё думала, что самое страшное в ноябре — контрольная по химии.'],
     ['lthought', 'Среда. Дома пахнет кофе и холодным супом. Значит, Джул дома.'],
     ['lthought', 'И значит — опять работа на кухонном столе.'],
   ],
@@ -17,7 +18,7 @@ export const DIALOGUES = {
     nodes: {
       a: { speaker: 'lizzy', text: 'Ты опять ужинаешь фотографиями?', expr: { lizzy: 'smile', julianL: 'neutral' } },
       b: { speaker: 'julianL', text: 'Привет, Лиз. Суп на плите. Наверное, уже холодный.' },
-      c: { speaker: 'lizzy', text: 'Что это? …Это лось?', expr: { lizzy: 'serious' } },
+      c: { speaker: 'lizzy', text: 'Что это? …Это лось?', expr: { lizzy: 'serious' }, cmd: 'photos:carcass' },
       d: { speaker: 'julianL', text: 'Был лось. Долина Такхини, три места за две недели. Олени, два лося. Их не едят. Рвут — и бросают.' },
       e: { speaker: 'lizzy', text: 'Волки?' },
       f: { speaker: 'julianL', text: 'В отчёте — «волки». Шеф подписал. Дело закрыто, у нас и без лосей хватает.' },
@@ -28,18 +29,18 @@ export const DIALOGUES = {
           { text: '«Может, медведь?»', next: 'bear' },
         ],
       },
-      map: { speaker: 'julianL', text: 'Юг реки. Потом севернее. Потом ещё севернее. Будто кто-то идёт вверх по течению — и не торопится.', set: { lh_map: true }, next: 'h' },
+      map: { cmd: 'photos:carcass,track,claws', speaker: 'julianL', text: 'Юг реки. Потом севернее. Потом ещё севернее. Будто кто-то идёт вверх по течению — и не торопится.', set: { lh_map: true }, next: 'h' },
       bear: { speaker: 'julianL', text: 'Медведи в ноябре спят, Лиз. Почти все. И медведь не уходит за сорок километров от берлоги, чтобы порвать лося и бросить.', next: 'h' },
-      h: { speaker: 'julianL', text: 'Шаг — два метра. Борозды на коре выше моей головы. Волк так не умеет. Никто так не умеет.' },
+      h: { cmd: 'photos:track,claws', speaker: 'julianL', text: 'Шаг — два метра. Борозды на коре выше моей головы. Волк так не умеет. Никто так не умеет.' },
       i: { speaker: 'lizzy', text: 'И что ты будешь делать?' },
-      j: { speaker: 'julianL', text: 'Ничего. Это не моё дело. И ты — тоже ничего. Слышишь? Химия, контрольная, спать.', expr: { julianL: 'serious' } },
+      j: { cmd: 'photos:', speaker: 'julianL', text: 'Ничего. Это не моё дело. И ты — тоже ничего. Слышишь? Химия, контрольная, спать.', expr: { julianL: 'serious' } },
       k: { speaker: 'lizzy', text: 'Да, сэр. Как скажете, сэр.', expr: { lizzy: 'smile' } },
       l: { speaker: 'julianL', text: 'В пятницу у меня ночное дежурство. Не жди, ложись.', expr: { julianL: 'smile' } },
       m: { speaker: 'lizzy', text: 'Передай Кайдену, что он мне должен двадцать баксов.', set: { lh_talked: true } },
     },
   },
   lh_after: [
-    ['lthought', 'Он ушёл в душ и оставил папку открытой. Нарочно или нет — неважно.'],
+    ['lthought', 'Он ушёл к себе дописывать отчёт и оставил папку открытой. Нарочно или нет — неважно.'],
     ['lthought', 'Я пересняла всё. Двенадцать кадров. Теперь — к себе, наверх.'],
   ],
   lh_photos: { mode: 'bark', nodes: { a: { speaker: 'lthought', text: 'Фото с вертолёта: снег, кровь, следы цепочкой. Внизу его почерком: «Не волки?»' } } },
@@ -62,9 +63,9 @@ export const DIALOGUES = {
   lh_awindow: { mode: 'bark', nodes: { a: { speaker: 'lthought', text: 'Огни Уайтхорса. Где-то там, на севере, кто-то идёт вдоль реки.' } } },
   lh_bed_wait: { mode: 'bark', nodes: { a: { speaker: 'lthought', text: 'Спать рано. Сначала — карта.' } } },
   lh_night: [
-    ['lthought', 'Напишу девочкам. «Пятница. Столовая. У меня дело века».'],
-    ['lthought', 'Пуриэль ответила через секунду: «УБИЙСТВА?? я в деле». Викки — «нет». Оливия — «а еду брать?»'],
+    ['lthought', 'Напишу девочкам.'],
   ],
+  lh_jul_room: { mode: 'bark', nodes: { a: { speaker: 'julianL', text: 'Лиз, спать. И не трогай папку на кухне. …Ты её уже трогала, да?' } } },
   lh_down_wait: { mode: 'bark', nodes: { a: { speaker: 'lthought', text: 'Внизу — ничего интересного. Только Джул и его холодный суп.' } } },
   lh_door_wait: { mode: 'bark', nodes: { a: { speaker: 'lthought', text: 'Уже поздно. Никуда я не пойду. Ну — до пятницы.' } } },
 

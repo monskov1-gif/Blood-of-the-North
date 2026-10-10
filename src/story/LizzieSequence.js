@@ -100,6 +100,10 @@ const methods = {
     const S = this.session;
     await this.lzCard(1);
     if (S !== this.session) return;
+    // a step back in time, said loud and clear: Lizzie's line starts a month before the bar
+    g.fader.set(true);
+    await g.card.show('Несколько недель назад', { en: 'Several weeks earlier', sub: 'ЗА МЕСЯЦ ДО НОЧИ В «СЕВЕРНОЙ РОЗЕ»', ms: 2800, style: 'chapter-b' });
+    if (S !== this.session) return;
     // the evening before: at home, Julian's case on the kitchen table (src/story/HomeSequence.js)
     if (!g.state.get('lh_done')) {
       if (!(await this.lzHome()) || S !== this.session) return;
@@ -197,6 +201,13 @@ const methods = {
       for (const [i, c] of [pu, ol, vi].entries()) { this.g.world.root.add(c.root); c.setVisible(true); c.placeAt(x - 1.2 - i * 0.9, 0.5 - i * 0.35, 1); }
       this.lzFollow = null;
       this.lzSearch = null;
+      // each site is its own stretch of the bank: she can't walk on up the river on her own —
+      // the girls take her to the next place when this one is done
+      const SPAN = { 1: [-11.8, -3.2], 2: [8.6, 17.4], 3: [18.4, 26.6] }[n];
+      const walk = { areas: [{ minX: SPAN[0], maxX: SPAN[1], minZ: -2.3, maxZ: 1.5 }] };
+      g.world.bounds.walk = walk;
+      g.nav.set(walk, g.world.colliders);
+      g.cameraSys.setBounds({ minX: SPAN[0] + 3.2, maxX: Math.max(SPAN[0] + 3.2, SPAN[1] - 3.2) });
       g.cameraSys.setShot(null, 1); g.cameraSys.snap();
       await g.card.show(`Точка ${n}`, { en: `Site ${n}`, sub, ms: 1600 });
       await g.fader.to(false, 900);
@@ -251,7 +262,20 @@ const methods = {
           this.lzSearch = null;
           resolve();
         } };
-      g.interactions.setItems([...items, go]);
+      // each clue is photographed once; when enough are in, the way on opens by itself (the girls
+      // call her on) — the player never has to hunt for an invisible gate
+      let moving = false;
+      const advance = async () => {
+        if (moving || !ready()) return;
+        moving = true;
+        await sleep(0.6);
+        if (g.dialogue.busy) await new Promise((r) => { const t = setInterval(() => { if (!g.dialogue.busy) { clearInterval(t); r(); } }, 200); });
+        await this.lines(gate.run ? [['olivia', 'Рид, доставай карту. Отметим всё, пока не стемнело.']] : [['vikki', 'Всё, Рид, хватит. Идём дальше, пока светло.'], ['lthought', 'Дальше — вдоль реки, на север.']]);
+        await go.run();
+        moving = false;
+      };
+      const clues = items.map((it) => ({ ...it, once: true, run: async (x) => { await it.run(x); advance(); } }));
+      g.interactions.setItems(clues);
     });
   },
 

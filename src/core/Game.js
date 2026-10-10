@@ -119,6 +119,7 @@ export class Game {
     this.director.registerAll(this.story.custodyCommands());
     this.director.registerAll(this.story.investigationCommands?.() || {});
     this.director.registerAll(this.story.lizzieCommands?.() || {});
+    this.director.registerAll(this.story.homeCommands?.() || {});
     this.interactions.setItems(this.story.interactables());
     this.view.bgProvider = (key) => this.story.paintBackground(key);
     this.windowLight = new WindowLight({ renderer: this.renderer, settings: this.settings, canvas: this.renderer.canvas });

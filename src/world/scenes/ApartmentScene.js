@@ -648,6 +648,25 @@ const AMBIENT = {
   day: { sky: 0xdce2ea, ground: 0x8a7a66, hemi: 1.0, fill: 0xe8eef4, fillI: 0.55, bg: 0x6a7078 },
 };
 
+/** Roman shade fabric: oatmeal linen weave with small sprigs in the shade's colour. */
+function romanTex(color) {
+  const c = new THREE.Color(color);
+  const tint = `rgb(${Math.round(c.r * 255)},${Math.round(c.g * 255)},${Math.round(c.b * 255)})`;
+  return canvasTexture(`apt-roman-${color}`, 128, 128, (ctx, w, h) => {
+    const r = rng(733);
+    ctx.fillStyle = '#e6dcc8'; ctx.fillRect(0, 0, w, h);
+    for (let y = 0; y < h; y += 2) { ctx.fillStyle = `rgba(150,130,100,${0.06 + r() * 0.06})`; ctx.fillRect(0, y, w, 1); }
+    for (let x = 0; x < w; x += 2) { ctx.fillStyle = `rgba(255,250,240,${0.04 + r() * 0.05})`; ctx.fillRect(x, 0, 1, h); }
+    for (let j = 0; j < 4; j++) for (let i = 0; i < 4; i++) {
+      const x = i * 32 + (j % 2) * 16 + 8, y = j * 32 + 10;
+      ctx.strokeStyle = tint; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.moveTo(x, y + 12); ctx.quadraticCurveTo(x + 1, y + 5, x + 2, y); ctx.stroke();
+      ctx.fillStyle = tint;
+      for (const [dx, dy, a] of [[-3, 4, -0.6], [4, 6, 0.6], [-2, 9, -0.5], [3, 1, 0.5]]) { ctx.beginPath(); ctx.ellipse(x + dx, y + dy, 2.6, 1.2, a, 0, 7); ctx.fill(); }
+    }
+  }, { repeat: [2, 2] });
+}
+
 class AptBase extends LocationBase {
   constructor(opts) {
     super(opts);
@@ -888,10 +907,21 @@ class AptBase extends LocationBase {
         this.rb(w - 0.03, 0.025, 0.04, 0.008, wm, 0, y1 - bh - 0.02, -0.04);
         this.rod([w * 0.35, y1 - 0.04, -0.02], [w * 0.35, y1 - bh - 0.25, -0.02], 0.003, this.M('cord', 0xd8d4c8));
       } else if (blind.kind === 'roman') {
-        const fm = this.M(`roman-${blind.color}`, blind.color, { roughness: 0.95 });
-        const folds = 3, fh = bh / folds;
-        this.rb(w + 0.06, bh * 0.5, 0.02, 0.01, fm, 0, y1 - bh * 0.25, 0.04);
-        for (let i = 0; i < folds; i++) this.cush(w + 0.06, fh * 0.9, 0.06, 0.03, fm, 0, y1 - bh + fh * (i + 0.5), 0.06, { puff: 0.25, seed: i + 3 });
+        // a linen roman shade: a printed fabric (small botanical sprigs on oatmeal linen), the flat
+        // drop, soft pleats gathered at the top, a wooden batten at the hem and a pull cord
+        const ft = romanTex(blind.color);
+        const fm = this.mat(`romanF-${blind.color}`, { map: ft, color: 0xffffff, roughness: 0.95, side: THREE.DoubleSide });
+        const drop = bh * 0.55, stack = bh - drop;
+        this.rb(w + 0.08, 0.035, 0.05, 0.012, this.M('romanHead', 0xe8e0d0), 0, y1 + 0.01, 0.03);
+        const folds = 4, fh = stack / folds;
+        for (let i = 0; i < folds; i++) {
+          const y = y1 - fh * (i + 0.5);
+          this.cush(w + 0.05 - i * 0.004, fh * 1.08, 0.05 + i * 0.012, 0.024, fm, 0, y, 0.035 + i * 0.006, { puff: 0.35, seed: i + 3, lump: 0.004 });
+        }
+        this.pl(w + 0.04, drop, fm, 0, y1 - stack - drop / 2, 0.03);
+        this.rb(w + 0.05, 0.02, 0.025, 0.008, this.M('romanBatten', 0xc9b48e, { roughness: 0.6 }), 0, y1 - bh, 0.035);
+        this.rod([w / 2 + 0.01, y1 - 0.02, 0.05], [w / 2 + 0.01, y1 - bh - 0.3, 0.05], 0.003, this.M('cord', 0xd8d4c8));
+        this.sph(0.012, this.M('romanBatten', 0xc9b48e), w / 2 + 0.01, y1 - bh - 0.31, 0.05);
       } else {
         const cm = this.M('cellShade', 0xd8d0c0, { roughness: 0.95, emissive: 0x100c08 });
         this.rb(w - 0.02, bh, 0.035, 0.008, cm, 0, y1 - bh / 2, -0.05);
@@ -1285,10 +1315,12 @@ export class ApartmentScene extends AptBase {
     this._add(sg, this.mats.cache.get('aptT-wallLiving'), 0, 0, BACK + w + 0.005);
     // a low cupboard door under the flight: oak, two panels, a brass knob; a basket of logs beside it
     const cdoor = this.texM('oakMid', oakTex(1), { roughness: 0.55 });
-    this.rb(0.62, 1.02, 0.03, 0.01, wm, 3.6, 0.52, BACK + w + 0.01);
-    this.rb(0.54, 0.96, 0.03, 0.01, cdoor, 3.6, 0.5, BACK + w + 0.025);
-    for (const y of [0.28, 0.72]) this.rb(0.42, 0.34, 0.012, 0.008, cdoor, 3.6, y, BACK + w + 0.045);
-    this.sph(0.018, this.brass(), 3.38, 0.55, BACK + w + 0.05);
+    // a full-height storage door (the space under the flight is ≈2.2 m tall here)
+    this.rb(0.8, 1.86, 0.03, 0.01, wm, 3.72, 0.93, BACK + w + 0.01);
+    this.rb(0.7, 1.8, 0.03, 0.01, cdoor, 3.72, 0.9, BACK + w + 0.025);
+    for (const [y, hh] of [[0.45, 0.6], [1.3, 0.72]]) this.rb(0.54, hh, 0.012, 0.008, cdoor, 3.72, y, BACK + w + 0.045);
+    this.sph(0.022, this.brass(), 3.45, 0.98, BACK + w + 0.055);
+    this.rb(0.05, 0.1, 0.01, 0.004, this.brass(), 3.45, 0.98, BACK + w + 0.042);
     this.rb(0.11, 0.11, 0.015, 0.006, this.white(), 2.55, 1.0, BACK + w + 0.01);
     this.lathe([[0.001, 0], [0.2, 0], [0.22, 0.3], [0.001, 0.3]], this.M('basket', 0x9a7a4a), 2.75, 0, BACK + w + 0.25, { sz: 0.7 });
     for (let k = 0; k < 5; k++) this.cy(0.045, 0.045, 0.36, this.M('log', 0x7a5a3a, { roughness: 1 }), 2.62 + (k % 3) * 0.12, 0.33 + Math.floor(k / 3) * 0.08, BACK + w + 0.25, { rz: Math.PI / 2 + (k - 2) * 0.1, seg: 12 });

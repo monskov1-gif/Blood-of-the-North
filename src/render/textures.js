@@ -92,25 +92,36 @@ export function panelTexture() {
 }
 
 export function plankTexture() {
-  return canvasTexture('planks', 1024, 1024, (ctx, w, h) => {
+  // narrow oak floorboards (≈14 cm) running the length of the room, staggered joints, each board
+  // its own tone, worn lighter down the middle of the walkway, dark seams and nail heads
+  return canvasTexture('planks2', 1024, 1024, (ctx, w, h) => {
     const r = rng(5);
-    const rows = 8;
+    const rows = 16, bh = h / rows;
     for (let i = 0; i < rows; i++) {
-      const y = (i * h) / rows;
-      let x = -r() * 300;
+      const y = i * bh;
+      let x = -r() * 400;
       while (x < w) {
-        const len = 260 + r() * 300;
-        const tone = 30 + r() * 18;
-        woodGrain(ctx, x, y, len, h / rows, `rgb(${tone + 16},${tone * 0.55},${tone * 0.32})`, r, false);
-        ctx.fillStyle = 'rgba(0,0,0,0.6)';
-        ctx.fillRect(x, y, 2, h / rows);
+        const len = 300 + r() * 420;
+        const t = r();
+        const R = 92 + t * 34, G = 54 + t * 20, B = 30 + t * 12;
+        woodGrain(ctx, x, y, len, bh, `rgb(${R | 0},${G | 0},${B | 0})`, r, false);
+        // long grain streaks and a knot now and then
+        for (let k = 0; k < 6; k++) {
+          ctx.fillStyle = `rgba(${r() < 0.5 ? '40,18,8' : '170,110,60'},${0.05 + r() * 0.08})`;
+          ctx.fillRect(x + r() * len, y + 2 + r() * (bh - 4), 40 + r() * 160, 1);
+        }
+        if (r() < 0.25) { ctx.fillStyle = 'rgba(40,18,8,0.45)'; ctx.beginPath(); ctx.ellipse(x + r() * len, y + bh / 2, 5 + r() * 4, 2.5, 0, 0, 7); ctx.fill(); }
+        // butt joint + nail heads
+        ctx.fillStyle = 'rgba(14,6,2,0.85)'; ctx.fillRect(x, y, 2, bh);
+        ctx.fillStyle = 'rgba(20,12,8,0.7)';
+        ctx.fillRect(x + 8, y + 6, 2, 2); ctx.fillRect(x + 8, y + bh - 8, 2, 2);
         x += len;
       }
-      ctx.fillStyle = 'rgba(0,0,0,0.7)';
-      ctx.fillRect(0, y, w, 2);
+      ctx.fillStyle = 'rgba(10,4,2,0.8)'; ctx.fillRect(0, y, w, 2);
+      ctx.fillStyle = 'rgba(255,220,180,0.06)'; ctx.fillRect(0, y + 2, w, 1);
     }
-    grain(ctx, w, h, 8, r);
-  }, { repeat: [6, 2] });
+    grain(ctx, w, h, 10, r);
+  }, { repeat: [7, 6], aniso: 8 });
 }
 
 // ------------------------------------------------------------------ wallpapers

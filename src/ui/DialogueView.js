@@ -224,6 +224,7 @@ export class DialogueView {
     const idx = down ? 2 : (expr === 'smile' || expr === 'happy') && PORTRAIT_SMILE.has(portraitId) ? 3 : (this.speaking === id ? 1 : 0);
     const sig = `${id}|${idx}`;
     slot.wrap.classList.toggle('pale', expr === 'dizzy' || expr === 'pain');
+    slot.wrap.style.setProperty('--ps', CHARACTERS[id]?.portraitScale ?? 1);
     if (slot.sig === sig) return;
     slot.sig = sig;
     const next = slot.imgs[1 - slot.front];

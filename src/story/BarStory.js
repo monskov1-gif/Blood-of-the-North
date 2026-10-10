@@ -125,7 +125,9 @@ export class BarStory {
       if (c.seat) {
         let p = c.seat;
         if (c.seat.fg != null) p = fg[c.seat.fg];
-        if (c.seat.stool != null) p = { x: STOOLS_X[c.seat.stool], z: STOOL_Z, y: STOOL_LIFT };
+        // the sprite sits just in front of the stool's round seat (in its plane the red cushion and the
+        // counter's edge cut through the body)
+        if (c.seat.stool != null) p = { x: STOOLS_X[c.seat.stool], z: STOOL_Z + 0.24, y: STOOL_LIFT };
         if (!p) { ch.setVisible(false); continue; }
         ch.sit({ x: p.x, z: p.z }, c.facing ?? p.facing ?? 1);
         ch.root.position.y = p.y || 0;
@@ -381,9 +383,10 @@ export class BarStory {
     const sh = this.owenShade;
     this.scene.root.add(sh.root);
     sh.setVisible(true); sh.stand(); sh.shadow.visible = false;
-    sh.placeAt(a.julianSeat.x - 3.2, 2.6, 1);
+    // off to the right edge of the frame, never under the subtitles in the middle
+    sh.placeAt(a.julianSeat.x + 3.4, 2.3, -1);
     sh.setPose('idle');
-    sh.root.scale.setScalar(1.08);
+    sh.root.scale.setScalar(1.0);
     g.cameraSys.setShot(null, 0.8);
     g.cameraSys.snap();
     g.state.set('objective', 'air');
