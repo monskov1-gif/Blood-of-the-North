@@ -406,18 +406,34 @@ function boardTex() {
 }
 
 function missingTex() {
-  return ptex('missing', 64, 80, (ctx, w, h) => {
+  // her school photo is the painted portrait itself (assets/portraits/lizzy_0.webp), printed on
+  // the poster: head and shoulders, a little faded, like an inkjet print
+  const t = ptex('missing2', 128, 160, (ctx, w, h, r) => {
     ctx.fillStyle = '#f2eedc'; ctx.fillRect(0, 0, w, h);
-    ctx.fillStyle = '#b01010'; ctx.fillRect(0, 0, w, 13);
-    text(ctx, 'MISSING', w / 2, 2, 10, '#fff', 'center');
-    ctx.fillStyle = '#6a5a50'; ctx.fillRect(16, 16, 32, 36);
-    ctx.fillStyle = '#d8b8a0'; ctx.beginPath(); ctx.ellipse(32, 34, 8, 11, 0, 0, 7); ctx.fill();
-    ctx.fillStyle = '#7a4a2a'; ctx.beginPath(); ctx.ellipse(32, 28, 11, 8, 0, Math.PI, 0); ctx.fill();
-    ctx.fillRect(21, 28, 4, 18); ctx.fillRect(39, 28, 4, 18);
-    text(ctx, 'ELIZABETH', w / 2, 55, 7, '#111', 'center');
-    text(ctx, 'REED', w / 2, 62, 7, '#111', 'center');
-    ctx.fillStyle = '#666'; ctx.fillRect(10, 72, 44, 1); ctx.fillRect(14, 75, 36, 1);
+    for (let i = 0; i < 500; i++) { ctx.fillStyle = `rgba(120,100,70,${r() * 0.05})`; ctx.fillRect(r() * w, r() * h, 1, 1); }
+    ctx.fillStyle = '#b01010'; ctx.fillRect(0, 0, w, 22);
+    text(ctx, 'MISSING', w / 2, 4, 15, '#fff', 'center');
+    ctx.fillStyle = '#2a2420'; ctx.fillRect(26, 28, 76, 82);       // photo frame (filled when it loads)
+    text(ctx, 'ELIZABETH "LIZZIE" REED', w / 2, 114, 8, '#111', 'center');
+    text(ctx, 'AGE 17 · 5\'6" · BROWN HAIR', w / 2, 125, 6, '#333', 'center');
+    text(ctx, 'LAST SEEN NOV 11 · TAKHINI', w / 2, 134, 6, '#333', 'center');
+    ctx.fillStyle = '#b01010'; ctx.fillRect(14, 144, 100, 10);
+    text(ctx, 'RCMP 867-667-5555', w / 2, 145, 7, '#fff', 'center');
   });
+  const im = new Image();
+  im.onload = () => {
+    const c = t.image, ctx = c.getContext('2d');
+    // head and shoulders of the standing portrait
+    const sx = im.width * 0.28, sy = im.height * 0.035, sw = im.width * 0.68, sh = sw * (82 / 76);
+    ctx.save();
+    ctx.filter = 'saturate(0.75) contrast(1.05) brightness(1.08)';
+    ctx.drawImage(im, sx, sy, sw, sh, 27, 29, 74, 80);
+    ctx.restore();
+    ctx.fillStyle = 'rgba(242,238,220,0.12)'; ctx.fillRect(27, 29, 74, 80);
+    t.needsUpdate = true;
+  };
+  im.src = 'assets/portraits/lizzy_0.webp';
+  return t;
 }
 
 function wantedTex(i) {
@@ -1080,7 +1096,7 @@ export class StationScene extends LocationBase {
     const fb = new Batch();
     fb.box(1.68, 1.08, 0.03, this.cm(0x3a2a1a, 0.6), 0, 0, -0.01);
     fb.plane(1.6, 1.0, this.pm('board', boardTex(), { roughness: 1 }), 0, 0, 0.012);
-    fb.plane(0.36, 0.45, this.pm('missing', missingTex(), { roughness: 0.9 }), -0.04, 0.02, 0.02, 0, 0, 0.02);
+    fb.plane(0.4, 0.5, this.pm('missing2', missingTex(), { roughness: 0.9 }), -0.04, 0.02, 0.02, 0, 0, 0.02);
     fb.plane(0.24, 0.3, this.pm('wanted1', wantedTex(1)), 0.36, -0.22, 0.018, 0, 0.1, -0.05);
     fb.plane(0.2, 0.26, this.pm('wanted3', wantedTex(3)), -0.42, -0.25, 0.018, 0, -0.1, 0.06);
     fb.box(0.012, 0.012, 0.02, this.cm(0xd02020), -0.04, 0.23, 0.03);
