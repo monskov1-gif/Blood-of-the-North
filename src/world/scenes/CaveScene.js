@@ -178,85 +178,94 @@ const ROCK = {
 const hash1 = (n, s) => { const v = Math.sin(n * 127.1 + s * 311.7) * 43758.5453; return v - Math.floor(v); };
 
 /**
- * The fine relief of the rock that only the texture carries (metres): oblique beds that step out
- * over each other, cross-laminae inside each bed at their own angle, and two sets of joints/cracks.
- * Returns [height, crack 0…1, bed index].
+ * The rock's own fracture pattern (texture only): blocks split along oblique bedding planes and
+ * joints — an anisotropic Voronoi, every block a flat broken facet of its own tilt and tone, a
+ * finer set of fractures inside. Fills RD with the facet slope, crack, edge, block and bed tone.
  */
+const RD = { gx: 0, gy: 0, crack: 0, tone: 0, row: 0, edge: 0 };
+const VO = { f: 0, id: 0, j: 0 }, VO2 = { f: 0, id: 0, j: 0 };
+function voro(U, V, s, out) {
+  const i0 = Math.floor(U), j0 = Math.floor(V);
+  let f1 = 9, f2 = 9, id = 0, rj = 0;
+  for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+    const i = i0 + di, j = j0 + dj, h = i * 73 + j * 1291;
+    const px = i + 0.15 + hash1(h, s) * 0.7, py = j + 0.2 + hash1(h, s + 1) * 0.6;
+    const dx = U - px, dy = V - py, d = Math.sqrt(dx * dx + dy * dy);
+    if (d < f1) { f2 = f1; f1 = d; id = h; rj = j; } else if (d < f2) f2 = d;
+  }
+  out.f = f2 - f1; out.id = id; out.j = rj;
+  return out;
+}
 function rockDetail(x, y, st) {
   const cd = Math.cos(st.dip), sd = Math.sin(st.dip);
-  const u = y * cd + x * sd + (fbm3(x * 0.18, y * 0.18, 9, st.seed, 2) - 0.5) * 1.3;
-  const bedF = u * 1.5 + Math.sin(u * 0.7 + st.seed) * 0.9, bi = Math.floor(bedF), bf = bedF - bi;
-  const hb = hash1(bi, st.seed);
-  const a2 = st.dip + (hb - 0.5) * 1.6;
-  const lam = (y * Math.cos(a2) + x * Math.sin(a2)) * (9 + hb * 8);
-  const lf = lam - Math.floor(lam);
-  const led = bf < 0.85 ? bf / 0.85 : (1 - bf) / 0.15;                 // each bed a ledge with a short face
-  let h = led * (0.06 + hb * 0.08) + Math.abs(lf - 0.5) * 0.014;
-  // angular facets: ridged noise, sharpened — broken faces, not soft blobs
-  const rdg = 1 - Math.abs(noise3(x * 1.3, y * 1.6, 11, st.seed + 3) - 0.5) * 2;
-  const rdg2 = 1 - Math.abs(noise3(x * 3.1, y * 3.4, 13, st.seed + 6) - 0.5) * 2;
-  h += rdg * rdg * 0.09 + rdg2 * rdg2 * 0.03;
-  // joints: near-vertical set and an oblique set, thin and sharp
-  const j1 = 1 - Math.abs(noise3(x * 1.6, y * 0.32, 3, st.seed + 1) - 0.5) * 2;
-  const j2 = 1 - Math.abs(noise3((x * sd - y * cd) * 0.9, (x * cd + y * sd) * 0.25, 7, st.seed + 2) - 0.5) * 2;
-  const crack = Math.max(sat((j1 - 0.972) / 0.02) * sat((noise3(x * 0.9, y * 0.5, 5, st.seed + 4) - 0.55) * 6),
-    sat((j2 - 0.978) / 0.018) * 0.8 * sat((noise3(x * 0.6, y * 0.6, 8, st.seed + 5) - 0.6) * 6));
-  h -= crack * 0.06;
-  return [h, crack, bi, bf, hb];
+  const wu = (fbm3(x * 0.35, y * 0.35, 9, st.seed, 2) - 0.5) * 0.9, wv = (fbm3(x * 0.5, y * 0.5, 4, st.seed + 1, 2) - 0.5) * 0.5;
+  const u = x * cd + y * sd + wu, v = -x * sd + y * cd + wv;
+  const bl = st.block || 0.9, bt = st.bed || 0.36;
+  voro(u / bl, v / bt, st.seed, VO);
+  voro(u / (bl * 0.38), v / (bt * 0.55), st.seed + 7, VO2);
+  const id = VO.id;
+  RD.gx = (hash1(id, st.seed + 2) - 0.5) * 1.3;
+  RD.gy = (hash1(id, st.seed + 3) - 0.35) * 1.1;
+  RD.tone = hash1(id, st.seed + 4);
+  RD.row = hash1(VO.j, st.seed + 5);
+  const open = 0.03 + hash1(id, st.seed + 6) * 0.07;                    // some joints gape, some are hairlines
+  RD.crack = 1 - sat(VO.f / open);
+  RD.edge = 1 - sat(VO.f / (open + 0.16));                             // the rounded, shadowed lip of each block
+  RD.crack = Math.max(RD.crack, (1 - sat(VO2.f / 0.035)) * 0.55 * (hash1(VO2.id, st.seed + 8) > 0.45 ? 1 : 0));
+  return RD;
 }
 
 /**
- * The wall texture: the room's height field + the fine rock detail, shaded per pixel by the light
- * of its own torches and fires (warm, falling off into black a few metres away).
+ * The wall texture: the room's height field + the rock's fracture facets, shaded per pixel by the
+ * light of its own torches and fires (warm, falling off into black a few metres away).
  * `hf(x, y)` is the height, `mf(x, y)` the passage mask (0…1, passages go black),
  * `lights` [[x, y, k]] the fire light.
  */
-const wallBakedTex = (key, w, h, xmin, width, hf, mf, st, lights) => canvasTexture(`cave-wallbake2-${key}-${w}`, w, h, (ctx) => {
+const wallBakedTex = (key, w, h, xmin, width, hf, mf, st, lights) => canvasTexture(`cave-wallbake3-${key}-${w}`, w, h, (ctx) => {
   const img = ctx.createImageData(w, h);
   const sx = width / w, sy = 6.4 / h;
   const A = st.a, B = st.b, S = [st.a[0] * 0.95, st.a[1] * 0.92, st.a[2] * 0.88];
   const rowH = new Float32Array(w + 1), prevH = new Float32Array(w + 1);
-  const heightAt = (x, y) => hf(x, y, true) + rockDetail(x, y, st)[0];
-  for (let i = 0; i <= w; i++) prevH[i] = heightAt(xmin + i * sx, 6.4 + sy);
+  for (let i = 0; i <= w; i++) prevH[i] = hf(xmin + i * sx, 6.4 + sy, false);
   for (let j = 0; j < h; j++) {
     const y = 6.4 - j * sy;
-    for (let i = 0; i <= w; i++) rowH[i] = heightAt(xmin + i * sx, y);
+    for (let i = 0; i <= w; i++) rowH[i] = hf(xmin + i * sx, y, false);
     for (let i = 0; i < w; i++) {
       const x = xmin + i * sx;
-      const hc = rowH[i], hx = rowH[i + 1], hy = prevH[i];
-      let nx = -(hx - hc) / sx * 0.9, ny = -(hy - hc) / sy * 0.9, nz = 1;
-      nx = Math.max(-1.4, Math.min(1.4, nx)); ny = Math.max(-1.4, Math.min(1.4, ny));
+      const hc = rowH[i];
+      const d = rockDetail(x, y, st);
+      let nx = -(rowH[i + 1] - hc) / sx * 0.8 - d.gx, ny = -(prevH[i] - hc) / sy * 0.8 - d.gy, nz = 1;
+      nx = Math.max(-1.6, Math.min(1.6, nx)); ny = Math.max(-1.6, Math.min(1.6, ny));
       const nl = Math.hypot(nx, ny, nz); nx /= nl; ny /= nl; nz /= nl;
-      const [, crack, bi, bf, hb] = rockDetail(x, y, st);
       // light: the sum of the fires, with the direction it comes from
-      let L = 0.035, lx = 0.3, ly = 0.5, lz = 0.5, warm = 0, cold = 0;
+      let L = 0.03, lx = 0.25, ly = 0.45, lz = 0.6, warm = 0, cold = 0;
       for (const [px, py, k] of lights) {
         const dx = px - x, dy = py - y, d2 = dx * dx + dy * dy * 1.3;
         const e = k * Math.exp(-d2 / 4.2);
         if (e < 0.004) continue;
-        L += e; const dl = Math.hypot(dx, dy, 1.4); lx += dx / dl * e * 3; ly += dy / dl * e * 3; lz += 1.4 / dl * e * 3;
+        L += e; const dl = Math.hypot(dx, dy, 1.2); lx += dx / dl * e * 3; ly += dy / dl * e * 3; lz += 1.2 / dl * e * 3;
         if (st.cold != null && px > st.cold) cold += e; else warm += e;
       }
       const ll = Math.hypot(lx, ly, lz);
       const dif = Math.max(0, (nx * lx + ny * ly + nz * lz) / ll);
-      const t = fbm3(x * 0.5, y * 0.5, 3, 21 + st.seed, 3);
-      const k = sat(t * 1.8 - 0.4 + (hb - 0.5) * 0.5);
+      const t = fbm3(x * 0.6, y * 0.6, 3, 21 + st.seed, 2);
+      const k = sat(t * 1.6 - 0.3 + (d.tone - 0.5) * 0.7);
       const m = mf(x, y);
-      const hollow = Math.max(0, Math.min(0.6, -hc * 0.35 - 0.15)) * Math.min(1, y * 1.5);
-      const under = bf < 0.03 + hb * 0.06 && hb > 0.4 && noise3(x * 0.8, y * 0.8, 2, st.seed + 9) > 0.48 ? 0.62 : 1;   // the shadowed underside of a bed, here and there
-      let shade = Math.min(1.25, L) * (0.1 + 1.25 * Math.pow(dif, 1.4)) * under * (1 - crack * 0.85) * (1 - hollow) * (1 - m);
+      const hollow = Math.max(0, Math.min(0.55, -hc * 0.3 - 0.15)) * Math.min(1, y * 1.5);
+      const shade = Math.min(1.25, L) * (0.08 + 1.3 * Math.pow(dif, 1.5)) * (1 - d.crack * 0.92) * (1 - d.edge * 0.35) * (1 - hollow) * (1 - m);
       const o = (j * w + i) * 4;
       const sand = sat((0.45 - y + (fbm3(x * 0.8, 0, 5, 83, 2) - 0.5) * 0.5) * 2.2) * (1 - m);   // grit drifted up the wall
       const rust = st.rust ? sat((fbm3(x * 5, y * 0.25, 4, st.seed + 6, 3) - 0.62) * 4) * sat(fbm3(x * 0.3, y * 0.3, 2, st.seed + 7, 2) * 2 - 0.6) * st.rust : 0;
       const wet = st.wet ? sat((fbm3(x * 3, y * 0.4, 6, st.seed + 8, 3) - 0.58) * 5) : 0;
       const cw = L > 0 ? warm / L : 0, cc = L > 0 ? cold / L : 0;
-      const tint = [1.0 + 0.14 * cw - 0.1 * cc, 0.96 + 0.02 * cw, 0.94 - 0.08 * cw + 0.2 * cc];
+      const tint = [1.0 + 0.12 * cw - 0.1 * cc, 0.97 + 0.02 * cw, 0.95 - 0.08 * cw + 0.2 * cc];
+      const spec = wet ? wet * Math.pow(dif, 8) * Math.min(1, L) * 90 : 0;
       for (let c = 0; c < 3; c++) {
         let v = A[c] + (B[c] - A[c]) * k;
-        v *= 0.86 + ((bi * 0.37 + hb) % 1) * 0.28;               // beds differ a little in tone
-        if (rust) v = v + ([118, 70, 40][c] - v) * rust * 0.55;
+        v *= 0.84 + d.row * 0.3;                                   // beds differ a little in tone
+        if (rust) v = v + ([112, 72, 46][c] - v) * rust * 0.5;
         if (wet) v *= 1 - wet * 0.35;
-        v = v * shade * tint[c] + (wet ? wet * dif * Math.min(1, L) * 60 * Math.pow(dif, 6) : 0);
+        v = v * shade * tint[c] + spec;
         img.data[o + c] = v * (1 - sand) + S[c] * (0.4 + 0.7 * Math.min(1, L)) * tint[c] * Math.min(1.1, L * 1.6) * sand;
       }
       img.data[o + 3] = 255;
