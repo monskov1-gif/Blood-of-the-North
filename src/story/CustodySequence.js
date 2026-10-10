@@ -782,7 +782,7 @@ const methods = {
     await g.card.show('Вечер', { en: 'Evening', ms: 1800 });
     if (S !== this.session) return;
     await g.fader.to(false, 1400);
-    await kow.walkTo([{ x: 16.9, z: -4.6 }, { x: w.wardA.bedSpot.x + 1.6, z: w.wardA.bedSpot.z + 0.9 }], { speed: 1.0 });
+    await kow.walkTo([{ x: 16.9, z: -4.6 }, { x: w.wardA.bedSpot.x + 0.85, z: w.wardA.bedSpot.z + 1.2 }], { speed: 1.0 });
     if (S !== this.session) return;
     kow.face(-1);
     await g.dialogue.start('h_investigator');
@@ -971,7 +971,10 @@ const methods = {
     nurse.walkTo([{ x: door.x, z: -2.0 }], { speed: 1.05, direct: true }).then(() => {
       if (S !== this.session) return;
       g.state.set('nurse_left', true);
-      return nurse.walkTo([{ x: door.x - 3, z: -1.7 }, { x: 4.5, z: -1.6 }, { x: -9.3, z: -2.3 }], { speed: 1.15 });
+      // away from Julian's ward: she turns right, down the far end of the corridor, never facing him
+      const far = Math.max(...(w.bounds.walk.areas || [{ maxX: door.x + 8 }]).map((a) => a.maxX));
+      nurse.face(1);
+      return nurse.walkTo([{ x: door.x + 2.5, z: -1.7 }, { x: Math.max(door.x + 4, far - 0.5), z: -1.8 }], { speed: 1.15, direct: true });
     }).then(() => { if (S === this.session) nurse.setVisible(false); });
     g.audio.play('sfx.lighter', { delay: 2.5, volume: 0.3 });
     await sleep(1.5);
@@ -1019,14 +1022,21 @@ const methods = {
     g.cameraSys.setShot({ x: bed.x - 0.3, y: 1.45, z: bed.z + 3.3, lookX: bed.x - 0.7, lookY: 1.28, lookZ: bed.z + 0.5, fov: 30 }, 0.9);
     this.bloodFocus = true; // the thirst vignette eases so the bag stays in the light
     const beats = setInterval(() => g.audio.play('inner.heartbeat', { volume: 1 }), 520);
+    // the dread under it: a low drone swelling, whispers at the edge of hearing
+    const drone = g.audio.loop('inner.drone', { fade: 1.6, volume: 1.8 });
+    const whispers = setInterval(() => g.audio.play('inner.whisper', { volume: 0.6 + Math.random() * 0.5, rate: 0.7 + Math.random() * 0.3 }), 1700);
     for (const [who, text] of g.dialogue.dialogues.n_patient) {
-      if (S !== this.session) { clearInterval(beats); return; }
+      if (S !== this.session) { clearInterval(beats); clearInterval(whispers); drone?.stop(0.3); return; }
       g.dialogue.history.push({ speaker: who, text });
       await g.view.flash(who, text, 1900 + text.length * 40);
     }
     // he lunges for the bag
     g.cameraSys.shake = 1.4;
+    clearInterval(whispers);
     g.audio.play('sfx.tear');
+    g.audio.play('sfx.shatter', { volume: 0.35, rate: 0.5 });   // a low, wrong crack under the tear
+    g.audio.play('inner.ring', { volume: 1.2 });
+    g.audio.play('inner.breath', { volume: 1.0, delay: 0.3 });
     bag.visible = false;
     w.wardB.iv.userData.tube.visible = false;
     J.setPose('think');
@@ -1034,6 +1044,9 @@ const methods = {
     g.fader.set(true);
     clearInterval(beats);
     g.audio.play('sfx.gulp');
+    g.audio.play('sfx.gulp', { delay: 0.7, rate: 0.85 });
+    g.audio.play('sfx.gulp', { delay: 1.4, rate: 0.75, volume: 0.8 });
+    drone?.stop(2.0);
     await sleep(2.2);
     if (S !== this.session) return;
     // instant clarity: every effect drops, sound snaps back
@@ -1074,7 +1087,7 @@ const methods = {
     const nurse = this.castIn(w, 'nurse');
     nurse.placeAt(10.5, -1.6, 1);
     g.audio.play('sfx.step', { volume: 0.6 });
-    await nurse.walkTo([{ x: 16.9, z: -2.0 }, { x: 16.9, z: -4.6 }, { x: w.wardA.bedSpot.x + 1.6, z: w.wardA.bedSpot.z + 0.9 }], { speed: 2.4 });
+    await nurse.walkTo([{ x: 16.9, z: -2.0 }, { x: 16.9, z: -4.6 }, { x: w.wardA.bedSpot.x + 0.85, z: w.wardA.bedSpot.z + 1.2 }], { speed: 2.4 });
     if (S !== this.session) return;
     nurse.face(-1);
     w.vnHide = [nurse.root];
@@ -1122,7 +1135,7 @@ const methods = {
       // stage each beat in the ward or the corridor
       if (i === 0) {
         this.lieInBed(w.wardA.bedSpot);
-        doc.placeAt(w.wardA.bedSpot.x + 1.5, w.wardA.bedSpot.z + 0.9, -1);
+        doc.placeAt(w.wardA.bedSpot.x + 0.85, w.wardA.bedSpot.z + 1.2, -1);   // inside the room (its wall is at bed + 1.35)
         psy.setVisible(false); nurse.setVisible(false);
         g.cameraSys.setShot(shots.ward, 2); g.cameraSys.snap();
       } else if (i === 1) {
@@ -1133,9 +1146,9 @@ const methods = {
         J.walkTo({ x: 8.5, z: -1.2 }, { speed: 1.3 });
         nurse.walkTo({ x: 9.6, z: -1.2 }, { speed: 1.2 });
       } else {
-        J.stand(); J.placeAt(w.wardA.inside.x + 0.6, w.wardA.inside.z, 1);
-        doc.setVisible(true); doc.placeAt(w.wardA.inside.x + 1.6, w.wardA.inside.z + 0.2, -1);
-        psy.setVisible(true); psy.placeAt(w.wardA.inside.x + 2.5, w.wardA.inside.z + 0.4, -1);
+        J.stand(); J.placeAt(w.wardA.inside.x + 0.35, w.wardA.inside.z, 1);
+        doc.setVisible(true); doc.placeAt(w.wardA.inside.x + 1.15, w.wardA.inside.z + 0.15, -1);
+        psy.setVisible(true); psy.placeAt(w.wardA.inside.x + 1.85, w.wardA.inside.z + 0.55, -1);
         nurse.setVisible(false);
         g.cameraSys.setShot(shots.ward, 2); g.cameraSys.snap();
       }

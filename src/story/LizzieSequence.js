@@ -989,10 +989,10 @@ const methods = {
     const L = this.julian;
     const ROUTE = [
       { loc: 'cave_altar', exit: 'altar_deep' },
-      { loc: 'cave_deep', exit: 'deep_hall', from: { x: -7.6, z: -2.4 } },
-      { loc: 'cave', exit: 'hall_store', from: { x: -0.6, z: -2.4 } },
-      { loc: 'cave_store', exit: 'store_tunnel', from: { x: -5.6, z: -2.4 } },
-      { loc: 'cave_tunnel', exit: null, from: { x: -6.6, z: -2.4 } },
+      { loc: 'cave_deep', exit: 'deep_hall', from: { x: -7.6, z: -2.9 } },
+      { loc: 'cave', exit: 'hall_store', from: { x: -0.6, z: -2.9 } },
+      { loc: 'cave_store', exit: 'store_tunnel', from: { x: -5.6, z: -2.9 } },
+      { loc: 'cave_tunnel', exit: null, from: { x: -6.6, z: -2.9 } },
     ];
     this.place = null;
     this.lzCaveState = 'L5';
@@ -1024,7 +1024,7 @@ const methods = {
       g.hud.show(true);
       g.player.enabled = true;
       g.state.set('objective', 'lz_escape');
-      if (r.from) setTimeout(() => { if (S === this.session && g.world === w) chasers.forEach((c) => c.setVisible(true)); }, 950);
+      if (r.from) setTimeout(() => { if (S === this.session && g.world === w) chasers.forEach((c) => c.setVisible(true)); }, 1500);   // they come out of the dark a beat after her
       const res = await this.lzChaseStep(chasers, goal, { nav: true });
       if (S !== this.session) return;
       if (res === 'caught') { await this.lzCaught(); retry = true; continue; }

@@ -583,6 +583,10 @@ export class BarStory {
     this.resetPositions();
     const st = g.state.stage;
     if (data?.leaverGone) { this.leaver.setVisible(false); this.leaverGone = true; }
+    // a loaded stage casts its own people: nobody from a later (or earlier) scene stays standing
+    // where the previous session left them
+    for (const c of this.custodyCast?.values() || []) { c.stop?.(); c.setVisible(false); }
+    this.clearCrowd?.();
     const a = this.scene.anchors;
     if (CUSTODY_STAGES.includes(st)) {
       await this.loadCustody(st);
