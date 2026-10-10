@@ -307,6 +307,8 @@ const methods = {
     wolf.eatT = 0;
     // what it is eating: a deer, under its muzzle
     w.addKill?.(w.anchors.wolf.x - 1.7, w.anchors.wolf.z + 0.12, -1);
+    // stand the wolf on the snow of the far bank, not in it
+    if (w.groundAt) wolf.root.position.y = w.groundAt(w.anchors.wolf.x, w.anchors.wolf.z);
     const man = this.castIn(w, 'stranger', 'stranger');
     man.setVisible(false);
     this.beast = wolf; this.stranger = man;
