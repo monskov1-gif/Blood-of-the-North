@@ -8,6 +8,7 @@ import { StreetScene } from './StreetScene.js';
 import { ForestScene } from './ForestScene.js';
 import { SchoolScene } from './SchoolScene.js';
 import { CaveScene } from './CaveScene.js';
+import { CaveDenScene, CaveDeepScene, CaveAltarScene, CaveStoreScene, CaveTunnelScene, CaveRiftScene } from './CaveRooms.js';
 import { CafeteriaScene } from './CafeteriaScene.js';
 import { ApartmentScene, ApartmentBedroomScene, ApartmentAtticScene } from './ApartmentScene.js';
 
@@ -29,6 +30,12 @@ export const LOCATIONS = {
   forest: ForestScene,
   school: SchoolScene,
   cave: CaveScene,
+  cave_den: CaveDenScene,
+  cave_deep: CaveDeepScene,
+  cave_altar: CaveAltarScene,
+  cave_store: CaveStoreScene,
+  cave_tunnel: CaveTunnelScene,
+  cave_rift: CaveRiftScene,
   cafeteria: CafeteriaScene,
   apartment: ApartmentScene,
   apt_bedroom: ApartmentBedroomScene,

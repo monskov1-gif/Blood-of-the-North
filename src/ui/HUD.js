@@ -30,7 +30,13 @@ const OBJECTIVES = {
   lz_sites: { ru: 'Сфотографировать следы. Идти вдоль реки', en: 'PHOTOGRAPH THE TRACES' },
   lz_herd: { ru: 'Стадо у реки. Подойти тихо', en: 'THE HERD BY THE RIVER' },
   lz_cave: { ru: 'Осмотреться. Понять, где мы', en: 'WHERE ARE WE' },
+  lz_l3_girls: { ru: 'Вернуться к Оливии и Викки', en: 'BACK TO THE GIRLS' },
+  lz_l3_night: { ru: 'Найти Пуриэль. Щель в тоннеле', en: 'FIND PURIEL' },
+  lz_l3_back: { ru: 'Вернуться в зал, к девочкам', en: 'BACK TO THE HALL' },
+  lz_l3_escape: { ru: 'К выходу. Тихо, по стенке', en: 'TO THE MOUTH. QUIETLY' },
   lz_pack: { ru: 'Слушать стаю', en: 'LISTEN TO THE PACK' },
+  lz_l4_back: { ru: 'Вечер. Вернуться к девочкам', en: 'EVENING. BACK TO THE GIRLS' },
+  lz_l5_deep: { ru: 'Голос — из глубины. Вниз по узкому ходу', en: 'THE VOICE BELOW' },
   lz_follow: { ru: 'Найти Оливию', en: 'FIND OLIVIA' },
   lz_escape: { ru: 'БЕГИ', en: 'RUN' },
 };

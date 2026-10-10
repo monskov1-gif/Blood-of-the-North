@@ -1,55 +1,114 @@
-/* ------------------------------------------------------------------ Lizzie's phone camera + river map (src/ui/LizzieUI.js) */
-.lz-flash { position: absolute; inset: 0; z-index: 58; background: #fff; pointer-events: none; animation: lzFlash .38s ease-out forwards; }
-@keyframes lzFlash { from { opacity: .95; } to { opacity: 0; } }
-.lz-thumb { position: absolute; right: calc(18px + var(--safe-r)); bottom: calc(120px + var(--safe-b)); z-index: 57; width: 120px; padding: 6px 6px 22px; background: #efe6d4;
-  box-shadow: 0 8px 18px rgba(0,0,0,.55); transform: rotate(4deg); animation: lzThumbIn .4s cubic-bezier(.3,1.4,.6,1) both; pointer-events: none; transition: transform .5s, opacity .5s; }
-.lz-thumb i { display: block; height: 72px; background: radial-gradient(ellipse at 50% 60%, #8a8a84, #2a2a28); filter: grayscale(.4); }
-.lz-thumb span { position: absolute; left: 0; right: 0; bottom: 4px; text-align: center; font-family: 'MonteCarlo', 'Pinyon', cursive; font-size: 15px; color: #2a2030; }
+/* ------------------------------------------------------------------ Lizzie's phone camera + river map (src/ui/LizzieUI.js, art in src/ui/LizzieArt.js) */
+/* shutter: a short black blink, then a hot white flash that falls off to warm */
+.lz-flash { position: absolute; inset: 0; z-index: 58; pointer-events: none; animation: lzFlash .42s ease-out forwards;
+  background: radial-gradient(ellipse at 50% 55%, #fff 0 30%, #fff6e6 55%, #e8dcc8 100%); }
+@keyframes lzFlash { 0% { opacity: 1; background: #000; } 12% { opacity: 1; background: #000; } 16% { opacity: .98; } 100% { opacity: 0; } }
+
+/* the polaroid of the shot */
+.lz-thumb { position: absolute; right: calc(18px + var(--safe-r)); bottom: calc(120px + var(--safe-b)); z-index: 57; width: 132px; padding: 7px 7px 26px; pointer-events: none;
+  background:
+    radial-gradient(ellipse at 30% 20%, rgba(255,255,255,.5), transparent 60%),
+    repeating-linear-gradient(87deg, rgba(120,100,70,.05) 0 1px, transparent 1px 3px),
+    linear-gradient(170deg, #f3ecdc, #e6dcc6);
+  box-shadow: 0 10px 22px rgba(0,0,0,.6), 0 2px 3px rgba(0,0,0,.4), inset 0 0 0 1px rgba(120,100,70,.25);
+  transform: rotate(4deg); animation: lzThumbIn .45s cubic-bezier(.3,1.4,.6,1) both; transition: transform .5s, opacity .5s; }
+.lz-thumb .ph { position: relative; overflow: hidden; background: #111; box-shadow: inset 0 0 0 1px rgba(0,0,0,.5); }
+.lz-thumb canvas { display: block; width: 100%; height: auto; filter: saturate(.75) contrast(1.08) sepia(.12); animation: lzDevelop 1.6s ease-out both; }
+.lz-thumb .ph::after { content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse at 50% 50%, transparent 45%, rgba(0,0,0,.55) 100%), linear-gradient(120deg, rgba(255,255,255,.18), transparent 40%); }
+@keyframes lzDevelop { from { filter: brightness(2.4) saturate(0) blur(1px); } to { filter: saturate(.75) contrast(1.08) sepia(.12); } }
+.lz-thumb span { position: absolute; left: 8px; right: 30px; bottom: 5px; text-align: left; font-family: 'MonteCarlo', 'Pinyon', cursive; font-size: 17px; color: #1d2550; }
+.lz-thumb em { position: absolute; right: 8px; bottom: 7px; font: 9px 'Courier New', monospace; color: rgba(60,40,30,.6); font-style: normal; }
 .lz-thumb.out { transform: translate(40px, 40px) rotate(14deg); opacity: 0; }
 @keyframes lzThumbIn { from { transform: translate(60px, 0) rotate(20deg); opacity: 0; } to { transform: rotate(4deg); opacity: 1; } }
 
+/* phone video: viewfinder over the live scene */
 .lz-rec { position: absolute; inset: calc(6 * var(--vh)) calc(5 * var(--vw)); z-index: 52; pointer-events: none; font-family: -apple-system, 'Segoe UI', sans-serif; color: #fff;
   text-shadow: 0 1px 2px #000; animation: fadeIn .3s; transition: opacity .5s; }
+.lz-rec::before { content: ''; position: absolute; inset: calc(-6 * var(--vh)) calc(-5 * var(--vw)); pointer-events: none;
+  background: radial-gradient(ellipse at 50% 50%, transparent 55%, rgba(0,0,0,.55) 100%); }
+.lz-rec .grain { position: absolute; inset: calc(-6 * var(--vh)) calc(-5 * var(--vw)); opacity: .16; mix-blend-mode: overlay; animation: lzGrain .25s steps(2) infinite;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+@keyframes lzGrain { 0% { transform: translate(0, 0); } 50% { transform: translate(-40px, 25px); } 100% { transform: translate(30px, -20px); } }
+.lz-rec .grid { position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent calc(33.33% - .5px), rgba(255,255,255,.22) calc(33.33% - .5px) calc(33.33% + .5px), transparent calc(33.33% + .5px) calc(66.66% - .5px), rgba(255,255,255,.22) calc(66.66% - .5px) calc(66.66% + .5px), transparent calc(66.66% + .5px)),
+              linear-gradient(180deg, transparent calc(33.33% - .5px), rgba(255,255,255,.22) calc(33.33% - .5px) calc(33.33% + .5px), transparent calc(33.33% + .5px) calc(66.66% - .5px), rgba(255,255,255,.22) calc(66.66% - .5px) calc(66.66% + .5px), transparent calc(66.66% + .5px)); }
 .lz-rec.out { opacity: 0; }
-.lz-rec .c { position: absolute; width: 34px; height: 34px; border: 2px solid rgba(255,255,255,.85); }
+.lz-rec .c { position: absolute; width: 34px; height: 34px; border: 2px solid rgba(255,255,255,.85); filter: drop-shadow(0 1px 1px rgba(0,0,0,.6)); }
 .lz-rec .tl { left: 0; top: 0; border-right: 0; border-bottom: 0; } .lz-rec .tr { right: 0; top: 0; border-left: 0; border-bottom: 0; }
 .lz-rec .bl { left: 0; bottom: 0; border-right: 0; border-top: 0; } .lz-rec .br { right: 0; bottom: 0; border-left: 0; border-top: 0; }
-.lz-rec .rec { position: absolute; left: 46px; top: 10px; font-weight: 700; letter-spacing: .1em; }
-.lz-rec .rec i { display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #e02020; margin-right: 8px; vertical-align: -1px; animation: pulse 1s infinite; }
-.lz-rec .tc { position: absolute; right: 46px; top: 10px; font-variant-numeric: tabular-nums; }
-.lz-rec .bat { position: absolute; right: 46px; bottom: 10px; font-size: 13px; opacity: .85; }
+.lz-rec .focus { position: absolute; left: 50%; top: 50%; width: 72px; height: 72px; transform: translate(-50%, -50%); border: 1px solid rgba(255,214,90,.9); animation: lzFocus 1.2s ease-out both; }
+.lz-rec .focus i { position: absolute; left: 50%; top: 50%; width: 8px; height: 8px; margin: -4px; border-radius: 50%; border: 1px solid rgba(255,214,90,.8); }
+@keyframes lzFocus { 0% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; } 30% { opacity: 1; } 60% { transform: translate(-50%, -50%) scale(.92); } 100% { transform: translate(-50%, -50%) scale(1); opacity: .55; } }
+.lz-rec .rec { position: absolute; left: 50%; top: 10px; transform: translateX(-50%); padding: 3px 10px; border-radius: 4px; background: rgba(0,0,0,.45); font-weight: 700; letter-spacing: .08em; font-size: 14px; }
+.lz-rec .rec i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #ff2a2a; margin-right: 8px; vertical-align: 0; box-shadow: 0 0 6px #ff2a2a; animation: pulse 1s infinite; }
+.lz-rec .tc { font-variant-numeric: tabular-nums; font-weight: 500; margin-left: 4px; }
+.lz-rec .fmt { position: absolute; left: 46px; top: 12px; font-size: 11px; letter-spacing: .08em; opacity: .85; }
+.lz-rec .bat { position: absolute; right: 46px; top: 12px; font-size: 12px; opacity: .9; display: flex; align-items: center; gap: 5px; }
+.lz-rec .bat b { position: relative; width: 22px; height: 11px; border: 1.5px solid #fff; border-radius: 3px; }
+.lz-rec .bat b::after { content: ''; position: absolute; right: -4px; top: 3px; width: 2px; height: 4px; background: #fff; border-radius: 0 1px 1px 0; }
+.lz-rec .bat b i { position: absolute; left: 1px; top: 1px; bottom: 1px; width: 23%; background: #ffcc33; border-radius: 1px; }
+.lz-rec .meter { position: absolute; left: 46px; bottom: 14px; display: grid; grid-template-columns: 10px 90px; gap: 3px 6px; align-items: center; font-size: 9px; opacity: .9; }
+.lz-rec .meter i { height: 4px; border-radius: 2px; background: linear-gradient(90deg, #6ad46a 0 60%, #e8d040 60% 85%, #e04040 85%) left / var(--lvl, 30%) 100% no-repeat, rgba(255,255,255,.18); transition: background-size .12s; }
+.lz-rec .zoom { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; background: rgba(0,0,0,.45); font-size: 11px; font-weight: 700; color: #ffd65a; }
+.lz-rec .exp { position: absolute; right: 46px; bottom: 14px; font-size: 10px; letter-spacing: .06em; opacity: .75; font-variant-numeric: tabular-nums; }
 
-.lz-map-wrap { position: absolute; inset: 0; z-index: 55; pointer-events: auto; display: grid; place-items: center; background: rgba(4,3,2,.78); animation: fadeIn .4s; transition: opacity .5s; }
+/* ------------------------------------------------------------------ the valley map */
+.lz-map-wrap { position: absolute; inset: 0; z-index: 55; pointer-events: auto; display: grid; place-items: center; animation: fadeIn .4s; transition: opacity .5s;
+  background: radial-gradient(ellipse at 50% 45%, rgba(40,28,16,.55), rgba(4,3,2,.9) 75%), rgba(4,3,2,.6); }
 .lz-map-wrap.out { opacity: 0; }
-.lz-map { position: relative; width: min(calc(80 * var(--vw)), calc(120 * var(--vh))); aspect-ratio: 10 / 7; background: #e2d4b2; transform: rotate(-1deg);
-  box-shadow: 0 24px 50px rgba(0,0,0,.8), inset 0 0 60px rgba(120,90,50,.45); border-radius: 2px; }
-.lz-map svg { position: absolute; inset: 0; width: 100%; height: 100%; }
-.lz-map .river { fill: none; stroke: #4a7aa8; stroke-width: 2.4; stroke-linecap: round; opacity: .8; }
-.lz-map .road { fill: none; stroke: #8a6a4a; stroke-width: .6; stroke-dasharray: 2 1.4; }
-.lz-map text { font-family: 'Playfair SC', serif; font-size: 3px; fill: #4a3a2a; letter-spacing: .3px; }
-.lz-map .link { fill: none; stroke: #b0161d; stroke-width: .9; vector-effect: non-scaling-stroke; stroke-width: 3px; }
-.lz-map .next { fill: none; stroke: #b0161d; stroke-width: 3px; vector-effect: non-scaling-stroke; stroke-dasharray: 8 6; }
-.lz-pin { position: absolute; transform: translate(-50%, -50%); width: 26px; height: 26px; border-radius: 50%; border: 2px solid #3a2a1a; background: #f2ead8; cursor: pointer; padding: 0; }
-.lz-pin b { position: absolute; left: 50%; top: 120%; transform: translateX(-50%); white-space: nowrap; font-family: 'MonteCarlo', 'Pinyon', cursive; font-size: 22px; font-weight: 400; color: #1d2550; }
-.lz-pin.on { background: #b0161d; border-color: #6a0a0e; }
-.lz-pin.next { background: none; border: 2px dashed #b0161d; animation: pulse 1.4s infinite; }
+.lz-map { position: relative; width: min(calc(82 * var(--vw)), calc(118 * var(--vh))); aspect-ratio: 10 / 7; background: #e2d4b2; transform: rotate(-1deg);
+  box-shadow: 0 28px 60px rgba(0,0,0,.85), 0 4px 10px rgba(0,0,0,.5); border-radius: 1px;
+  clip-path: polygon(0 .6%, 12% 0, 30% .4%, 49% 0, 71% .5%, 88% 0, 100% .3%, 99.7% 30%, 100% 62%, 99.6% 100%, 76% 99.5%, 52% 100%, 27% 99.6%, 8% 100%, 0 99.4%, .4% 64%, 0 33%); }
+.lz-map .paper { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.lz-map .shade { position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(115deg, rgba(255,250,235,.12), transparent 35%, transparent 65%, rgba(40,25,10,.16)), radial-gradient(ellipse at 50% 50%, transparent 60%, rgba(70,45,20,.25) 100%); }
+.lz-map svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.lz-map .link, .lz-map .link-shadow, .lz-map .next { fill: none; vector-effect: non-scaling-stroke; stroke-linejoin: round; stroke-linecap: round; }
+.lz-map .link { stroke: #a8121c; stroke-width: 2.6px; }
+.lz-map .link-shadow { stroke: rgba(30,15,5,.35); stroke-width: 3px; transform: translate(.35px, .5px); }
+.lz-map .next { stroke: rgba(168,18,28,.85); stroke-width: 2.4px; stroke-dasharray: 2 7; }
+/* push-pins: a lacquered head, a needle and a cast shadow */
+.lz-pin { position: absolute; transform: translate(-50%, -50%); width: 34px; height: 34px; border: 0; background: none; cursor: pointer; padding: 0; z-index: 2; }
+.lz-pin::after { content: ''; position: absolute; left: 50%; top: 50%; width: 15px; height: 15px; margin: -13px 0 0 -8px; border-radius: 50%;
+  background: radial-gradient(circle at 34% 30%, #fff 0 12%, #f2ecdc 24%, #c9bea2 70%, #7a6e58 100%);
+  box-shadow: 4px 6px 4px rgba(20,10,0,.45), inset -1px -2px 2px rgba(0,0,0,.25); transition: background .2s, transform .2s; }
+.lz-pin::before { content: ''; position: absolute; left: 50%; top: 50%; width: 2px; height: 11px; margin: -4px 0 0 -1px; transform: rotate(-28deg); transform-origin: 50% 0;
+  background: linear-gradient(90deg, #888, #eee 50%, #777); box-shadow: 3px 2px 2px rgba(20,10,0,.35); }
+.lz-pin:hover::after { transform: translateY(-2px) scale(1.08); }
+.lz-pin b { position: absolute; left: 50%; top: 92%; transform: translateX(-50%) rotate(-2deg); white-space: nowrap; font-family: 'MonteCarlo', 'Pinyon', cursive; font-size: 23px; font-weight: 400; color: #1d2550; line-height: 1;
+  padding: 0 6px 2px; background: radial-gradient(ellipse at 50% 55%, rgba(240,232,210,.92) 40%, rgba(240,232,210,0) 75%); }
+.lz-pin.on::after { background: radial-gradient(circle at 34% 30%, #ffd0c8 0 10%, #e03a3a 26%, #a0121a 62%, #4a0608 100%); }
+.lz-pin.next { cursor: default; }
+.lz-pin.next::after { width: 30px; height: 30px; margin: -15px; background: none; box-shadow: none; border: 2px dashed rgba(168,18,28,.85); animation: pulse 1.4s infinite; }
+.lz-pin.next::before { display: none; }
+.lz-pin.next b { color: #8a0e16; }
 .lz-pin.shake { animation: lzShake .35s; }
 @keyframes lzShake { 25% { transform: translate(-58%, -50%); } 75% { transform: translate(-42%, -50%); } }
-.lz-map-hint { position: absolute; bottom: calc(5 * var(--vh) + var(--safe-b)); left: 0; right: 0; text-align: center; color: #e2d0ae; font-family: var(--serif); font-size: 18px; text-shadow: 0 2px 6px #000; }
+.lz-pin.ghost { cursor: default; }
+.lz-pin.ghost::after { width: 18px; height: 18px; margin: -9px; background: none; box-shadow: none; border: 1.5px solid rgba(50,50,60,.55); }
+.lz-pin.ghost::before { width: 14px; height: 1.5px; margin: -.75px 0 0 -7px; transform: rotate(45deg); transform-origin: 50% 50%; background: rgba(50,50,60,.55); box-shadow: none; }
+.lz-pin.ghost b { color: rgba(30,30,60,.65); }
+.lz-map-hint { position: absolute; bottom: calc(4 * var(--vh) + var(--safe-b)); left: 0; right: 0; text-align: center; color: #e8d6b2; font-family: var(--serif); font-size: 18px; text-shadow: 0 2px 6px #000; padding: 0 16px; }
 
 /* Lizzie's chapters: no Julian's phone or case folder in the HUD */
 .hud.lizzie .hud-btn:not(:last-child) { display: none !important; }
 
-.lz-map.jul { background: #d8ccb0; }
-.lz-map .cliffs { fill: none; stroke: #5a4a3a; stroke-width: .5; }
-.lz-pin.ghost { background: none; border: 2px solid rgba(60,40,20,.4); cursor: default; }
-.lz-pin.ghost b { color: rgba(30,30,60,.6); }
-.cctv { align-content: center; gap: 14px; }
-.cc-title { color: #c8d0c8; font-family: 'Courier New', monospace; letter-spacing: .2em; font-size: 14px; text-align: center; }
-.cc-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; width: min(calc(86 * var(--vw)), calc(140 * var(--vh))); }
-.cc-frame { position: relative; padding: 0; border: 2px solid #2a2a2a; background: #000; cursor: pointer; }
-.cc-frame canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; filter: contrast(1.1); }
-.cc-tc { position: absolute; left: 6px; top: 4px; color: #e8e8e8; font: 11px 'Courier New', monospace; text-shadow: 0 1px 2px #000; }
-.cc-frame.hit { border-color: #b0161d; box-shadow: 0 0 0 2px rgba(176,22,29,.5); }
-.cc-frame.miss { opacity: .55; }
-.cctv .lz-map-hint { position: static; }
+/* ------------------------------------------------------------------ CCTV review (chapter 6) */
+.cctv { align-content: center; gap: 14px; background: radial-gradient(ellipse at 50% 40%, #1a1c1a, #050605 80%); }
+.cctv::before { content: ''; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(180deg, rgba(255,255,255,.015) 0 1px, transparent 1px 3px); }
+.cc-title { color: #b8c8b8; font-family: 'Courier New', monospace; letter-spacing: .2em; font-size: 14px; text-align: center; text-shadow: 0 0 6px rgba(160,220,160,.35); }
+.cc-title::before { content: '●  '; color: #e03030; animation: pulse 1.2s infinite; }
+.cc-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; width: min(calc(88 * var(--vw)), calc(140 * var(--vh))); padding: 10px; background: #0b0c0b;
+  border: 1px solid #2a2c2a; border-radius: 4px; box-shadow: 0 20px 50px rgba(0,0,0,.8), inset 0 0 30px rgba(0,0,0,.9); }
+.cc-frame { position: relative; padding: 0; border: 1px solid #1e201e; background: #000; cursor: zoom-in; overflow: hidden; transition: transform .2s, box-shadow .2s; }
+.cc-frame::after { content: ''; position: absolute; inset: 0; pointer-events: none; border-radius: 6px; box-shadow: inset 0 0 18px rgba(0,0,0,.85); background: linear-gradient(160deg, rgba(255,255,255,.06), transparent 40%); }
+.cc-frame:hover { transform: scale(1.03); z-index: 2; box-shadow: 0 0 0 1px #7a9a7a, 0 10px 30px rgba(0,0,0,.9); }
+.cc-frame canvas { display: block; width: 100%; height: auto; }
+.cc-mark { position: absolute; inset: 6px; pointer-events: none; border: 2px solid transparent; }
+.cc-frame.hit { border-color: #b0161d; box-shadow: 0 0 0 2px rgba(176,22,29,.6), 0 0 22px rgba(176,22,29,.35); }
+.cc-frame.hit .cc-mark { border-color: rgba(230,40,40,.9); }
+.cc-frame.hit .cc-mark::after { content: 'ОТМЕЧЕНО'; position: absolute; right: 4px; top: 22px; padding: 1px 5px; background: rgba(176,22,29,.9); color: #fff; font: 700 10px 'Courier New', monospace; letter-spacing: .1em; }
+.cc-frame.miss { opacity: .45; filter: grayscale(1); }
+.cctv .lz-map-hint { position: static; max-width: 80vw; margin: 0 auto; }
+@media (max-height: 480px) { .cctv { gap: 8px; } .cc-title { font-size: 11px; } .cc-grid { gap: 6px; padding: 6px; width: min(calc(96 * var(--vw)), calc(168 * var(--vh))); } .lz-pin b { font-size: 17px; } .lz-map-hint { font-size: 14px; } }

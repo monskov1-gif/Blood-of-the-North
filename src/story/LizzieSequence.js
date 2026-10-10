@@ -183,6 +183,7 @@ const methods = {
   async lzL1Sites() {
     const g = this.g;
     const S = this.session;
+    const { pu, ol, vi } = this.lzCast;
     const site = async (n, x, sub) => {
       await g.fader.to(true, 900);
       if (S !== this.session) return false;
@@ -194,7 +195,8 @@ const methods = {
       L.placeAt(x, 0.2, 1);
       const { pu, ol, vi } = this.lzCast;
       for (const [i, c] of [pu, ol, vi].entries()) { this.g.world.root.add(c.root); c.setVisible(true); c.placeAt(x - 1.2 - i * 0.9, 0.5 - i * 0.35, 1); }
-      this.lzFollow = [pu, ol, vi];
+      this.lzFollow = null;
+      this.lzSearch = null;
       g.cameraSys.setShot(null, 1); g.cameraSys.snap();
       await g.card.show(`Точка ${n}`, { en: `Site ${n}`, sub, ms: 1600 });
       await g.fader.to(false, 900);
@@ -209,7 +211,7 @@ const methods = {
       { id: 'l1_bones', label: 'Кости в кустах', at: { x: -8.0, z: -1.9 }, radius: 0.8, anchor: w().anchors.siteA.bones, run: this.lzSay('l1_bones') },
       { id: 'l1_claws', label: 'Борозды на ели', at: { x: -6.2, z: -2.1 }, radius: 0.7, anchor: w().anchors.siteA.claws, run: this.lzSay('l1_claws') },
       { id: 'l1_sapling', label: 'Сломанная берёза', at: { x: -5.4, z: -2.0 }, radius: 0.6, anchor: w().anchors.siteA.sapling, run: this.lzSay('l1_sapling') },
-    ], { x: -3.6, label: 'Дальше, на север' }, () => ['bones', 'claws', 'sapling'].filter(photo).length >= 2);
+    ], { x: -3.6, label: 'Дальше, на север' }, () => ['bones', 'claws', 'sapling'].filter(photo).length >= 2, null, { girls: [pu, ol, vi] });
     if (S !== this.session) return;
     // site 2 — further north: carcasses, ravens
     if (!(await site(2, 10.2, 'СЕВЕРНЕЕ · ВОСКРЕСЕНЬЕ'))) return;
@@ -217,14 +219,14 @@ const methods = {
     await this.lzExplore([
       { id: 'l1_carcass', label: 'Туши', at: { x: 13.4, z: -1.8 }, radius: 0.9, anchor: w().anchors.siteB.carcass, run: this.lzSay('l1_carcass') },
       { id: 'l1_ravens', label: 'Вороны', at: { x: 15.4, z: -1.8 }, radius: 0.8, anchor: w().anchors.siteB.ravens, run: this.lzSay('l1_ravens') },
-    ], { x: 18.2, label: 'Дальше, на север' }, () => ['carcass', 'ravens'].some(photo));
+    ], { x: 18.2, label: 'Дальше, на север' }, () => ['carcass', 'ravens'].some(photo), null, { girls: [pu, ol, vi] });
     if (S !== this.session) return;
     // site 3 — north: fresh tracks, the map
     if (!(await site(3, 20.0, 'СЕВЕР · ПОНЕДЕЛЬНИК'))) return;
     if (!(await this.lines(g.dialogue.dialogues.l1_siteC))) return;
     await this.lzExplore([
       { id: 'l1_tracks', label: 'Следы', at: { x: 23.6, z: -1.4 }, radius: 0.9, anchor: w().anchors.siteC.tracks, run: this.lzSay('l1_tracks') },
-    ], { x: 25.6, label: 'Карта', run: () => g.dialogue.start('l1_mapTime') }, () => photo('tracks'), () => g.state.get('lz_map_done'));
+    ], { x: 25.6, label: 'Карта', run: () => g.dialogue.start('l1_mapTime') }, () => photo('tracks'), () => g.state.get('lz_map_done'), { girls: [pu, ol, vi] });
     if (S !== this.session) return;
     g.player.enabled = false;
     if (!(await this.lines(g.dialogue.dialogues.l1_after))) return;
@@ -235,20 +237,79 @@ const methods = {
    * Free exploration with a gate: `items` are the clues, `gate` the way on (shown once `ready()`);
    * resolves when the gate is used (or `done()` turns true).
    */
-  lzExplore(items, gate, ready, done) {
+  lzExplore(items, gate, ready, done, { girls } = {}) {
     const g = this.g;
     g.hud.show(true);
     g.player.enabled = true;
+    if (girls) this.lzSearchStart(girls, items);
     return new Promise((resolve) => {
       const go = { id: `lz_gate_${gate.x}`, label: gate.label, at: { x: gate.x, z: 0.0 }, radius: 1.0, anchor: V(gate.x + 0.4, 1.4, -0.4),
         run: async () => {
           if (!ready()) { await g.dialogue.start('l1_needPhotos'); return; }
           if (gate.run) { await gate.run(); if (done && !done()) return; }
           g.interactions.setItems([]);
+          this.lzSearch = null;
           resolve();
         } };
       g.interactions.setItems([...items, go]);
     });
+  },
+
+  /**
+   * The girls search on their own: each walks her own route between the clues, stops, looks,
+   * points. When the player has found nothing new for a while, the girl nearest to a clue still
+   * unfound walks up to it and calls Lizzie over.
+   */
+  lzSearchStart(girls, items) {
+    const g = this.g;
+    this.lzFollow = null;
+    const CALL = {
+      lz_puriel: ['puriel', 'Рид! Иди сюда — тут что-то есть!'],
+      lz_olivia: ['olivia', 'Лиззи… посмотри. Вот здесь.'],
+      lz_vikki: ['vikki', 'Эй, детектив. Не это ищешь?'],
+    };
+    const S = this.session;
+    const found = () => items.filter((it) => g.state.interacted.has(it.id)).length;
+    const st = this.lzSearch = { t: 0, last: 0, n: found(), calling: null };
+    girls.forEach((f, i) => {
+      (async () => {
+        await sleep(0.5 + i * 0.7);
+        while (this.lzSearch === st && S === this.session) {
+          if (st.calling === f) { await sleep(1); continue; }
+          // her own route: from clue to clue, a step aside, a look
+          const it = items[(i + Math.floor(Math.random() * items.length)) % items.length];
+          const tx = it.at.x + (Math.random() - 0.5) * 2.4 + (i - 1) * 0.6;
+          const tz = Math.max(-2.0, Math.min(1.0, it.at.z + 0.4 + (Math.random() - 0.5) * 1.2));
+          await f.walkTo({ x: tx, z: tz }, { speed: 0.9 + Math.random() * 0.4, direct: true });
+          if (this.lzSearch !== st) break;
+          f.faceTowards(it.at.x);
+          if (Math.random() < 0.4 && f.poses.talk) { f.setPose('talk'); await sleep(1.2); f.setPose('idle'); }
+          await sleep(2 + Math.random() * 4);
+        }
+      })();
+    });
+    st.tick = (dt) => {
+      st.t += dt;
+      const n = found();
+      if (n !== st.n) { st.n = n; st.last = st.t; if (st.calling) { st.calling.setPose('idle'); st.calling = null; } }
+      if (st.calling || g.dialogue.busy || !g.player.enabled || st.t - st.last < (globalThis.__lzHelpAfter ?? 28)) return;
+      const left = items.filter((it) => !g.state.interacted.has(it.id));
+      if (!left.length) return;
+      const L = this.julian;
+      const it = left.sort((a, b) => Math.abs(a.at.x - L.position.x) - Math.abs(b.at.x - L.position.x))[0];
+      const f = girls.filter((c) => c.root.visible).sort((a, b) => Math.abs(a.position.x - it.at.x) - Math.abs(b.position.x - it.at.x))[0];
+      if (!f) return;
+      st.calling = f;
+      st.last = st.t;
+      f.walkTo({ x: it.at.x + 0.5, z: Math.min(1.0, it.at.z + 0.5) }, { speed: 1.8, direct: true }).then(() => {
+        if (this.lzSearch !== st) return;
+        f.faceTowards(L.position.x);
+        if (f.poses.talk) f.setPose('talk');
+        const [who, text] = CALL[f.def?.id || f.id] || ['puriel', 'Лиззи! Сюда!'];
+        this.lines([[who, text]], { blocking: false });
+        g.audio.play('sfx.step', { volume: 0.3 });
+      });
+    };
   },
 
   // ------------------------------------------------------------------ L2 — ЛЕС
@@ -374,6 +435,82 @@ const methods = {
     await sleep(0.8);
   },
 
+  // ------------------------------------------------------------------ the cave (L3–L5)
+
+  /** The chambers of the cave (src/world/scenes/CaveScene.js + CaveRooms.js). */
+  lzCaveRooms() { return ['cave', 'cave_den', 'cave_deep', 'cave_altar', 'cave_store', 'cave_tunnel', 'cave_rift']; },
+
+  /** A new chapter in the cave: no blood left over from the last time in any chamber. */
+  lzCaveReset() {
+    for (const [id, w] of this.g.locations || []) if (id.startsWith('cave')) { w.clearBlood?.(); w.state = null; }
+  },
+
+  /** The scene state every chamber opens in from now on (and the one we are in, right away). */
+  lzCaveSetState(st) {
+    this.lzCaveState = st;
+    if (this.place?.state) for (const id of this.lzCaveRooms()) this.place.state[id] = st;
+    this.g.world.setState?.(st);
+  },
+
+  /**
+   * The chapter's life in the cave: its interactables per chamber, who is where when the player
+   * comes in, and which passages are shut (gate returns a bark id). Open passages lead through
+   * lzCaveGo (a short fade, footsteps on sand — no door sound in the rock).
+   */
+  lzCavePlace(st, { items, onEnter, gate }) {
+    this.lzCaveState = st;
+    this.setPlace({
+      state: Object.fromEntries(this.lzCaveRooms().map((id) => [id, st])),
+      items: (loc) => items(loc) || [],
+      onEnter: (loc) => onEnter?.(loc),
+      door: (d) => gate?.(d) || (() => this.lzCaveGo(d.to, d.spawn)),
+    });
+  },
+
+  /** Through a passage into the next chamber. */
+  async lzCaveGo(to, spawn = {}, ms = 380) {
+    const g = this.g;
+    const S = this.session;
+    const L = this.julian;
+    if (this.traveling) return false;
+    this.traveling = true;
+    g.player.enabled = false;
+    L.stop?.();
+    g.audio.play('sfx.step', { volume: 0.5 });
+    await g.fader.to(true, ms);
+    if (S !== this.session) { this.traveling = false; return false; }
+    g.interactions.setItems([]);
+    this.lzWatch = null;
+    await g.setLocation(to, { state: this.place?.state?.[to] ?? this.lzCaveState });
+    g.world.followTarget = () => L;
+    L.root.position.y = 0;
+    L.stand();
+    L.placeAt(spawn.x ?? 0, spawn.z ?? -0.8, spawn.facing ?? 1);
+    g.cameraSys.setShot(null, 0);
+    g.cameraSys.snap();
+    await this.place?.onEnter?.(to);
+    if (S !== this.session) { this.traveling = false; return false; }
+    if (this.place) this.placeItems();
+    await sleep(0.05);
+    await g.fader.to(false, ms + 120);
+    this.traveling = false;
+    if (S === this.session && !g.dialogue.busy && !this.lzHold) g.player.enabled = true;
+    return true;
+  },
+
+  /** An interactable in a cave chamber. */
+  lzIt(id, label, x, z, anchor, run, radius = 0.9) {
+    return { id, label, at: { x, z }, radius, anchor: anchor || V(x, 1.0, z - 0.4), run };
+  },
+
+  /** Companions put just behind Lizzie (after a passage): [[character key, cast id], …]. */
+  lzBehind(list) {
+    const L = this.julian;
+    list.forEach(([key, id], i) => {
+      this.lzCastIn(key, id, L.position.x - L.facing * (0.9 + i * 0.8), Math.max(-1.9, Math.min(0.8, L.position.z + (i % 2 ? 0.4 : -0.3))), L.facing);
+    });
+  },
+
   // ------------------------------------------------------------------ L3 — ПЕЩЕРА
 
   async lizzieL3() {
@@ -381,14 +518,16 @@ const methods = {
     const S = this.session;
     await this.lzCard(3);
     if (S !== this.session) return;
+    this.lzHold = false;
+    this.lzCaveReset();
     await this.lzEnter('cave', 'L3', 'lizzie_3');
-    const w = g.world, L = this.julian;
-    L.placeAt(w.anchors.bedL.x + 0.6, -1.4, 1);
+    const L = this.julian;
+    const A = () => g.world.anchors;
+    L.placeAt(A().bedL.x, A().bedL.z, 1);
     L.lieDown(1);
-    const ol = this.lzCastIn('olivia', 'lz_olivia', 1.6, -1.3, -1);
-    const vi = this.lzCastIn('vikki', 'lz_vikki', 3.0, -1.6, -1);
-    const guards = w.anchors.guards.map((p, i) => { const wf = this.lzCastIn(i ? 'wolfGrey' : 'wolf', `lz_guard${i}`, p.x, p.z, -1); wf.root.scale.setScalar(1.25); wf.setPose('eat'); return wf; });
-    this.lzCast = { ol, vi, guards };
+    const ol = this.lzCastIn('olivia', 'lz_olivia', 6.2, -1.4, -1);
+    const vi = this.lzCastIn('vikki', 'lz_vikki', 7.3, -1.0, -1);
+    this.lzCast = { ol, vi, guards: [] };
     this.setAmbience(['amb.oldwing']);
     g.hud.show(false);
     g.player.enabled = false;
@@ -398,91 +537,198 @@ const methods = {
     if (S !== this.session) return;
     if (!(await this.lines(g.dialogue.dialogues.l3_wake))) return;
     g.narrative.setChar('bob', 'hostile_neutral');
-    // day: look around; talk to the girls when ready
-    const day = () => ['lz_l3_food', 'lz_l3_store', 'lz_l3_guards'].filter((k) => g.state.get(k)).length >= 2;
-    await new Promise((resolve) => {
-      g.hud.show(true);
-      g.player.enabled = true;
-      g.state.set('objective', 'lz_cave');
-      g.interactions.setItems([
-        { id: 'l3_food', label: 'Еда', at: { x: 4.2, z: -1.6 }, radius: 0.9, anchor: w.anchors.food, run: this.lzSay('l3_food') },
-        { id: 'l3_beds', label: 'Солома', at: { x: 0.8, z: -1.7 }, radius: 0.8, anchor: w.anchors.beds, run: this.lzSay('l3_beds') },
-        { id: 'l3_store', label: 'Чужие вещи', at: { x: 8.2, z: -1.6 }, radius: 1.0, anchor: w.anchors.store, run: this.lzSay('l3_store') },
-        { id: 'l3_bones', label: 'Кости', at: { x: 10.4, z: -1.6 }, radius: 0.8, anchor: w.anchors.bones, run: this.lzSay('l3_bones') },
-        { id: 'l3_guards', label: 'Выход', at: { x: 16.6, z: -0.6 }, radius: 1.2, anchor: V(18.8, 1.6, -0.8), run: this.lzSay('l3_guards') },
-        { id: 'l3_girls', label: 'Оливия и Викки', at: { x: 2.2, z: -1.0 }, radius: 1.0, anchor: V(2.3, 1.9, -1.4),
-          run: async () => { if (!day()) { await g.view.flash('lthought', 'Сначала осмотреться. Понять, где мы.', 2200); return; } await g.dialogue.start('l3_girls'); resolve(); } },
-      ]);
-    });
+
+    // the chapter moves through phases: day (look around) → night (find Puriel) → back → escape
+    let phase = 'day';
+    let next = null;
+    const wait = () => new Promise((r) => { next = r; });
+    const go = () => { const r = next; next = null; r?.(); };
+    const f = (k) => g.state.get(k);
+    const looked = () => f('lz_l3_store') && f('lz_l3_guards') && ['lz_l3_den', 'lz_l3_deep', 'lz_l3_food', 'lz_l3_beds', 'lz_l3_bucket', 'lz_l3_ashes'].some(f);
+    const bark = (id) => async () => {
+      await g.dialogue.start(id);
+      if (phase === 'day' && looked() && g.state.get('objective') === 'lz_cave') g.state.set('objective', 'lz_l3_girls');
+    };
+    const girlsDay = () => { this.lzCastIn('olivia', 'lz_olivia', 6.2, -1.4, -1); this.lzCastIn('vikki', 'lz_vikki', 7.3, -1.0, -1); };
+    const girlsAsleep = () => { this.lzCastIn('olivia', 'lz_olivia', 6.9, -1.9, 1).lieDown(-1); this.lzCastIn('vikki', 'lz_vikki', 8.7, -1.1, 1).lieDown(1); };
+    const items = (loc) => {
+      const a = A();
+      switch (loc) {
+        case 'cave':
+          if (phase === 'day') {
+            return [
+              this.lzIt('l3_beds', 'Солома', 5.0, -1.8, a.beds, bark('l3_beds')),
+              this.lzIt('l3_food', 'Еда', 8.0, -1.8, a.food, bark('l3_food')),
+              this.lzIt('l3_bucket', 'Ведро', 2.6, -1.1, a.bucket, bark('l3_bucket'), 0.8),
+              this.lzIt('l3_ashes', 'Кострище', -7.2, -0.7, a.ashes, bark('l3_ashes')),
+              this.lzIt('l3_girls', 'Оливия и Викки', 6.8, -0.8, V(6.8, 1.9, -1.2), async () => {
+                if (!looked()) { await g.dialogue.start('l3_look_more'); return; }
+                await g.dialogue.start('l3_girls');
+                go();
+              }, 1.0),
+            ];
+          }
+          if (phase === 'night') return [this.lzIt('l3_sleeping', 'Оливия и Викки', 7.6, -0.9, V(7.6, 1.0, -1.4), bark('l3_sleeping'), 1.1), this.lzIt('l3_ashes', 'Кострище', -7.2, -0.7, a.ashes, bark('l3_ashes'))];
+          if (phase === 'back') return [this.lzIt('l3_tell', 'Оливия и Викки', 7.6, -0.9, V(7.6, 1.0, -1.4), () => go(), 1.1)];
+          return [];
+        case 'cave_den':
+          return [
+            this.lzIt('l3_den_furs', 'Шкуры', -4.4, -0.1, a.furs, bark('l3_den_furs')),
+            this.lzIt('l3_den_bones', 'Кости', -7.4, -1.7, a.bones, bark('l3_den_bones')),
+            this.lzIt('l3_den_carcass', 'Олень', -3.9, -1.5, a.carcass, bark('l3_den_carcass')),
+            this.lzIt('l3_den_clothes', 'Одежда', 1.7, -1.8, a.clothes, bark('l3_den_clothes')),
+            this.lzIt('l3_den_marks', 'Зарубки', 5.2, -1.8, a.marks, bark('l3_den_marks')),
+          ];
+        case 'cave_deep':
+          return [
+            this.lzIt('l3_deep_claws', 'Борозды', -1.6, -1.3, a.claws, bark('l3_deep_claws')),
+            this.lzIt('l3_deep_pool', 'Вода', 1.0, -0.2, a.pool, bark('l3_deep_pool')),
+          ];
+        case 'cave_store':
+          return [
+            this.lzIt('l3_store', 'Рюкзаки', -1.8, -1.8, a.packs, bark('l3_store')),
+            this.lzIt('l3_store_phone', 'Телефон', -2.6, -1.3, a.phone, bark('l3_store_phone'), 0.7),
+            this.lzIt('l3_store_tent', 'Палатка', 1.9, -1.7, a.tent, bark('l3_store_tent')),
+            this.lzIt('l3_bones', 'Кости', 3.9, -1.7, a.bones, bark('l3_bones')),
+          ];
+        case 'cave_tunnel':
+          return [
+            this.lzIt('l3_tunnel_moon', 'Луна', 6.6, -0.4, a.mouth, bark('l3_tunnel_moon')),
+            this.lzIt('l3_guards', 'Выход', 9.2, -0.6, V(11.4, 1.6, -0.8), bark(phase === 'day' ? 'l3_guards' : 'l3_guards_night'), 1.1),
+          ];
+        case 'cave_rift':
+          return [
+            this.lzIt('l3_rift_crack', 'Щель в своде', -1.3, -0.7, a.crack, bark('l3_rift_crack')),
+            this.lzIt('l3_rift_nails', 'Царапины', -2.6, -1.4, a.nails, bark('l3_rift_nails'), 0.8),
+            this.lzIt('l3_rift_pool', 'Вода', 1.6, -0.4, a.pool, bark('l3_rift_pool'), 0.8),
+          ];
+        default: return [];
+      }
+    };
+    const onEnter = (loc) => {
+      if (loc === 'cave') {
+        if (phase === 'day') girlsDay();
+        else if (phase === 'night' || phase === 'back') girlsAsleep();
+      }
+      if (loc === 'cave_tunnel') {
+        this.lzCast.guards = A().guards.map((p, i) => {
+          const wf = this.lzCastIn(i ? 'wolfGrey' : 'wolf', `lz_guard${i}`, p.x, p.z, -1);
+          wf.root.scale.setScalar(1.25);
+          wf.setPose(phase === 'day' ? 'eat' : 'idle');
+          return wf;
+        });
+        if (phase === 'escape') this.lzWatch = () => { if (L.position.x > 7.2 && !g.dialogue.busy && !this.traveling) { this.lzWatch = null; go(); } };
+      }
+      if (loc === 'cave_rift' && phase !== 'day') {
+        const pu = this.lzCastIn('puriel', 'lz_puriel', A().puriel.x, A().puriel.z, -1);
+        pu.lieDown(-1);
+        this.lzCast.pu = pu;
+        if (phase === 'night') this.lzWatch = () => { if (L.position.x < -1.6 && !g.dialogue.busy && !this.traveling) { this.lzWatch = null; go(); } };
+      }
+      if (phase === 'escape') this.lzBehind([['olivia', 'lz_olivia'], ['vikki', 'lz_vikki']]);
+    };
+    const gate = (d) => {
+      if (phase === 'day' && d.id === 'tunnel_rift') return 'l3_rift_day';
+      if (d.id === 'deep_altar') return 'l3_deep_dark';
+      if (phase === 'night' && d.id === 'hall_den') return 'l3_not_now';
+      if (phase === 'back' && (d.id === 'hall_den' || d.id === 'hall_deep')) return 'l3_back_first';
+      return null;
+    };
+    this.lzCavePlace('L3', { items, onEnter, gate });
+    g.hud.show(true);
+    g.player.enabled = true;
+    g.state.set('objective', looked() ? 'lz_l3_girls' : 'lz_cave');
+    await wait();
     if (S !== this.session) return;
+
     // night
     g.interactions.setItems([]);
     g.player.enabled = false;
+    this.lzHold = true;
     await g.fader.to(true, 1200);
     await g.card.show('Ночь', { en: 'Night', ms: 1500 });
-    w.lights.hemi.intensity = 0.3;
-    w.nicheFire.base = 2.4;
-    ol.lieDown(-1); vi.lieDown(1);
-    for (const gd of guards) gd.setPose('idle');
-    L.placeAt(1.0, -0.8, 1);
-    const pu = this.lzCastIn('puriel', 'lz_puriel', w.anchors.puriel.x, w.anchors.puriel.z, -1);
-    pu.lieDown(-1);
-    this.lzCast.pu = pu;
+    if (S !== this.session) return;
+    phase = 'night';
+    this.lzCaveSetState('L3N');
+    girlsAsleep();
+    L.placeAt(5.0, -0.8, 1);
     g.cameraSys.snap();
     await g.fader.to(false, 1200);
     if (!(await this.lines(g.dialogue.dialogues.l3_night))) return;
-    await new Promise((resolve) => {
-      g.player.enabled = true;
-      g.interactions.setItems([
-        { id: 'l3_alcove', label: 'Проход', at: { x: 12.8, z: -1.6 }, radius: 1.0, anchor: V(13.2, 1.4, -2.6), run: () => resolve() },
-        { id: 'l3_guards2', label: 'Выход', at: { x: 16.6, z: -0.6 }, radius: 1.2, anchor: V(18.8, 1.6, -0.8), run: this.lzSay('l3_guards') },
-      ]);
-    });
+    this.lzHold = false;
+    g.state.set('objective', 'lz_l3_night');
+    this.placeItems();
+    g.player.enabled = true;
+    await wait();                                     // she walks into the rift and finds Puriel
     if (S !== this.session) return;
+
     // Puriel
     g.interactions.setItems([]);
     g.player.enabled = false;
+    this.lzHold = true;
     g.hud.show(false);
     g.letterbox.set(true, 900);
-    g.cameraSys.setShot({ x: 12.2, y: 1.6, z: 3.4, lookX: 13.0, lookY: 0.6, lookZ: -2.2, fov: 38 }, 1.4);
-    for (let i = 0; i < 3; i++) this.lzBlood(12.6 + i * 0.5, -2.0 + (i % 2) * 0.3, 1.0);
+    const P = A().puriel;
+    g.cameraSys.setShot({ x: P.x + 0.8, y: 1.6, z: 3.4, lookX: P.x + 0.2, lookY: 0.6, lookZ: -2.0, fov: 38 }, 1.4);
+    for (let i = 0; i < 3; i++) this.lzBlood(P.x - 0.4 + i * 0.5, -1.8 + (i % 2) * 0.3, 1.0);
     if (!(await this.lines(g.dialogue.dialogues.l3_found))) return;
     g.narrative.setChar('puriel', 'dead');
     g.narrative.setChar('lizzie', 'grieving');
     g.audio.play('sfx.shouts', { volume: 0.9 });
     await this.lzHit(0.8);
-    // Stinko Bob comes out of the tunnel
-    const bob = this.lzCastIn('bob', 'lz_bob', 19.6, -0.4, -1);
-    g.cameraSys.setShot({ x: 14.6, y: 1.7, z: 3.8, lookX: 14.6, lookY: 1.1, lookZ: -1.6, fov: 40 }, 1.6);
-    await bob.walkTo({ x: 14.6, z: -1.0 }, { speed: 1.4, direct: true });
+    // Stinko Bob comes in from the tunnel
+    const bob = this.lzCastIn('bob', 'lz_bob', 4.6, -2.2, -1);
+    L.face(1);
+    g.cameraSys.setShot({ x: 0.6, y: 1.7, z: 3.8, lookX: 0.4, lookY: 1.1, lookZ: -1.4, fov: 40 }, 1.6);
+    await bob.walkTo({ x: L.position.x + 1.5, z: -0.9 }, { speed: 1.4 });
     if (S !== this.session) return;
     bob.setPose('idle');
+    bob.faceTowards(L.position.x);
     g.narrative.setChar('bob', 'conversational');
     if (!(await this.lines(g.dialogue.dialogues.l3_bob))) return;
     g.narrative.setChar('bob', 'lore_source');
     g.narrative.setWw('human_blood_consumed', g.narrative.ww('human_blood_consumed') + 1);
     g.state.set('lz_bob_rules', true);
     bob.face(1);
-    bob.walkTo({ x: 19.8, z: -0.4 }, { speed: 1.2, direct: true }).then(() => bob.setVisible(false));
-    // back to the others — and the first attempt
-    await L.walkTo({ x: 2.6, z: -0.8 }, { speed: 1.5, direct: true });
-    ol.stand(); vi.stand(); ol.placeAt(1.6, -1.3, 1); vi.placeAt(3.4, -1.5, -1);
+    bob.walkTo({ x: 4.6, z: -2.4 }, { speed: 1.2 }).then(() => bob.setVisible(false));
     g.letterbox.set(false, 600);
+    g.cameraSys.setShot(null, 1);
+    g.hud.show(true);
+    phase = 'back';
+    this.lzHold = false;
+    g.state.set('objective', 'lz_l3_back');
+    this.placeItems();
+    g.player.enabled = true;
+    await wait();                                     // back in the hall: wake the girls
     if (S !== this.session) return;
+
+    // tell them — and the first attempt
+    g.interactions.setItems([]);
+    g.player.enabled = false;
+    for (const c of [ol, vi]) { c.stand(); c.state = 'idle'; c.fall = 0; c.pivot.rotation.z = 0; c.setPose('idle'); }
+    ol.placeAt(6.6, -1.6, -1); vi.placeAt(8.0, -1.1, -1);
     await g.dialogue.start('l3_tell');
     if (S !== this.session) return;
     g.narrative.setChar('lizzie', 'desperate');
     g.narrative.setChar('olivia', 'frightened');
+    phase = 'escape';
     this.lzFollow = [ol, vi];
-    g.cameraSys.setShot(null, 1);
-    await L.walkTo({ x: 16.4, z: -0.4 }, { speed: 1.2, direct: true });
+    g.state.set('objective', 'lz_l3_escape');
+    this.placeItems();
+    g.player.enabled = true;
+    await wait();                                     // in the tunnel, close to the guards
     if (S !== this.session) return;
+    g.interactions.setItems([]);
+    g.player.enabled = false;
+    g.hud.show(false);
     g.letterbox.set(true, 600);
+    const guards = this.lzCast.guards || [];
     for (const gd of guards) { gd.setPose('idle'); gd.faceTowards(L.position.x); }
-    await guards[0].walkTo({ x: 17.4, z: -0.5 }, { speed: 2.4, direct: true });
+    if (guards[0]) await guards[0].walkTo({ x: L.position.x + 1.1, z: L.position.z - 0.1 }, { speed: 2.4, direct: true });
     g.audio.play('inner.heartbeat', { volume: 0.8 });
     if (!(await this.lines(g.dialogue.dialogues.l3_fail))) return;
     this.lzFollow = null;
+    this.endPlace();
     await g.fader.to(true, 1400);
     g.letterbox.set(false, 10);
     g.narrative.setChar('olivia', 'captive');
@@ -496,22 +742,35 @@ const methods = {
     const S = this.session;
     await this.lzCard(4);
     if (S !== this.session) return;
+    this.lzHold = false;
+    this.lzCaveReset();
     await this.lzEnter('cave', 'L4', 'lizzie_4');
-    const w = g.world, L = this.julian;
+    const L = this.julian;
+    const A = () => g.world.anchors;
     g.narrative.tickDays(19);
     g.narrative.setChar('lizzie', 'captive');
-    L.placeAt(1.8, -0.6, -1);
-    const ol = this.lzCastIn('olivia', 'lz_olivia', 0.6, -1.4, 1);
-    const vi = this.lzCastIn('vikki', 'lz_vikki', 2.8, -1.5, -1);
-    const seats = w.anchors.hallSeats;
-    // spread through the hall: two by the fires, one lying at the wall, two closer to the niche
-    const spots = [[-8.9, -1.9, 1], [-6.6, -0.3, -1], [-4.7, -2.3, 1], [-3.0, -0.9, -1], [-1.1, -1.9, -1]];
-    const pack = ['packA', 'packB', 'packC', 'packD', 'packE'].map((k, i) => this.lzCastIn(k, `lz_${k}`, spots[i][0], spots[i][1], spots[i][2]));
-    void seats;
-    pack[2].setPose('eat');                         // the grey one gnaws the same bone for weeks
-    pack[0].setPose('eat');
-    const bob = this.lzCastIn('bob', 'lz_bob', -9.4, -0.6, 1);
-    this.lzCast = { ol, vi, pack, bob };
+    L.placeAt(5.0, -0.7, -1);
+    const ol = this.lzCastIn('olivia', 'lz_olivia', 6.4, -1.5, -1);
+    const vi = this.lzCastIn('vikki', 'lz_vikki', 7.6, -1.2, -1);
+    // the pack is spread through the chambers: by the fires, in the den, at the mouth; Bob in the store
+    const WHERE = {
+      cave: [['packA', -6.0, -0.8, -1, 'idle'], ['packB', -2.9, -1.0, 1, 'idle']],
+      cave_den: [['packC', -3.0, -1.7, -1, 'eat'], ['packD', 2.8, -0.9, -1, 'idle']],
+      cave_store: [['bob', -0.6, -1.4, -1, 'idle']],
+      cave_tunnel: [['packE', 8.2, -0.7, 1, 'idle'], ['wolfGrey', 11.0, -1.3, -1, 'eat']],
+    };
+    const NAMES = { packA: 'Хриплый', packB: 'Молодой', packC: 'Очкарик', packD: 'Марта', packE: 'Рыжая', bob: 'Боб' };
+    const who = {};
+    const castRoom = (loc) => {
+      for (const [k, x, z, fc, pose] of WHERE[loc] || []) {
+        const c = this.lzCastIn(k, k === 'wolfGrey' ? 'lz_wguard' : `lz_${k}`, x, z, fc);
+        if (k === 'wolfGrey') c.root.scale.setScalar(1.25);
+        c.setPose(pose);
+        who[k] = c;
+      }
+    };
+    castRoom('cave');
+    this.lzCast = { ol, vi, who };
     this.setAmbience(['amb.oldwing']);
     g.hud.show(false);
     g.player.enabled = false;
@@ -519,43 +778,79 @@ const methods = {
     await g.fader.to(false, 1600);
     if (!(await this.lines(g.dialogue.dialogues.l4_open))) return;
     g.narrative.setChar('pack', 'territorial_conflict');
+    let evening = false;
+    let next = null;
     const talks = () => ['lz_l4_a', 'lz_l4_b', 'lz_l4_c', 'lz_l4_d', 'lz_l4_e', 'lz_l4_bob'].filter((k) => g.state.get(k)).length;
-    await new Promise((resolve) => {
-      const wrap = (id, ch) => async () => { ch?.faceTowards(L.position.x); await g.dialogue.start(id); if (talks() >= 4 && g.state.get('lz_l4_e')) resolve(); };
-      g.hud.show(true);
-      g.player.enabled = true;
-      g.state.set('objective', 'lz_pack');
-      const at = (c) => ({ x: c.position.x + 0.6, z: Math.max(-1.9, c.position.z + 0.3) });
-      g.interactions.setItems([
-        ...pack.map((c, i) => ({ id: `l4_${c.id}`, label: ['Хриплый', 'Молодой', 'Очкарик', 'Марта', 'Рыжая'][i], at: at(c), radius: 0.8, anchor: V(c.position.x, 2.0, c.position.z), run: wrap(`l4_pack${'ABCDE'[i]}`, c) })),
-        { id: 'l4_bob', label: 'Боб', at: at(bob), radius: 0.8, anchor: V(bob.position.x, 2.0, bob.position.z), run: wrap('l4_bob', bob) },
-        { id: 'l4_fire', label: 'Костёр', at: { x: -7.6, z: -1.2 }, radius: 0.8, anchor: V(-7.6, 1.2, -1.9), run: wrap('l4_fire') },
-      ]);
-    });
+    const ready = () => talks() >= 4 && g.state.get('lz_l4_e');
+    const after = () => {
+      if (!evening && ready()) {
+        evening = true;
+        g.state.set('objective', 'lz_l4_back');
+        this.placeItems();
+        g.dialogue.start('l4_evening');
+      }
+    };
+    const bark = (id, ch) => async () => { ch?.faceTowards(L.position.x); await g.dialogue.start(id); after(); };
+    const talkTo = (k, id) => {
+      const c = who[k];
+      if (!c?.root.visible) return null;
+      return this.lzIt(`l4_${k}`, NAMES[k], c.position.x + 0.7 * (c.facing || 1), Math.max(-1.9, Math.min(0.7, c.position.z + 0.3)), V(c.position.x, 2.0, c.position.z), bark(id, c), 0.9);
+    };
+    const items = (loc) => {
+      const a = A();
+      const list = {
+        cave: () => [talkTo('packA', 'l4_packA'), talkTo('packB', 'l4_packB'),
+          this.lzIt('l4_fire', 'Костёр', -7.2, -0.6, a.spit, bark('l4_fire')),
+          evening
+            ? this.lzIt('l4_evening_go', 'Оливия и Викки', 7.0, -0.7, V(7.0, 1.9, -1.3), () => next?.(), 1.1)
+            : this.lzIt('l4_girls', 'Оливия и Викки', 7.0, -0.7, V(7.0, 1.9, -1.3), bark('l4_girls'), 1.1)],
+        cave_den: () => [talkTo('packC', 'l4_packC'), talkTo('packD', 'l4_packD'),
+          this.lzIt('l4_den_clothes', 'Одежда', 1.4, -1.8, a.clothes, bark('l4_den_clothes')),
+          this.lzIt('l4_den_marks', 'Зарубки', 5.3, -1.8, a.marks, bark('l4_den_marks')),
+          this.lzIt('l4_den_carcass', 'Олень', -4.8, -1.4, a.carcass, bark('l4_den_carcass'))],
+        cave_store: () => [talkTo('bob', 'l4_bob'), this.lzIt('l4_store_pack', 'Рюкзаки', -2.6, -1.8, a.packs, bark('l4_store_pack'))],
+        cave_tunnel: () => [talkTo('packE', 'l4_packE'), this.lzIt('l4_tunnel_exit', 'Выход', 9.4, -0.3, V(11.4, 1.6, -0.8), bark('l4_tunnel_exit'), 1.0)],
+        cave_deep: () => [this.lzIt('l4_deep_drag', 'Борозды', 2.6, -0.4, a.drag, bark('l4_deep_drag')), this.lzIt('l3_deep_claws', 'Борозды на стене', -1.6, -1.3, a.claws, bark('l3_deep_claws'))],
+        cave_rift: () => [this.lzIt('l4_rift', 'Ниша', -3.6, -1.3, V(-4.4, 0.6, -2.1), bark('l4_rift'))],
+      }[loc];
+      return (list?.() || []).filter(Boolean);
+    };
+    const onEnter = (loc) => {
+      castRoom(loc);
+      if (loc === 'cave') { this.lzCastIn('olivia', 'lz_olivia', 6.4, -1.5, -1); this.lzCastIn('vikki', 'lz_vikki', 7.6, -1.2, -1); }
+    };
+    const gate = (d) => (d.id === 'deep_altar' ? 'l4_deep_block' : null);
+    this.lzCavePlace('L4', { items, onEnter, gate });
+    g.hud.show(true);
+    g.player.enabled = true;
+    g.state.set('objective', 'lz_pack');
+    await new Promise((resolve) => { next = resolve; });
     if (S !== this.session) return;
     // evening: they come for Vicky
     g.interactions.setItems([]);
     g.player.enabled = false;
     g.hud.show(false);
-    await L.walkTo({ x: 1.6, z: -0.5 }, { speed: 1.4, direct: true });
+    this.endPlace();
+    await L.walkTo({ x: 5.2, z: -0.6 }, { speed: 1.4 });
+    L.face(1);
     g.letterbox.set(true, 900);
-    g.cameraSys.setShot({ x: 0.4, y: 1.8, z: 4.4, lookX: 0.2, lookY: 1.1, lookZ: -1.4, fov: 40 }, 1.4);
-    const [a, b] = [pack[0], pack[1]];
+    g.cameraSys.setShot({ x: 3.6, y: 1.8, z: 4.6, lookX: 3.4, lookY: 1.1, lookZ: -1.4, fov: 40 }, 1.4);
+    const [a, b] = [who.packA, who.packB];
     a.setPose('idle'); b.setPose('idle');
-    await Promise.all([a.walkTo({ x: 1.6, z: -1.7 }, { speed: 1.6, direct: true }), b.walkTo({ x: 4.4, z: -1.3 }, { speed: 1.6, direct: true })]);
+    await Promise.all([a.walkTo({ x: 4.0, z: -1.6 }, { speed: 1.6 }), b.walkTo({ x: 3.2, z: -0.4 }, { speed: 1.6 })]);
     if (S !== this.session) return;
     const take = this.lines(g.dialogue.dialogues.l4_take);
     await sleep(2.4);
     g.narrative.setChar('vicky', 'taken');
-    // teeth in her jacket: she is knocked down and dragged across the stone, like a carcass
+    // teeth in her jacket: she is knocked down and dragged across the stone into the deep, like a carcass
     a.faceTowards(vi.position.x);
-    await a.walkTo({ x: vi.position.x - 0.9, z: vi.position.z - 0.1 }, { speed: 2.6, direct: true });
+    await a.walkTo({ x: vi.position.x - 0.9, z: vi.position.z - 0.1 }, { speed: 2.6 });
     g.audio.play('sfx.thud', { volume: 0.7 });
     vi.lieDown(-1);
     a.face(-1);
     this.lzDrag = [{ who: vi, by: a, dx: 1.05, dz: 0.15 }];
-    a.walkTo({ x: -10.0, z: -1.5 }, { speed: 1.3, direct: true });
-    b.walkTo({ x: -8.9, z: -0.8 }, { speed: 1.3, direct: true });
+    a.walkTo([{ x: 3.4, z: -1.2 }, { x: -0.6, z: -2.5 }], { speed: 1.3 });
+    b.walkTo([{ x: 0.4, z: -1.0 }, { x: -0.6, z: -2.4 }], { speed: 1.3 });
     if (!(await take)) return;
     this.lzDrag = null;
     vi.setVisible(false); a.setVisible(false); b.setVisible(false);
@@ -575,17 +870,13 @@ const methods = {
     g.narrative.resetL5();
     await this.lzCard(5);
     if (S !== this.session) return;
+    this.lzHold = false;
+    this.lzCaveReset();
     await this.lzEnter('cave', 'L5', 'lizzie_5');
-    const w = g.world, L = this.julian;
-    L.placeAt(1.0, -1.2, -1);
+    const L = this.julian;
+    const A = () => g.world.anchors;
+    L.placeAt(A().bedL.x, A().bedL.z, -1);
     L.lieDown(-1);
-    // Olivia on the slab, four of them holding her
-    const ol = this.lzCastIn('olivia', 'lz_olivia', w.anchors.slab.x - 0.5, w.anchors.slab.z - 0.1, 1);
-    ol.root.position.y = 0.56;
-    ol.lieDown(1);
-    const holders = [['packA', -15.6, -1.1, 1], ['packD', -12.4, -1.2, -1], ['packE', -14.8, -0.2, 1], ['packB', -13.2, -2.1, -1]]
-      .map(([k, x, z, f]) => { const wf = this.lzCastIn(k, `lz_${k}`, x, z, f); wf.setPose('idle'); return wf; });
-    this.lzCast = { ol, holders };
     this.setAmbience(['amb.oldwing']);
     g.hud.show(false);
     g.player.enabled = false;
@@ -596,25 +887,58 @@ const methods = {
     g.narrative.setChar('olivia', 'taken');
     g.narrative.setChar('lizzie', 'frightened');
     // follow the voice into the deep (the hall is empty tonight)
+    let heard = false;
+    let next = null;
+    let ol = null, holders = [];
+    const bark = (id) => () => g.dialogue.start(id);
+    const items = (loc) => {
+      const a = A();
+      return {
+        cave: [this.lzIt('l5_straw', 'Солома', 5.0, -1.8, a.beds, bark('l5_straw')), this.lzIt('l5_drag', 'Следы', 1.6, -1.0, V(1.4, 0.3, -1.6), bark('l5_drag'))],
+        cave_den: [this.lzIt('l5_den', 'Шкуры', -4.4, -0.1, a.furs, bark('l5_den'))],
+        cave_deep: [this.lzIt('l5_sweater', 'Шерсть', -3.0, -0.6, a.sweater, bark('l5_sweater'), 0.8), this.lzIt('l5_pool', 'Вода', 1.0, -0.2, a.pool, bark('l5_pool'))],
+      }[loc] || [];
+    };
+    const voice = () => {
+      if (heard) return;
+      heard = true;
+      g.state.set('objective', 'lz_l5_deep');
+      this.lines(g.dialogue.dialogues.l5_voice, { blocking: false });
+    };
+    const onEnter = (loc) => {
+      if (loc === 'cave') this.lzWatch = () => { if (L.position.x < 2.0) voice(); };
+      if (loc === 'cave_deep') voice();
+      if (loc === 'cave_altar') {
+        const sl = A().slab;
+        // Olivia on the slab, four of them holding her
+        ol = this.lzCastIn('olivia', 'lz_olivia', sl.x - 0.5, sl.z - 0.1, 1);
+        ol.root.position.y = 0.56;
+        ol.lieDown(1);
+        holders = [['packA', -1.6, 0.2, 1], ['packD', 1.6, 0.1, -1], ['packE', -0.8, 1.1, 1], ['packB', 0.8, -0.8, -1]]
+          .map(([k, dx, dz, fc]) => { const wf = this.lzCastIn(k, `lz_${k}`, sl.x + dx, sl.z + dz, fc); wf.setPose('idle'); return wf; });
+        this.lzCast = { ol, holders };
+        this.lzWatch = () => { if (L.position.x < A().peek.x + 0.4 && !g.dialogue.busy && !this.traveling) { this.lzWatch = null; next?.(); } };
+      }
+    };
+    const gate = (d) => (d.id === 'hall_store' ? 'l5_noleave' : null);
+    this.lzCavePlace('L5', { items, onEnter, gate });
+    onEnter('cave');
     g.hud.show(true);
     g.player.enabled = true;
     g.state.set('objective', 'lz_follow');
-    let heard = false;
-    await new Promise((resolve) => {
-      this.lzWatch = (dt) => {
-        if (!heard && L.position.x < -1.2) { heard = true; this.lines(g.dialogue.dialogues.l5_voice, { blocking: false }); }
-        if (L.position.x < w.anchors.peek.x + 0.4 && !g.dialogue.busy) { this.lzWatch = null; resolve(); }
-      };
-    });
+    await new Promise((resolve) => { next = resolve; });
     if (S !== this.session) return;
+    this.endPlace();
+    const w = g.world;
+    const sl = w.anchors.slab;
     // the observation position: the player cannot intervene
+    g.interactions.setItems([]);
     g.player.enabled = false;
     g.hud.show(false);
     L.face(-1);
     g.letterbox.set(true, 1200);
     g.audio.music('none', 1);
-    const chamber = { x: -11.4, y: 1.6, z: 3.6, lookX: -13.6, lookY: 0.8, lookZ: -1.2, fov: 40 };
-    g.cameraSys.setShot(chamber, 1.8);
+    g.cameraSys.setShot({ x: sl.x + 2.6, y: 1.6, z: 3.6, lookX: sl.x + 0.4, lookY: 0.8, lookZ: -1.2, fov: 40 }, 1.8);
     await sleep(1.8);
     if (!(await this.lines(g.dialogue.dialogues.l5_watch))) return;
     g.narrative.setChar('olivia', 'dying');
@@ -622,10 +946,10 @@ const methods = {
     const beat = async (wf, k) => {
       const p = wf.position.clone();
       wf.setPose('eat');
-      await wf.walkTo({ x: p.x + (w.anchors.slab.x - p.x) * 0.3, z: p.z + (w.anchors.slab.z - p.z) * 0.3 }, { speed: 4, direct: true });
+      await wf.walkTo({ x: p.x + (sl.x - p.x) * 0.3, z: p.z + (sl.z - p.z) * 0.3 }, { speed: 4, direct: true });
       g.audio.play('sfx.tear', { volume: 0.7 }); g.audio.play('sfx.thud', { volume: 0.5 });
-      this.lzBlood(w.anchors.slab.x + (Math.random() - 0.5) * 1.6, w.anchors.slab.z + (Math.random() - 0.5) * 0.8, 0.8 + k * 0.25, 0.56);
-      this.lzBlood(p.x * 0.5 + w.anchors.slab.x * 0.5, 0.2 + (Math.random() - 0.5), 0.9, 0.016);
+      this.lzBlood(sl.x + (Math.random() - 0.5) * 1.6, sl.z + (Math.random() - 0.5) * 0.8, 0.8 + k * 0.25, 0.56);
+      this.lzBlood(p.x * 0.5 + sl.x * 0.5, sl.z + 1.4 + (Math.random() - 0.5), 0.9, 0.016);
       ol.pivot.position.x = (Math.random() - 0.5) * 0.06;
       await this.lzHit(0.7);
       if (k === 1) g.pflash.show('assets/portraits/lizzy_2.webp', { ms: 1500, side: 'right' });
@@ -636,7 +960,7 @@ const methods = {
     if (!(await beatsText)) return;
     // she sees Lizzie
     ol.pivot.position.x = 0;
-    g.cameraSys.setShot({ x: -10.4, y: 1.4, z: 2.0, lookX: -12.6, lookY: 0.9, lookZ: -1.0, fov: 34 }, 1.2);
+    g.cameraSys.setShot({ x: sl.x + 3.6, y: 1.4, z: 2.0, lookX: sl.x + 1.4, lookY: 0.9, lookZ: -1.0, fov: 34 }, 1.2);
     if (!(await this.lines(g.dialogue.dialogues.l5_run))) return;
     holders[1].setPose('idle');
     holders[1].faceTowards(L.position.x);
@@ -653,22 +977,64 @@ const methods = {
     await this.lzRunForest(route);
   },
 
-  /** Inside: run right to the exit; the two wolves come after. Caught → back to the chamber edge. */
+  /**
+   * Inside: the run back through the chambers — the slab, the deep passage, the hall, the store,
+   * the tunnel and out of the mouth. Each passage takes her on the moment she reaches it (no key);
+   * the two wolves come out of the rock behind her a beat later. Caught → back to the start of
+   * the same chamber.
+   */
   async lzRunCave(chasers) {
     const g = this.g;
     const S = this.session;
     const L = this.julian;
-    const start = { x: -8.6, z: 0.2 };
-    while (S === this.session) {
-      for (const [i, c] of chasers.entries()) { c.setVisible(true); c.setPose('idle'); c.placeAt(-12.2 - i * 0.7, -0.6 + i * 0.5, 1); }
-      L.placeAt(start.x, start.z, 1);
+    const ROUTE = [
+      { loc: 'cave_altar', exit: 'altar_deep' },
+      { loc: 'cave_deep', exit: 'deep_hall', from: { x: -7.6, z: -2.4 } },
+      { loc: 'cave', exit: 'hall_store', from: { x: -0.6, z: -2.4 } },
+      { loc: 'cave_store', exit: 'store_tunnel', from: { x: -5.6, z: -2.4 } },
+      { loc: 'cave_tunnel', exit: null, from: { x: -6.6, z: -2.4 } },
+    ];
+    this.place = null;
+    this.lzCaveState = 'L5';
+    this.lzWatch = null;
+    const first = chasers.map((c) => ({ x: c.position.x, z: c.position.z }));
+    let start = { x: L.position.x, z: L.position.z, facing: 1 };
+    let i = 0, retry = false;
+    while (S === this.session && i < ROUTE.length) {
+      const r = ROUTE[i];
+      const w = g.world;
+      const door = r.exit ? w.doors.find((d) => d.id === r.exit) : null;
+      const goal = door ? () => Math.hypot(L.position.x - door.x, (L.position.z - door.z) * 0.7) < 1.0 : () => L.position.x > w.anchors.exit.x - 0.2;
+      // where the wolves are when she starts here
+      const wolvesAt = (k) => (r.from ? { x: r.from.x - k * 0.4, z: r.from.z + k * 0.3 } : first[k]);
+      chasers.forEach((c, k) => {
+        w.root.add(c.root);
+        c.stop(); c.setPose('idle');
+        const p = wolvesAt(k);
+        c.placeAt(p.x, p.z, 1);
+        c.setVisible(!r.from);
+      });
+      if (retry) {
+        L.root.position.y = 0; L.stand();
+        L.placeAt(start.x, start.z, start.facing);
+        g.cameraSys.setShot(null, 0); g.cameraSys.snap();
+        await g.fader.to(false, 400);
+      }
+      g.interactions.setItems(door ? [{ id: `lz_run_${door.id}`, label: door.label, at: { x: door.x, z: door.z }, radius: 1.05, anchor: door.anchor, run: () => {} }] : []);
       g.hud.show(true);
       g.player.enabled = true;
       g.state.set('objective', 'lz_escape');
-      const res = await this.lzChaseStep(chasers, (x) => x > 20.6);
+      if (r.from) setTimeout(() => { if (S === this.session && g.world === w) chasers.forEach((c) => c.setVisible(true)); }, 950);
+      const res = await this.lzChaseStep(chasers, goal, { nav: true });
       if (S !== this.session) return;
-      if (res === 'escaped') return;
-      await this.lzCaught();
+      if (res === 'caught') { await this.lzCaught(); retry = true; continue; }
+      retry = false;
+      g.interactions.setItems([]);
+      if (!door) return;                                 // out of the mouth
+      chasers.forEach((c) => c.stop());
+      await this.lzCaveGo(door.to, door.spawn, 220);
+      start = { ...door.spawn };
+      i++;
     }
   },
 
@@ -709,9 +1075,9 @@ const methods = {
   },
 
   /** A chase step: wolves keep a few metres behind and close in if she stops. */
-  lzChaseStep(chasers, goal) {
+  lzChaseStep(chasers, goal, { nav = false } = {}) {
     return new Promise((resolve) => {
-      this.lzChaseS = { chasers, goal, resolve, t: 0 };
+      this.lzChaseS = { chasers, goal, resolve, t: 0, nav };
     });
   },
 
@@ -805,6 +1171,7 @@ const methods = {
       });
     }
     this.lzWatch?.(dt);
+    this.lzSearch?.tick?.(dt);
     // a wolf drags someone by the clothes
     for (const d of this.lzDrag || []) { if (!d.who.root.visible) continue; d.who.root.position.x = d.by.position.x + d.dx; d.who.root.position.z = d.by.position.z + d.dz; }
     // the herd scatters (L2)
@@ -820,7 +1187,7 @@ const methods = {
         if (d < 0.75 && c.t > 1.2) { this.lzChaseS = null; c.chasers.forEach((x) => x.stop()); c.resolve('caught'); return; }
         const speed = d > 7 ? 4.2 : d > 3 ? 2.6 : 2.1;   // keep the pressure, never out-run a running girl
         w._chaseT = (w._chaseT || 0) - dt;
-        if (w._chaseT <= 0 || w.state !== 'walk') { w._chaseT = 0.3; w.walkTo({ x: L.position.x, z: L.position.z }, { speed, direct: true }); }
+        if (w._chaseT <= 0 || w.state !== 'walk') { w._chaseT = 0.3; w.walkTo({ x: L.position.x, z: L.position.z }, { speed, direct: !c.nav }); }   // in the cave: round the rocks
       }
     }
   },

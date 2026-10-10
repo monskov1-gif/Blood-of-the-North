@@ -221,7 +221,7 @@ const methods = {
       get: () => jpos.copy(this.julian.root.getWorldPosition(jpos)).add(V(0, 0.9, 0)),
       active: () => g.mode === 'play' && (g.keyScene || !g.player.enabled) && this.julian.root.parent === world.root });
     // free walk in the long hospital: a column or door post may cross Julian, but never hide him
-    if (['hospital', 'forest', 'school', 'cave'].includes(world.id)) {
+    if (['hospital', 'forest', 'school'].includes(world.id) || world.id?.startsWith('cave')) {
       const walking = () => g.mode === 'play' && g.player.enabled && !g.keyScene && this.julian.root.parent === world.root;
       const jp2 = new THREE.Vector3();
       zones.addZone({ id: 'julian (walk)', radius: 0.42, maxOcclusion: 0.3, priority: 1, active: walking,

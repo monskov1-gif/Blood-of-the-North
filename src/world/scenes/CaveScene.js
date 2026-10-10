@@ -1,29 +1,35 @@
 import * as THREE from 'three';
-import { flareSource } from '../../fx/WindowLight.js';
 import { LocationBase } from '../LocationBase.js';
 import { canvasTexture, rng, glowTexture } from '../../render/textures.js';
 import { glow } from '../props.js';
-import { fbm3, rockGeometry, rockMaterial, roundedBox, reliefSheet, shaftTexture, mistTexture, smoothNormals } from '../nature.js';
+import { fbm3, rockGeometry, rockMaterial, roundedBox, reliefSheet, smoothNormals } from '../nature.js';
 
-const sat = (v) => Math.max(0, Math.min(1, v));
+export const sat = (v) => Math.max(0, Math.min(1, v));
 
 /**
- * The pack's cave above the Takhini (Lizzie's captivity, L3–L5). Side-on; walls and vault are one
- * continuous weathered sandstone relief (scalloped hollows, layers), smooth boulders on a sandy floor;
- * warm dirty firelight, cold moonlight only at the exit.
- *   x -18 … -10  the ritual chamber (L5): a stone slab, red light
- *   x -10 …  -2  the pack's hall (L4): fires, the pack in human form
- *   x  -2 …   6  the girls' niche: straw, a heap of food
- *   x   6 …  11  the store: backpacks, torn tents, bones — the other victims
- *   x  11 …  15  the side passage; Puriel's alcove at x ≈ 13
- *   x  15 …  22  the tunnel to the exit (guards), moonlight at the mouth
- * States: 'L3' | 'L4' | 'L5' (walkable part, lights, who is where).
+ * The pack's cave above the Takhini (Lizzie's captivity, L3–L5): not one corridor but a system of
+ * chambers, each its own location joined by dark passages in the rock (Places.js doors):
+ *
+ *            cave_den ── cave (the hall) ── cave_store ── cave_tunnel ── the mouth (moon)
+ *                             │                                │
+ *                         cave_deep                         cave_rift (dead end, Puriel)
+ *                             │
+ *                         cave_altar (the slab)
+ *
+ * Every chamber shares the same construction (CaveBase): a continuous weathered sandstone wall
+ * baked from one height field (scalloped hollows, cross-bedded layers), a vault that hangs towards
+ * the viewer, end walls that close the chamber, smooth boulders on a sandy floor, real colliders
+ * for everything that stands in the way, and foreground rocks near the camera (SafeZones fade
+ * them off Lizzie). Passages are true recesses in the height field, so they read as holes into
+ * the dark, not as painted arches.
+ * States: 'L3' (day of the first chapter) | 'L3N' (its night) | 'L4' | 'L5'.
  */
 
-const BACK = -3.6, H = 3.6;
+export const BACK = -3.6;
 const PX = (key, w, h, draw) => canvasTexture(`cave-${key}`, w, h, draw, { nearest: true, aniso: 1 });
 const hex = (v) => Math.max(0, Math.min(255, Math.round(v)));
 const rgb = (r, g, b, a = 1) => `rgba(${hex(r)},${hex(g)},${hex(b)},${a})`;
+export const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
 
 /** Packed earth, grit, straw and old dark stains. */
 const floorTex = () => PX('floor', 64, 64, (ctx, w, h) => {
@@ -40,7 +46,7 @@ const floorTex = () => PX('floor', 64, 64, (ctx, w, h) => {
 });
 
 /** A red splash (decal) — the ritual chamber, Olivia's clothes. */
-const bloodTex = (seed) => PX(`blood${seed}`, 32, 32, (ctx, w, h) => {
+export const bloodTex = (seed) => PX(`blood${seed}`, 32, 32, (ctx, w, h) => {
   const r = rng(720 + seed);
   ctx.clearRect(0, 0, w, h);
   const blob = (x, y, rr, c) => { ctx.fillStyle = c; for (let k = 0; k < rr * rr * 3; k++) { const a = r() * 7, d = r() * rr; ctx.fillRect(Math.round(x + Math.cos(a) * d), Math.round(y + Math.sin(a) * d), 1, 1); } };
@@ -48,8 +54,46 @@ const bloodTex = (seed) => PX(`blood${seed}`, 32, 32, (ctx, w, h) => {
   for (let i = 0; i < 9; i++) { const a = r() * 7, d = 9 + r() * 6; blob(16 + Math.cos(a) * d, 16 + Math.sin(a) * d, 1 + r() * 1.5, '#6a0a0a'); }
 });
 
+/** Drag marks: two dark furrows in the sand, smeared with old blood here and there. */
+export const dragTex = () => PX('drag', 64, 16, (ctx, w, h) => {
+  const r = rng(781);
+  ctx.clearRect(0, 0, w, h);
+  for (const y0 of [5, 10]) for (let x = 0; x < w; x++) {
+    const y = Math.round(y0 + Math.sin(x * 0.2 + y0) * 1.2);
+    ctx.fillStyle = rgb(60, 44, 32, 0.75); ctx.fillRect(x, y, 1, 2);
+    ctx.fillStyle = rgb(176, 150, 116, 0.5); ctx.fillRect(x, y - 1, 1, 1);
+    if (r() < 0.12) { ctx.fillStyle = rgb(90, 14, 10, 0.7); ctx.fillRect(x, y, 2, 2); }
+  }
+});
+
+/** Claw furrows / tally scratches cut into the soft sandstone (decal for the wall). */
+export const scratchTex = (kind) => PX(`scratch-${kind}`, 48, 48, (ctx, w, h) => {
+  const r = rng(790 + (kind === 'tally' ? 1 : 0));
+  ctx.clearRect(0, 0, w, h);
+  const cut = (x0, y0, x1, y1) => {
+    const n = Math.ceil(Math.hypot(x1 - x0, y1 - y0));
+    for (let i = 0; i <= n; i++) {
+      const t = i / n, x = Math.round(x0 + (x1 - x0) * t), y = Math.round(y0 + (y1 - y0) * t);
+      ctx.fillStyle = rgb(40, 26, 18, 0.9); ctx.fillRect(x, y, 1, 1);
+      ctx.fillStyle = rgb(220, 196, 160, 0.55); ctx.fillRect(x + 1, y, 1, 1);
+    }
+  };
+  if (kind === 'tally') {
+    for (let g = 0; g < 6; g++) {
+      const gx = 3 + (g % 3) * 15, gy = 6 + Math.floor(g / 3) * 20;
+      for (let i = 0; i < 4; i++) cut(gx + i * 3, gy, gx + i * 3 + r(), gy + 12);
+      if (g < 5) cut(gx - 1, gy + 9, gx + 11, gy + 2);
+    }
+  } else {
+    for (let s = 0; s < 3; s++) {
+      const ox = s * 15 + 4;
+      for (let i = 0; i < 4; i++) cut(ox + i * 3, 4 + r() * 4, ox + i * 3 + 6 + r() * 3, 40 + r() * 6);
+    }
+  }
+});
+
 /** The night outside the mouth: sky, a hill of spruce, a pale ground. */
-const outsideTex = () => canvasTexture('cave-outside2', 128, 128, (ctx, w, h) => {
+export const outsideTex = () => canvasTexture('cave-outside2', 128, 128, (ctx, w, h) => {
   const g = ctx.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#1e2a46'); g.addColorStop(0.55, '#4e5e84'); g.addColorStop(1, '#7484a2');
   ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
   const r = rng(733);
@@ -66,7 +110,7 @@ const outsideTex = () => canvasTexture('cave-outside2', 128, 128, (ctx, w, h) =>
   ctx.fillStyle = m; ctx.fillRect(0, h * 0.55, w, h * 0.25);
 });
 
-/** Sandstone grain for the walls: fine streaks along the layers, no crack lines. */
+/** Sandstone grain for the vault and end walls: fine streaks along the layers, no crack lines. */
 const sandGrainTex = () => canvasTexture('cave-sandgrain', 256, 128, (ctx, w, h) => {
   const img = ctx.createImageData(w, h);
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
@@ -80,9 +124,8 @@ const flameTex = () => canvasTexture('cave-flame', 32, 64, (ctx, w, h) => {
   g.addColorStop(0, 'rgba(255,250,220,1)'); g.addColorStop(0.3, 'rgba(255,190,90,0.9)'); g.addColorStop(0.7, 'rgba(230,90,30,0.4)'); g.addColorStop(1, 'rgba(200,40,10,0)');
   ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(w / 2, 0); ctx.bezierCurveTo(w * 0.95, h * 0.5, w * 0.9, h, w / 2, h); ctx.bezierCurveTo(w * 0.1, h, w * 0.05, h * 0.5, w / 2, 0); ctx.fill();
 }, { color: false });
-const glowTex = () => glowTexture();
 /** A ragged arch: the mouth seen from inside. */
-const archMask = () => canvasTexture('cave-arch', 64, 64, (ctx, w, h) => {
+export const archMask = () => canvasTexture('cave-arch', 64, 64, (ctx, w, h) => {
   ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, h);
   ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(w * 0.12, h);
   for (let i = 0; i <= 20; i++) { const a = Math.PI - (i / 20) * Math.PI; const rr = 0.42 + Math.sin(i * 2.3) * 0.04; ctx.lineTo(w / 2 + Math.cos(a) * w * rr, h * 0.62 - Math.sin(a) * h * 0.5); }
@@ -94,75 +137,123 @@ const archMask = () => canvasTexture('cave-arch', 64, 64, (ctx, w, h) => {
  * pockets, stepped layers that overhang the next one, and fine grain. Used twice: coarse for the
  * geometry, per pixel for the baked wall texture (so the relief stays crisp).
  */
-function strata(x, y) {
-  const dip = (fbm3(x * 0.07, 0, 1, 81, 2) - 0.5) * 1.6;                              // the dip changes from bed to bed
+function strata(x, y, ox = 0) {
+  const dip = Math.max(-0.55, Math.min(0.55, (fbm3(x * 0.07, 0, 1, 81, 2) - 0.5) * 1.6));   // the dip changes from bed to bed (never steep: no 'zebra')
   const thick = 0.8 + fbm3(x * 0.05, y * 0.1, 2, 82, 2) * 1.4;                         // thin and thick layers
-  const v = (y * Math.cos(dip) + x * Math.sin(dip) * 0.35) * thick + fbm3(x * 0.15, y * 0.25, 4, 22, 3) * 3.0;
+  const v = (y * Math.cos(dip) + (x - ox) * Math.sin(dip) * 0.35) * thick + fbm3(x * 0.15, y * 0.25, 4, 22, 3) * 3.0;
   return ((v % 1) + 1) % 1;
 }
 
-function wallHeight(x, y, fine = false) {
+/** `ox`: the chamber's own origin in the rock field (keeps the bedding planes gentle far from 0). */
+export function wallHeight(x, y, fine = false, ox = 0) {
   let d = (fbm3(x * 0.32, y * 0.32, 0, 23, 4) - 0.5) * 1.5;
   d -= Math.max(0, fbm3(x * 0.7, y * 0.7, 5, 25, 3) - 0.5) * 3.6;                   // scallops
   d -= Math.pow(Math.max(0, fbm3(x * 1.1, y * 1.4, 6, 29, 3) - 0.52), 1.5) * 4.0;      // smaller wind-carved cups
-  const fr = strata(x, y);                                                           // cross-bedded layers
+  const fr = strata(x, y, ox);                                                       // cross-bedded layers
   const lay = fr < 0.75 ? fr / 0.75 : (1 - fr) / 0.25;
   d += lay * lay * (3 - 2 * lay) * 0.15;
-  if (fine) {
-    d += (fbm3(x * 4, y * 4, 2, 35, 3) - 0.5) * 0.1;
-  }
+  if (fine) d += (fbm3(x * 4, y * 4, 2, 35, 3) - 0.5) * 0.1;
   d += Math.max(0, 0.9 - y) * 0.7;
   d += Math.pow(Math.max(0, y - 3.0), 1.4) * 0.6;                                    // leans gently over into the vault
   return d;
 }
 
-/** The wall texture: the same height field, shaded by light raking in from the mouth. */
-const wallBakedTex = (W, Hh) => canvasTexture(`cave-wallbake-${W}`, W, Hh, (ctx, w, h) => {
+/**
+ * The wall texture: the room's height field, shaded by light raking in from the right.
+ * `hf(x, y)` is the height, `mf(x, y)` the passage mask (0…1, passages go black).
+ */
+const wallBakedTex = (key, w, h, xmin, width, hf, mf, ox = 0, nx = 0) => canvasTexture(`cave-wallbake-${key}-${w}`, w, h, (ctx) => {
   const img = ctx.createImageData(w, h);
-  const sx = 46 / w, sy = 6.4 / h;
-  const A = [0xc4, 0x9e, 0x76], B = [0x84, 0x62, 0x48], D = [0x30, 0x22, 0x18];
+  const sx = width / w, sy = 6.4 / h;
+  const A = [0xc4, 0x9e, 0x76], B = [0x84, 0x62, 0x48], D = [0x30, 0x22, 0x18], S = [0xb4, 0x92, 0x6c];
   const L = [0.62, 0.55, 0.56];
-  const row = new Float32Array((w + 1) * 2);
   for (let j = 0; j < h; j++) {
     const y = 6.4 - j * sy;
     for (let i = 0; i < w; i++) {
-      const x = -21 + i * sx;
-      const hc = wallHeight(x, y, true), hx = wallHeight(x + sx, y, true), hy = wallHeight(x, y + sy, true);
+      const x = xmin + i * sx;
+      const hc = hf(x, y, true), hx = hf(x + sx, y, true), hy = hf(x, y + sy, true);
       let nx = -(hx - hc) / sx * 0.6, ny = -(hy - hc) / sy * 0.6, nz = 1;
       const nl = Math.hypot(nx, ny, nz); nx /= nl; ny /= nl; nz /= nl;
       const lit = Math.max(0, nx * L[0] + ny * L[1] + nz * L[2]);
       const t = fbm3(x * 0.5, y * 0.5, 3, 21, 3);
-      const band = strata(x, y);
-      const k = Math.max(0, Math.min(1, t * 1.8 - 0.4));
-      const shade = (0.3 + 1.0 * lit) * (0.8 + 0.28 * band);
-      const hollow = Math.max(0, Math.min(0.8, -hc * 0.55 - 0.2)) * Math.min(1, y * 1.5);
+      const band = strata(x + nx, y, ox);
+      const k = sat(t * 1.8 - 0.4);
+      const m = mf(x, y);
+      const shade = (0.3 + 1.0 * lit) * (0.8 + 0.28 * band) * (1 - m);
+      const hollow = Math.max(0, Math.min(0.8, -hc * 0.55 - 0.2)) * Math.min(1, y * 1.5) * (1 - m);
       const o = (j * w + i) * 4;
-      const sand = Math.max(0, Math.min(1, (0.55 - y + (fbm3(x * 0.8, 0, 5, 83, 2) - 0.5) * 0.5) * 2.2));   // sand drifted up the wall
-      const S = [0xb4, 0x92, 0x6c];
+      const sand = sat((0.55 - y + (fbm3(x * 0.8, 0, 5, 83, 2) - 0.5) * 0.5) * 2.2) * (1 - m);   // sand drifted up the wall
       for (let c = 0; c < 3; c++) img.data[o + c] = (((A[c] + (B[c] - A[c]) * k) * shade) * (1 - hollow) + D[c] * hollow) * (1 - sand) + S[c] * (0.7 + 0.35 * lit) * sand;
       img.data[o + 3] = 255;
     }
   }
-  void row;
   ctx.putImageData(img, 0, 0);
 }, { aniso: 4 });
 
-export class CaveScene extends LocationBase {
-  constructor(opts) {
+/**
+ * One chamber of the cave. `cfg`:
+ *   id, title, x0, x1        — the chamber spans x0…x1 (end walls there)
+ *   nx                       — where in the endless rock field this chamber's wall is cut from
+ *   openings [{ x, w, h, door: { id, label, to, spawn }, tint }] — passages in the back wall
+ *   minZ, maxZ, walk         — the walkable floor (main strip + passage notches + extra areas)
+ *   cam {minX, maxX}, distance, vault (height), lean (y where a corridor wall starts closing over)
+ *   torches [x…], lights [[x, y, k]] (extra light baked into the wall's vertex colours)
+ *   fg [[x, w, h]], lips [[x, w]] — foreground boulders / rock lips hanging from the vault
+ *   openRight / openLeft     — no end wall on that side (the mouth)
+ */
+export class CaveBase extends LocationBase {
+  constructor(opts, cfg) {
     super(opts);
-    this.id = 'cave';
-    this.title = 'Пещера';
+    this.cfg = cfg;
+    this.id = cfg.id;
+    this.title = cfg.title;
     this.background = 0x050404;
-    this.camera = { distance: 7.6, height: 2.0, lookHeight: 1.25, lookZ: -0.8 };
-    this.zones = {
-      L3: { walk: [{ minX: -1.6, maxX: 20.6, minZ: -2.0, maxZ: 0.7 }], cam: { minX: 2.0, maxX: 18 } },
-      L4: { walk: [{ minX: -9.6, maxX: 10.5, minZ: -2.0, maxZ: 0.7 }], cam: { minX: -6.5, maxX: 8 } },
-      L5: { walk: [{ minX: -17.4, maxX: 21.6, minZ: -2.0, maxZ: 0.7 }], cam: { minX: -14, maxX: 18.5 } },
-    };
-    this.bounds = { walk: { areas: this.zones.L3.walk }, camera: { ...this.zones.L3.cam } };
+    this.camera = { distance: cfg.distance ?? 7.6, height: cfg.camHeight ?? 2.0, lookHeight: 1.25, lookZ: -0.8 };
+    const minZ = cfg.minZ ?? -2.0, maxZ = cfg.maxZ ?? 0.9;
+    const areas = [{ minX: cfg.walkX?.[0] ?? cfg.x0 + 0.9, maxX: cfg.walkX?.[1] ?? cfg.x1 - 0.9, minZ, maxZ }];
+    for (const o of cfg.openings || []) if (o.walkIn !== false) areas.push({ minX: o.x - 0.55, maxX: o.x + 0.55, minZ: minZ - 0.32, maxZ: minZ + 0.2 });   // a shallow step into the passage (deep notches trap the player)
+    areas.push(...(cfg.walk || []));
+    this.bounds = { walk: { areas }, camera: { ...cfg.cam } };
     this.fires = [];
+    this.flames = [];
+    this.torches = [];
     this.groups = {};
+    this.doors = [];
+    this.ox = (cfg.x0 + cfg.x1) / 2 + (cfg.nx || 0);
   }
+
+  // ------------------------------------------------------------------ the rock
+
+  /**
+   * 1 inside a passage cut into the back wall, 0 on solid rock (soft rim). Also leaves the depth
+   * and darkness of the opening it found in `_depth` / `_dark` (a shallow alcove stays lit).
+   */
+  openMask(x, y) {
+    let m = 0;
+    this._depth = 2.8; this._dark = 0.94;
+    for (const o of this.cfg.openings || []) {
+      const dx = Math.abs(x - o.x) / (o.w / 2);
+      if (dx > 1.4) continue;
+      const ry = Math.max(0, (y / o.h - 0.5) / 0.5);
+      const mm = sat((1.1 - Math.hypot(dx, ry)) / 0.28);
+      if (mm > m) { m = mm; this._depth = o.depth ?? 2.8; this._dark = o.dark ?? 0.94; }
+    }
+    return m;
+  }
+
+  /** How dark the wall goes at (x, y): 0 rock … ~1 inside a passage. */
+  darkMask(x, y) { const m = this.openMask(x, y); return m * this._dark; }
+
+  wallH(x, y, fine = false) {
+    const c = this.cfg;
+    let d = wallHeight(x + (c.nx || 0), y, fine, this.ox);
+    if (c.lean != null) d += Math.pow(Math.max(0, y - c.lean), 1.3) * 0.55;       // a corridor: the wall closes over
+    const m = this.openMask(x, y);
+    return m > 0 ? d * (1 - m) - this._depth * m : d;
+  }
+
+  /** The z of the wall's surface at (x, y) — for decals cut into the rock. */
+  wallZ(x, y) { return BACK - 0.5 + this.wallH(x, y); }
 
   B(w, h, d, m, x, y, z, parent = this.root) { return this.box(w, h, d, m, x, y, z, parent); }
 
@@ -177,158 +268,221 @@ export class CaveScene extends LocationBase {
 
   /** A weathered sandstone boulder (reference: smooth, layered, warm). */
   boulder(seed, x, z, sx, sy, sz, parent = this.root, o = {}) {
-    const b = new THREE.Mesh(rockGeometry(seed, { detail: 4, rough: 0.46, sharp: 0.45, strata: 1.2, flat: -0.1, colA: 0x9a7654, colB: 0x6e5038, dark: 0.6, ...o }), this.sandMat);
+    const b = new THREE.Mesh(rockGeometry(seed, { detail: this.low ? 3 : 4, rough: 0.46, sharp: 0.45, strata: 1.2, flat: -0.1, colA: 0x9a7654, colB: 0x6e5038, dark: 0.6, ...o }), this.sandMat);
     b.position.set(x, -0.3 * sy, z); b.scale.set(sx, sy * 0.85, sz); b.rotation.y = seed * 1.3;
     parent.add(b);
     return b;
   }
 
+  /** A boulder that blocks the way: geometry + colliders covering its footprint. */
+  solidBoulder(seed, x, z, sx, sy, sz, parent = this.root, o = {}) {
+    const b = this.boulder(seed, x, z, sx, sy, sz, parent, o);
+    this.solid(x, z, sx, sz);
+    return b;
+  }
+
+  /** Colliders for an elliptical footprint (one circle, or a row of them for a long rock). */
+  solid(x, z, rx, rz = rx, k = 0.82) {
+    const r = Math.min(rx, rz) * k;
+    const n = Math.max(1, Math.round(rx / Math.max(0.2, rz)));
+    for (let i = 0; i < n; i++) {
+      const t = n === 1 ? 0 : (i / (n - 1) - 0.5) * 2;
+      this.colliders.push({ x: x + t * (rx * k - r), z, r });
+    }
+  }
+
+  /**
+   * A standing rock: a weathered sandstone block with a smaller one leaning on it (sandstone caves
+   * have no dripstone cones); blocks the way.
+   */
+  stalagmite(seed, x, z, h = 1.4, r = 0.32, parent = this.root) {
+    const w = Math.max(0.42, r * 1.7);
+    const a = this.boulder(seed, x, z, w, h * 1.05, w * 0.8, parent);
+    const b = this.boulder(seed + 50, x + w * 0.55, z + 0.12, w * 0.55, h * 0.55, w * 0.5, parent);
+    void b;
+    this.colliders.push({ x: x + w * 0.15, z, r: w * 0.85 });
+    return a;
+  }
+
+  /** A stalactite / rock lip hanging from the vault. */
+  stalactite(seed, x, z, len = 1.0, r = 0.3, parent = this.root, top = this.cfg.vault ?? 3.95) {
+    const b = this.boulder(seed, x, z, r, len * 1.6, r * 0.9, parent, { rough: 0.4, strata: 1.4, colA: 0x7a5c42, colB: 0x4a3626 });
+    b.position.y = top - len * 0.2;
+    b.rotation.z = Math.PI;
+    return b;
+  }
+
   build() {
     const root = this.root;
-    const r = rng(730);
+    const c = this.cfg;
+    const r = rng(730 + Math.round((c.nx || 0) * 3));
     this.sandMat = rockMaterial(this.low, { roughness: 0.95 });
-    const rockDark = this.mat('caveRockDark', { color: 0x6a5444, roughness: 1 });
-    // floor: packed sand and grit, darker towards the walls
-    const ft = floorTex().clone(); ft.needsUpdate = true; ft.wrapS = ft.wrapT = THREE.RepeatWrapping; ft.repeat.set(46 / 1.28, 9 / 1.28);
-    const fgeo = new THREE.PlaneGeometry(46, 9, 184, 36); fgeo.rotateX(-Math.PI / 2);
-    { const p = fgeo.attributes.position; const col = new Float32Array(p.count * 3); const c = new THREE.Color();
+    const W = c.x1 - c.x0 + 6, cx = (c.x0 + c.x1) / 2;
+    this.cx = cx;
+    const lightsAt = [...(c.torches || []).map((x) => [x, 2.1, 1.0]), ...(c.lights || [])];
+    // floor: packed sand and grit, darker towards the walls; it runs on into the passages
+    const ft = floorTex().clone(); ft.needsUpdate = true; ft.wrapS = ft.wrapT = THREE.RepeatWrapping; ft.repeat.set(W / 1.28, 9 / 1.28);
+    const fgeo = new THREE.PlaneGeometry(W, 9, Math.round(W * 4), 36); fgeo.rotateX(-Math.PI / 2);
+    { const p = fgeo.attributes.position; const col = new Float32Array(p.count * 3); const cc = new THREE.Color();
       for (let i = 0; i < p.count; i++) {
-        const x = p.getX(i) + 2, z = p.getZ(i) - 1;
-        const edge = sat((-z - 2.3) / 1.3);                      // rises into the foot of the wall
+        const x = p.getX(i) + cx, z = p.getZ(i) - 1;
+        const open = this.openMask(x, 0.4), dk = open * this._dark;
+        const edge = sat((-z - 2.3) / 1.3) * (1 - open);                      // rises into the foot of the wall
         p.setY(i, edge * edge * 0.35 + (fbm3(x * 0.6, 0, z * 0.6, 11, 3) - 0.5) * 0.12 * (0.3 + edge));
-        c.setHex(0xc8a47c).lerp(new THREE.Color(0x7a5c46), sat(edge * 0.8 + (fbm3(x * 0.25, 1, z * 0.25, 12, 2) - 0.4)));
-        col.set([c.r, c.g, c.b], i * 3);
+        cc.setHex(0xc8a47c).lerp(new THREE.Color(0x7a5c46), sat(edge * 0.8 + (fbm3(x * 0.25, 1, z * 0.25, 12, 2) - 0.4)));
+        if (dk > 0 && z < -2.4) cc.multiplyScalar(1 - dk * sat((-z - 2.4) / 1.4));   // the passage floor goes into the dark
+        col.set([cc.r, cc.g, cc.b], i * 3);
       }
       fgeo.setAttribute('color', new THREE.BufferAttribute(col, 3)); fgeo.computeVertexNormals(); }
     const floor = new THREE.Mesh(fgeo, this.mat('caveFloor', { map: ft, color: 0xffffff, roughness: 1, vertexColors: true }));
-    floor.position.set(2, 0, -1); root.add(floor);
-    // the back wall: one continuous weathered sheet — scalloped hollows, flowing layers
-    const black = new THREE.Mesh(new THREE.PlaneGeometry(50, 12), new THREE.MeshBasicMaterial({ color: 0x020202 }));
-    black.position.set(2, 4, BACK - 3.4); root.add(black);
-    const sandA = new THREE.Color(0xc09a72), sandB = new THREE.Color(0x86644a), deep = new THREE.Color(0x3a281c);
-    // light baked into the rock: it rakes in from the mouth (upper right), so every ledge and pocket reads
-    const LX = 0.62, LY = 0.55, LZ = 0.56;
-    const wallCol = (c, x, y, d, nx = 0, ny = 0, nz = 1) => {
-      const t = fbm3(x * 0.5, y * 0.5, 3, 21, 3);
-      c.copy(sandA).lerp(sandB, sat(t * 1.8 - 0.4));
-      const band = (y * 1.9 + fbm3(x * 0.3, y * 0.3, 4, 22, 2) * 2.2) % 1;
-      c.multiplyScalar(0.78 + 0.3 * band);                                         // alternating ochre / brown layers
-      const lit = Math.max(0, nx * LX + ny * LY + nz * LZ);
-      c.multiplyScalar(0.38 + 0.95 * lit);
-      c.lerp(deep, sat(-d * 1.1 - 0.1));                                         // hollows go dark
-    };
-    const wallOff = (x, y) => wallHeight(x, y);
-    // where the light comes from: torches, fires, the moonlit mouth (x, y, strength)
-    const LIGHTS = [[-6.2, 2.1, 1.0], [5.0, 2.1, 1.0], [11.4, 2.1, 0.9], [16.6, 2.1, 0.9], [-7.6, 0.6, 1.05], [-3.6, 0.6, 0.95], [1.8, 0.6, 0.95], [-11.6, 0.6, 0.9], [-14, 1.5, 0.85], [8.0, 2.2, 0.85], [21.0, 1.5, 1.0]];
-    const wallOffOld = (x, y) => {
-      let d = (fbm3(x * 0.32, y * 0.32, 0, 23, 4) - 0.5) * 1.5;
-      d -= Math.max(0, fbm3(x * 0.7, y * 0.7, 5, 25, 3) - 0.5) * 3.6;            // scallops
-      const cell = Math.abs(fbm3(x * 1.3, y * 1.6, 6, 29, 3) - 0.5);            // sharp-rimmed pockets (ridged)
-      d -= Math.max(0, 0.16 - cell) * 3.2;
-      d -= Math.max(0, fbm3(x * 2.6, y * 2.2, 8, 37, 2) - 0.58) * 0.8;
-      d += Math.sin(y * 5.2 + fbm3(x * 0.4, y * 0.4, 9, 27, 2) * 6) * 0.08;       // eroded layers
-      const sl = (y * 1.9 + fbm3(x * 0.3, y * 0.3, 4, 22, 2) * 2.2) % 1;          // stepped ledges: each layer overhangs the next
-      d += sl * 0.32 - 0.16;
-      d += (fbm3(x * 3, y * 3, 2, 35, 2) - 0.5) * 0.08;                           // grain
-      d += Math.max(0, 0.9 - y) * 0.7;                                            // flares into the floor
-      d += Math.max(0, y - 3.4) * 0.9;                                            // leans over into the vault
-      return d;
-    };
-    void wallOffOld;
-    // geometry gives the silhouette and parallax; the baked texture carries the crisp relief
-    const wgeo = reliefSheet(46, 6.4, this.low ? 140 : 200, this.low ? 30 : 44, (x, y) => wallOff(x + 2, y + 3.2), (c, x, y, d) => {
-      const wx = x + 2, wy = y + 3.2;
+    floor.position.set(cx, 0, -1); root.add(floor);
+    const black = new THREE.Mesh(new THREE.PlaneGeometry(W + 10, 12), new THREE.MeshBasicMaterial({ color: 0x020202 }));
+    black.position.set(cx, 4, BACK - 3.6); root.add(black);
+    // the back wall: one continuous weathered sheet; passages are deep recesses in it
+    const segX = Math.round(W * (this.low ? 3.2 : 4.4)), segY = this.low ? 30 : 44;
+    const wgeo = reliefSheet(W, 6.4, segX, segY, (x, y) => this.wallH(x + cx, y + 3.2), (col, x, y, d) => {
+      const wx = x + cx, wy = y + 3.2;
       let lit = 0.32;
-      for (const [lx, ly, k] of LIGHTS) lit = Math.max(lit, k * Math.exp(-((wx - lx) ** 2) / 18 - ((wy - ly) ** 2) / 10));
-      c.setScalar(Math.min(1.1, lit) * (1 - sat(-d * 0.5 - 0.2) * 0.5));
+      for (const [lx, ly, k] of lightsAt) lit = Math.max(lit, k * Math.exp(-((wx - lx) ** 2) / 18 - ((wy - ly) ** 2) / 10));
+      col.setScalar(Math.min(1.1, lit) * (1 - sat(-d * 0.5 - 0.2) * 0.5) * (1 - 0.98 * this.darkMask(wx, wy)));
     });
     const wallMat = rockMaterial(this.low, { roughness: 0.95 });
-    wallMat.map = wallBakedTex(this.low ? 1536 : 2048, this.low ? 214 : 286); wallMat.map.repeat.set(1, 1); wallMat.map.wrapS = wallMat.map.wrapT = THREE.ClampToEdgeWrapping;
-    const vaultMat = rockMaterial(this.low, { roughness: 0.95 });
-    vaultMat.map = sandGrainTex(); vaultMat.map.repeat.set(16, 3);
+    const texW = Math.round(W * (this.low ? 30 : 42));
+    wallMat.map = wallBakedTex(this.id, texW, this.low ? 214 : 286, cx - W / 2, W, (x, y, f) => this.wallH(x, y, f), (x, y) => this.darkMask(x, y), this.ox, c.nx || 0);
+    wallMat.map.wrapS = wallMat.map.wrapT = THREE.ClampToEdgeWrapping;
     this.wallMat = wallMat;
     const wall = new THREE.Mesh(wgeo, wallMat);
-    wall.position.set(2, 3.2, BACK - 0.5); root.add(wall);
+    wall.position.set(cx, 3.2, BACK - 0.5); root.add(wall);
     // the vault overhead: hangs lower towards the camera, a dark lip framing the top of the view
-    const cgeo = reliefSheet(46, 5.6, this.low ? 140 : 200, this.low ? 18 : 26, (x, y) => {
-      const zz = -y;                                   // sheet y → world z after the rotation
-      let d = (fbm3(x * 0.4, zz * 0.4, 7, 31, 4) - 0.5) * 1.1 - Math.max(0, fbm3(x * 0.8, zz * 0.8, 2, 33, 3) - 0.55) * 2;
+    const vaultMat = rockMaterial(this.low, { roughness: 0.95 });
+    vaultMat.map = sandGrainTex(); vaultMat.map.repeat.set(W / 3, 3);
+    const vY = c.vault ?? 3.95;
+    const cgeo = reliefSheet(W, 6.4, Math.round(W * 3), this.low ? 18 : 26, (x, y) => {
+      const zz = -y, xx = x + cx + (c.nx || 0);
+      let d = (fbm3(xx * 0.4, zz * 0.4, 7, 31, 4) - 0.5) * 1.1 - Math.max(0, fbm3(xx * 0.8, zz * 0.8, 2, 33, 3) - 0.55) * 2;
       d -= Math.max(0, zz - 0.2) * 0.55;               // the lip hangs towards the viewer
       return d;
-    }, (c, x, y, d, nx, ny, nz) => { wallCol(c, x + 2, 4 + d, d - 0.2, nx, -nz, ny); c.multiplyScalar(0.7); });
+    }, (col, x, y, d) => {
+      const xx = x + cx;
+      let lit = 0.25;
+      for (const [lx, , k] of lightsAt) lit = Math.max(lit, k * 0.8 * Math.exp(-((xx - lx) ** 2) / 14));
+      col.setRGB(0.62, 0.5, 0.4).multiplyScalar(lit * (0.75 + 0.25 * sat(d + 1)));
+    });
     cgeo.rotateX(Math.PI / 2);
     const vault = new THREE.Mesh(cgeo, vaultMat);
-    vault.position.set(2, 3.95, -0.4); root.add(vault);
-    // boulders along the foot of the wall
-    for (let x = -19; x < 23; x += 1.6 + r() * 2.4) {
-      if (x > -15.4 && x < -12.6) continue;             // the slab stands free
-      this.boulder(800 + Math.round(x * 3), x, BACK + 0.5 + r() * 0.5, 0.6 + r() * 0.9, 0.45 + r() * 0.7, 0.5 + r() * 0.5);
+    vault.position.set(cx, vY, -0.6); root.add(vault);
+    // end walls: the chamber is closed left and right (except the mouth)
+    const capMat = rockMaterial(this.low, { roughness: 0.95 });
+    capMat.map = sandGrainTex().clone(); capMat.map.needsUpdate = true; capMat.map.wrapS = capMat.map.wrapT = THREE.RepeatWrapping; capMat.map.repeat.set(2.5, 2.5);
+    for (const side of [-1, 1]) {
+      if ((side < 0 && c.openLeft) || (side > 0 && c.openRight)) continue;
+      const ex = side < 0 ? c.x0 : c.x1;
+      const geo = reliefSheet(8, 7, 40, 40, (u, y) => {
+        const z = -u * side;                     // sheet u runs along the world z
+        return wallHeight(z * 1.1 + 300 + ex, y + 3.5, false, 300 + ex) * 0.7 + Math.max(0, z - 1.5) * 0.25;
+      }, (col, u, y, d) => col.setRGB(0.58, 0.46, 0.36).multiplyScalar(0.35 + 0.25 * sat(d + 0.8) - Math.max(0, y) * 0.03));
+      const cap = new THREE.Mesh(geo, capMat);
+      cap.rotation.y = side < 0 ? Math.PI / 2 : -Math.PI / 2;
+      cap.position.set(ex + side * 0.4, 3.0, -0.4);
+      root.add(cap);
+      // a heap of fallen rock where the end wall meets the floor
+      for (let i = 0; i < 4; i++) this.boulder(840 + i + Math.round(ex * 2), ex - side * (0.2 + r() * 0.5), -2.6 + i * 1.3, 0.6 + r() * 0.5, 0.5 + r() * 0.5, 0.6, root, { colA: 0x7a5c42, colB: 0x4e3a2a });
+    }
+    // boulders along the foot of the wall (not in front of a passage)
+    const nearOpening = (x, pad = 0.4) => (c.openings || []).some((o) => Math.abs(x - o.x) < o.w / 2 + pad);
+    const minZ = c.minZ ?? -2.0;
+    for (let x = c.x0 + 0.3; x < c.x1; x += 1.4 + r() * 2.2) {
+      if (nearOpening(x, 0.6) || (c.clear || []).some(([a, b]) => x > a && x < b)) continue;
+      const sx = 0.6 + r() * 0.9, sy = 0.45 + r() * 0.7, sz = 0.5 + r() * 0.5, z = BACK + 0.5 + r() * 0.5;
+      this.boulder(800 + Math.round(x * 3 + (c.nx || 0)), x, z, sx, sy, sz);
+      if (z + sz * 0.8 > minZ - 0.25) this.solid(x, z, sx, sz);
     }
     // sand drifted against the foot of the wall (no hard seam)
-    const drift = new THREE.InstancedMesh(rockGeometry(880, { detail: 3, rough: 0.2, flat: -0.05, colA: 0xb89470, colB: 0x9a7a5a, dark: 0.25 }), this.sandMat, 46);
+    const nD = Math.round(W);
+    const drift = new THREE.InstancedMesh(rockGeometry(880, { detail: 3, rough: 0.2, flat: -0.05, colA: 0xb89470, colB: 0x9a7a5a, dark: 0.25 }), this.sandMat, nD);
     { const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
-      for (let i = 0; i < 46; i++) { const x = -20 + i * 0.95 + r() * 0.5; q.setFromEuler(e.set(0, r() * 6, 0)); m.compose(new THREE.Vector3(x, -0.04, BACK + 0.15 + r() * 0.5), q, new THREE.Vector3(1.0 + r() * 0.9, 0.22 + r() * 0.3, 0.6 + r() * 0.4)); drift.setMatrixAt(i, m); } }
-    // talus: broken rock fallen from the layers, piled along the base
-    { const tal = new THREE.InstancedMesh(rockGeometry(885, { detail: 2, rough: 0.4, sharp: 0.8, flat: -0.3, strata: 1, colA: 0x9a7654, colB: 0x6e5038, dark: 0.5 }), this.sandMat, 220);
-      const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
-      for (let i = 0; i < 220; i++) { const x = -20 + r() * 44, sc = 0.06 + r() * r() * 0.3; q.setFromEuler(e.set(r() * 3, r() * 6, r() * 3)); m.compose(new THREE.Vector3(x, sc * 0.3, BACK + 0.35 + r() * 0.9), q, new THREE.Vector3(sc * (1 + r()), sc, sc)); tal.setMatrixAt(i, m); }
-      root.add(tal); }
+      for (let i = 0; i < nD; i++) { let x = cx - W / 2 + i * 0.95 + r() * 0.5; if (nearOpening(x, 0.1)) x = cx - W / 2 - 4; q.setFromEuler(e.set(0, r() * 6, 0)); m.compose(V3(x, -0.04, BACK + 0.15 + r() * 0.5), q, V3(1.0 + r() * 0.9, 0.22 + r() * 0.3, 0.6 + r() * 0.4)); drift.setMatrixAt(i, m); } }
     root.add(drift);
-    // a few flat, half-buried slabs and clustered small boulders between the big ones
-    for (let i = 0; i < 9; i++) {
-      const x = -18 + i * 4.6 + r() * 1.5;
-      if (x > -15.4 && x < -12.6) continue;
-      this.boulder(890 + i, x, BACK + 1.1 + r() * 0.4, 0.5 + r() * 0.4, 0.14 + r() * 0.1, 0.4 + r() * 0.3);
-      this.boulder(895 + i, x + 0.6, BACK + 1.3, 0.22 + r() * 0.15, 0.2 + r() * 0.12, 0.2);
-    }
+    // talus: broken rock fallen from the layers, piled along the base
+    const nT = Math.round(W * 4.5);
+    { const tal = new THREE.InstancedMesh(rockGeometry(885, { detail: 2, rough: 0.4, sharp: 0.8, flat: -0.3, strata: 1, colA: 0x9a7654, colB: 0x6e5038, dark: 0.5 }), this.sandMat, nT);
+      const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
+      for (let i = 0; i < nT; i++) { const x = cx - W / 2 + r() * W, sc = 0.06 + r() * r() * 0.3; q.setFromEuler(e.set(r() * 3, r() * 6, r() * 3)); m.compose(V3(x, sc * 0.3, BACK + 0.35 + r() * 0.9), q, V3(sc * (1 + r()), sc, sc)); tal.setMatrixAt(i, m); }
+      root.add(tal); }
     // grit and pebbles along the foot of the wall and across the floor
-    const peb = new THREE.InstancedMesh(rockGeometry(870, { detail: 2, rough: 0.35, flat: -0.3, strata: 0.5, colA: 0x9a7a5a, colB: 0x5a4434, dark: 0.4 }), this.sandMat, 160);
+    const nP = Math.round(W * 3.4);
+    const peb = new THREE.InstancedMesh(rockGeometry(870, { detail: 2, rough: 0.35, flat: -0.3, strata: 0.5, colA: 0x9a7a5a, colB: 0x5a4434, dark: 0.4 }), this.sandMat, nP);
     { const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
-      for (let i = 0; i < 160; i++) {
-        const x = -19 + r() * 42, z = r() < 0.6 ? BACK + 0.9 + r() * 0.8 : -2 + r() * 3.4, sc = r() < 0.6 ? 0.04 + r() * 0.06 : 0.1 + r() * 0.12;
-        q.setFromEuler(e.set(0, r() * 6, 0)); m.compose(new THREE.Vector3(x, 0, z), q, new THREE.Vector3(sc * (1 + r()), sc, sc)); peb.setMatrixAt(i, m);
+      for (let i = 0; i < nP; i++) {
+        const x = cx - W / 2 + r() * W, z = r() < 0.6 ? BACK + 0.9 + r() * 0.8 : -2 + r() * 3.4, sc = r() < 0.6 ? 0.04 + r() * 0.06 : 0.1 + r() * 0.12;
+        q.setFromEuler(e.set(0, r() * 6, 0)); m.compose(V3(x, 0, z), q, V3(sc * (1 + r()), sc, sc)); peb.setMatrixAt(i, m);
       } }
     root.add(peb);
-    this.buildRitual();
-    this.buildHall();
-    this.buildNiche();
-    this.buildStore();
-    this.buildExit();
-    this.buildForeground();
+    // the passages: darkness inside, a faint breath of light from where they lead
+    for (const o of c.openings || []) {
+      if (o.tint) {
+        const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: o.tint, transparent: true, opacity: o.tintOpacity ?? 0.22, depthWrite: false, blending: THREE.AdditiveBlending }));
+        s.scale.set(o.w * 1.1, o.h * 0.9, 1); s.position.set(o.x, o.h * 0.42, BACK - 2.0); root.add(s);
+        o.glowSprite = s;
+      }
+      if (o.door) this.doors.push({ id: o.door.id, label: o.door.label, x: o.x, z: -2.3, radius: 1.05, anchor: V3(o.x, Math.min(1.9, o.h * 0.7), BACK + 0.2), to: o.door.to, spawn: o.door.spawn });
+    }
     // decals added by the story (blood)
     this.decals = new THREE.Group(); root.add(this.decals);
     // light
     const hemi = new THREE.HemisphereLight(0xb4a08a, 0x3a2a1e, 0.95);
     root.add(hemi);
-    // light raking along the wall from the mouth's side: it is what makes the eroded relief read
+    // light raking along the wall from the right: it is what makes the eroded relief read
     const rake = new THREE.DirectionalLight(0xf0d0a8, 2.0);
-    rake.position.set(26, 9, -1.5); rake.target.position.set(0, 1, BACK);
+    rake.position.set(cx + 24, 9, -1.5); rake.target.position.set(cx, 1, BACK);
     root.add(rake, rake.target);
-    const fill = new THREE.PointLight(0xd0a884, 5, 12, 1.1); fill.position.set(0, 1.8, 3.5); root.add(fill);
+    const fill = new THREE.PointLight(0xd0a884, 5, 12, 1.1); fill.position.set(cx, 1.8, 3.5); root.add(fill);
     this.fill = fill;
-    // torches wedged in the rock along the passage: warm, dirty pools of light
-    this.torches = [];
-    for (const x of [-6.2, 5.0, 11.4, 16.6]) {
-      const t = glow(0xff9a48, 0.55, 0.4); t.position.set(x, 2.12, BACK + 0.75); root.add(t);
-      const fl = new THREE.Sprite(new THREE.SpriteMaterial({ map: flameTex(), color: 0xffc070, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
-      fl.scale.set(0.16, 0.3, 1); fl.position.set(x, 2.16, BACK + 0.8); root.add(fl);
-      this.flames = this.flames || []; this.flames.push({ s: fl, ph: x });
-      const l = new THREE.PointLight(0xff8a40, 5, 7, 1.4); l.position.set(x, 2.0, -1.4); root.add(l);
-      this.torches.push(l);
-      const tst = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.035, 0.5, 16), this.mat('torchStick', { color: 0x2a1c12 })); tst.position.set(x, 1.8, BACK + 0.65); tst.rotation.x = -0.3; root.add(tst);
-    }
     this.lights = { hemi, rake };
-    this.anchors.niche = { x: 1.6, z: -0.6 };
-    this.anchors.bedL = { x: 0.2, z: -1.6 };
-    this.anchors.puriel = { x: 13.2, z: -2.3 };
-    this.anchors.guards = [{ x: 18.6, z: -1.2 }, { x: 19.8, z: -0.2 }];
-    this.anchors.exit = { x: 21.4, z: -0.6 };
-    this.anchors.slab = { x: -14.0, z: -1.0 };
-    this.anchors.peek = { x: -9.2, z: 0.4 };
-    this.windowLights = [flareSource('MOON', new THREE.Vector3(22.0, 1.5, -1.0), { triggerDistance: 4.0, fadeDistance: 3.0, dir: new THREE.Vector3(-0.6, 0, 0.8) })];
+    for (const x of c.torches || []) this.torch(x);
+    this.buildRoom(r);
+    this.buildForeground();
     this.setState('L3');
     return root;
   }
+
+  /** The chamber's own things (overridden). */
+  buildRoom() {}
+
+  /** A torch wedged in the rock: warm, dirty pool of light. */
+  torch(x, y = 2.12) {
+    const root = this.root;
+    const zw = Math.max(BACK + 0.55, Math.min(BACK + 1.3, this.wallZ(x, y) + 0.12));
+    const t = glow(0xff9a48, 0.55, 0.4); t.position.set(x, y, zw + 0.1); root.add(t);
+    const fl = new THREE.Sprite(new THREE.SpriteMaterial({ map: flameTex(), color: 0xffc070, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    fl.scale.set(0.16, 0.3, 1); fl.position.set(x, y + 0.04, zw + 0.15); root.add(fl);
+    this.flames.push({ s: fl, ph: x });
+    const l = new THREE.PointLight(0xff8a40, 5, 7, 1.4); l.position.set(x, y - 0.12, -1.4); root.add(l);
+    this.torches.push(l);
+    const tst = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.035, 0.5, 16), this.mat('torchStick', { color: 0x2a1c12 })); tst.position.set(x, y - 0.32, zw); tst.rotation.x = -0.3; root.add(tst);
+    return l;
+  }
+
+  buildForeground() {
+    const fg = (name) => { const g = new THREE.Group(); g.name = name; this.root.add(g); this.foregroundGroups.push(g); return g; };
+    const dark = { colA: 0x4a3828, colB: 0x2a1e16, dark: 0.6 };
+    // big rocks between the camera and the floor: the chamber closes in around the player
+    for (const [x, w, h, z = 2.6] of this.cfg.fg || []) {
+      const g = fg(`fg-rock-${this.id}-${x}`);
+      const W = w * 1.35, Hh = h * 1.9;
+      this.boulder(970 + Math.round(x * 5 + (this.cfg.nx || 0)), x, z, W, Hh, 0.9, g, dark);
+      this.boulder(975 + Math.round(x * 5), x + W * 0.75, z + 0.35, W * 0.55, Hh * 0.6, 0.6, g, dark);
+      this.boulder(978 + Math.round(x * 5), x - W * 0.8, z + 0.5, W * 0.45, Hh * 0.4, 0.5, g, dark);
+    }
+    for (const [x, w, len = 1.0] of this.cfg.lips || []) {
+      const g = fg(`fg-lip-${this.id}-${x}`);
+      const top = (this.cfg.vault ?? 3.95) + 0.4;
+      this.stalactite(985 + Math.round(x * 3), x, 2.0, len, w, g, top);
+      this.stalactite(986 + Math.round(x * 3), x + w * 1.3, 2.3, len * 0.6, w * 0.6, g, top);
+    }
+  }
+
+  // ------------------------------------------------------------------ props
 
   fire(x, z, s = 1, parent = this.root) {
     const g = new THREE.Group();
@@ -341,167 +495,26 @@ export class CaveScene extends LocationBase {
     const core = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: 0xffe0a0, transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending }));
     core.scale.set(0.3 * s, 0.45 * s, 1); core.position.y = 0.22 * s; g.add(core);
     const light = new THREE.PointLight(0xff8a40, 7 * s, 7 * s, 1.4); light.position.y = 0.7; g.add(light);
+    // the cold ring of stones stays when the fire is out
+    const ash = new THREE.Mesh(new THREE.CircleGeometry(0.36 * s, 18), this.mat('ash', { color: 0x2a2420, roughness: 1 }));
+    ash.rotation.x = -Math.PI / 2; ash.position.set(x, 0.01, z); parent.add(ash);
     g.position.set(x, 0, z);
     parent.add(g);
     const f = { g, flame, core, light, base: 7 * s, baseH: 0.9 * s, ph: Math.random() * 6 };
     this.fires.push(f);
+    this.colliders.push({ x, z, r: 0.42 * s });
     return f;
   }
 
-  buildRitual() {
-    const g = this.groups.ritual = new THREE.Group(); this.root.add(g);
-    const sgeo = roundedBox(2.6, 0.55, 1.3, 0.07, 4);
-    { const p = sgeo.attributes.position; const col = new Float32Array(p.count * 3); const c = new THREE.Color();
-      for (let i = 0; i < p.count; i++) {
-        const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
-        const k = (fbm3(x * 2.5, y * 2.5, z * 2.5, 61, 3) - 0.5) * 0.16;
-        p.setXYZ(i, x * (1 + k), y + (y > 0.2 ? k * 0.3 : 0), z * (1 + k));
-        c.setHex(0x8a7868).lerp(new THREE.Color(0x5a4a40), sat(fbm3(x, y, z, 62, 3) * 1.5 - 0.3));
-        if (y > 0.25 && fbm3(x * 1.5, 0, z * 1.5, 63, 3) > 0.52) c.lerp(new THREE.Color(0x3a1410), 0.7);   // old blood soaked into the stone
-        col.set([c.r, c.g, c.b], i * 3);
-      }
-      sgeo.setAttribute('color', new THREE.BufferAttribute(col, 3)); smoothNormals(sgeo); }
-    const slab = new THREE.Mesh(sgeo, this.sandMat);
-    slab.position.set(-14.0, 0.275, -1.3); slab.rotation.y = 0.04; g.add(slab);
-    for (const [dx, dz] of [[-1.1, -0.5], [1.15, 0.45]]) g.add(this.skull(-14.0 + dx, 0.62, -1.3 + dz, this.mat('caveBone', { color: 0xcfc4b0, roughness: 0.8 })));
-    // old stains on the stone, antlers and skulls along the wall
-    const stain = this.mat('oldStain', { map: bloodTex(1), transparent: true, alphaTest: 0.3, color: 0x6a4a40, depthWrite: false });
-    for (let i = 0; i < 4; i++) { const d = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.9), stain); d.rotation.x = -Math.PI / 2; d.position.set(-15 + i * 0.7, 0.012, -0.4 + (i % 2) * 0.5); g.add(d); }
-    const bone = this.mat('caveBone', { color: 0xcfc4b0, roughness: 0.8 });
-    // skulls piled at the foot of the wall, antlers hung on the rock (set against the relief, not in the air)
-    for (const [x, y, z] of [[-17.2, 0.14, BACK + 1.25], [-16.9, 0.14, BACK + 1.45], [-17.05, 0.32, BACK + 1.33], [-12.0, 0.14, BACK + 1.3], [-11.7, 0.14, BACK + 1.5], [-15.6, 0.14, BACK + 1.4]]) g.add(this.skull(x, y, z, bone));
-    for (let i = 0; i < 3; i++) {
-      const ax = -16.4 + i * 2.4;
-      const az = BACK - 0.5 + wallHeight(ax, 1.6) + 0.1;
-      g.add(this.antlers(ax, 1.45, az, bone));
-      const shd = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 1.2), new THREE.MeshBasicMaterial({ map: glowTexture(), color: 0x000000, transparent: true, opacity: 0.5, depthWrite: false }));
-      shd.position.set(ax + 0.08, 1.4, az - 0.06); g.add(shd);
-    }
-    // the red light of the chamber (L5)
-    this.ritualLight = new THREE.PointLight(0xc03a20, 0, 9, 1.3); this.ritualLight.position.set(-14, 2.6, 0.4); g.add(this.ritualLight);
-    this.ritualFire = this.fire(-11.6, -2.4, 0.9, g);
+  /** Fire on / off (the stone ring and the ash stay). */
+  setFire(f, on, k = 1) {
+    f.flame.visible = f.core.visible = on;
+    f.base = (f.base0 ?? (f.base0 = f.base)) * k;
+    f.light.intensity = on ? f.base : 0;
+    for (const ch of f.g.children) if (ch.isMesh && ch.geometry.type === 'CylinderGeometry') ch.material = on ? this.mat('fireLog', { color: 0x2a1c12, roughness: 1 }) : this.mat('fireLogCold', { color: 0x1a1612, roughness: 1 });
   }
 
-  buildHall() {
-    const g = this.groups.hall = new THREE.Group(); this.root.add(g);
-    this.hallFires = [this.fire(-7.6, -1.9, 1.1, g), this.fire(-3.6, -2.2, 0.9, g)];
-    // furs, a carcass on a spit, a stolen crate of beer cans
-    const fur = this.mat('fur', { color: 0x4a3a2c, roughness: 1 });
-    for (const [x, z] of [[-9, -2.6], [-5.6, -2.8], [-2.6, -2.6]]) this.pelt(x, z, x, g);
-    const spit = this.mat('spit', { color: 0x3a2a1c, roughness: 1 });
-    const stick = (x0, y0, x1, y1) => { const L = Math.hypot(x1 - x0, y1 - y0); const c = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.03, L, 16), spit); c.position.set((x0 + x1) / 2, (y0 + y1) / 2, -1.9); c.rotation.z = Math.atan2(x0 - x1, y1 - y0); g.add(c); };
-    stick(-8.5, 0, -8.15, 1.05); stick(-7.85, 0, -8.2, 1.05); stick(-7.35, 0, -7.0, 1.05); stick(-6.7, 0, -7.05, 1.05); stick(-8.4, 1.0, -6.8, 1.0);
-    const meat = new THREE.Mesh(rockGeometry(905, { detail: 3, rough: 0.35, flat: -2, colA: 0x7a3420, colB: 0x4a1a10, dark: 0.5 }), this.mat('meatV', { vertexColors: true, color: 0xffffff, roughness: 0.6 }));
-    meat.scale.set(0.45, 0.22, 0.22); meat.position.set(-7.6, 0.92, -1.9); g.add(meat);
-    const crate = new THREE.Mesh(roundedBox(0.6, 0.4, 0.4, 0.03), this.mat('crate', { color: 0x7a5a34, roughness: 1 })); crate.position.set(-4.6, 0.2, -3.0); crate.rotation.y = 0.3; g.add(crate);
-    this.anchors.hallSeats = [{ x: -8.6, z: -1.2 }, { x: -6.4, z: -1.5 }, { x: -4.4, z: -1.1 }, { x: -2.8, z: -1.6 }];
-  }
-
-  buildNiche() {
-    const g = this.groups.niche = new THREE.Group(); this.root.add(g);
-    // straw beds, a blanket, a heap of food (too much food)
-    const straw = this.mat('straw', { color: 0xa88a4a, roughness: 1, flatShading: true });
-    // straw beds: loose heaps of stalks, not pillows; a fur thrown over one
-    const stalk = new THREE.PlaneGeometry(0.018, 0.34); stalk.translate(0, 0.17, 0);
-    const stM = this.mat('strawStalk', { color: 0xc8a45a, roughness: 1, side: THREE.DoubleSide });
-    const sr = rng(744), N = 540;
-    const st = new THREE.InstancedMesh(stalk, stM, N);
-    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), col = new THREE.Color();
-    const beds = [[-0.6, -2.2], [0.8, -2.5], [2.2, -2.2]];
-    for (let i = 0; i < N; i++) {
-      const [bx, bz] = beds[i % 3], a = sr() * 6.28, d = Math.sqrt(sr());
-      q.setFromEuler(e.set(Math.PI / 2 - 0.15 - sr() * 0.5, sr() * 6.28, (sr() - 0.5) * 0.6));
-      m4.compose(new THREE.Vector3(bx + Math.cos(a) * d * 0.75, 0.02 + (1 - d) * 0.1 * sr(), bz + Math.sin(a) * d * 0.42), q, new THREE.Vector3(1, 0.6 + sr() * 0.8, 1));
-      st.setMatrixAt(i, m4); st.setColorAt(i, col.setScalar(0.65 + sr() * 0.5));
-    }
-    g.add(st);
-    for (const [x, z] of beds) { const lump = this.rock(x, 0.0, z, 0.7, 0.07, 0.4, straw, g, x); lump.position.y = 0.02; }
-    this.pelt(0.8, -2.5, 0.2, g, 0x5a2a2a, 0.15);
-    const meat = this.mat('rawMeat', { color: 0x7a2a22, roughness: 0.7, flatShading: true });
-    const berry = this.mat('berries', { color: 0x3a2a5a, roughness: 0.6 });
-    const can = this.mat('can', { color: 0xa8b0b8, metalness: 0.7, roughness: 0.3 });
-    meat.color.set(0x5a1c14);
-    for (let i = 0; i < 6; i++) this.rock(4.0 + (i % 3) * 0.35, 0.1 + Math.floor(i / 3) * 0.14, -2.7 + (i % 2) * 0.2, 0.2, 0.1, 0.14, meat, g, i);
-    for (let i = 0; i < 4; i++) { const b = this.longBone(this.mat('caveBone', { color: 0xcfc4b0, roughness: 0.8 })); b.position.set(4.0 + i * 0.28, 0.24, -2.6 + (i % 2) * 0.15); b.rotation.set(0.3, i, 1.2); g.add(b); }
-    for (let i = 0; i < 12; i++) { const b = new THREE.Mesh(new THREE.SphereGeometry(0.04, 14, 10), berry); b.position.set(3.4 + (i % 4) * 0.08, 0.05, -2.2 + Math.floor(i / 4) * 0.08); g.add(b); }
-    for (let i = 0; i < 4; i++) { const c = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.12, 16), can); c.position.set(4.9 + i * 0.13, 0.06, -2.1 + (i % 2) * 0.1); if (i === 3) { c.rotation.z = Math.PI / 2; c.position.y = 0.05; } g.add(c); }
-    const bucket = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.13, 0.3, 20, 1, true), this.mat('bucket', { color: 0x5a6068, metalness: 0.5, roughness: 0.4, side: THREE.DoubleSide })); bucket.position.set(2.9, 0.15, -2.9); g.add(bucket);
-    const handle = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.008, 6, 20, Math.PI), this.mats.cache.get('bucket')); handle.position.set(2.9, 0.3, -2.9); handle.rotation.z = 0.3; g.add(handle);
-    this.nicheFire = this.fire(1.8, -1.2, 0.7, g);
-    this.anchors.food = new THREE.Vector3(4.2, 0.5, -2.4);
-    this.anchors.beds = new THREE.Vector3(0.8, 0.4, -2.4);
-  }
-
-  buildStore() {
-    const g = this.groups.store = new THREE.Group(); this.root.add(g);
-    const packs = [0x2a4a6a, 0x7a2a2a, 0x3a5a2a, 0xb07a20, 0x4a3a5a];
-    const packGeo = roundedBox(0.36, 0.5, 0.22, 0.08), pocketGeo = roundedBox(0.26, 0.18, 0.08, 0.04);
-    packs.forEach((c, i) => {
-      const pm = this.mat(`hpack${i}`, { color: c, roughness: 0.9 });
-      const b = new THREE.Mesh(packGeo, pm); b.position.set(6.4 + i * 0.7, 0.25, -2.8 + (i % 2) * 0.25); b.rotation.set(0, i, i % 2 ? 0.3 : -0.2); g.add(b);
-      const pk = new THREE.Mesh(pocketGeo, pm); pk.position.set(0, -0.08, 0.12); b.add(pk);
-    });
-    // a torn orange tent, a boot, a hat, a pile of bones
-    const tentGeo = new THREE.ConeGeometry(0.9, 0.9, 16, 6, true);
-    { const tp = tentGeo.attributes.position; for (let i = 0; i < tp.count; i++) { const k = 1 + (fbm3(tp.getX(i) * 3, tp.getY(i) * 3, tp.getZ(i) * 3, 41, 2) - 0.5) * 0.5; tp.setX(i, tp.getX(i) * k); tp.setZ(i, tp.getZ(i) * k); } tentGeo.computeVertexNormals(); }
-    const tent = new THREE.Mesh(tentGeo, this.mat('torntent', { color: 0xc86a1c, roughness: 0.9, side: THREE.DoubleSide }));
-    tent.position.set(9.6, 0.4, -2.6); tent.rotation.set(0.2, 0.5, 0.35); g.add(tent);
-    const boot = new THREE.Mesh(roundedBox(0.3, 0.12, 0.12, 0.05), this.mat('boot', { color: 0x3a2a1c, roughness: 0.9 })); boot.position.set(8.4, 0.06, -1.9); boot.rotation.y = 0.6; g.add(boot);
-    const shaft = new THREE.Mesh(roundedBox(0.11, 0.18, 0.12, 0.04), this.mats.cache.get('boot')); shaft.position.set(-0.08, 0.12, 0); boot.add(shaft);
-    const bone = this.mat('caveBone', { color: 0xcfc4b0, roughness: 0.8 });
-    for (let i = 0; i < 9; i++) { const b = this.longBone(bone); b.position.set(10.4 + Math.sin(i) * 0.3, 0.04 + i * 0.02, -2.6 + Math.cos(i) * 0.25); b.rotation.set(Math.PI / 2, 0, i); g.add(b); }
-    g.add(this.skull(10.6, 0.14, -2.5, bone));
-    this.anchors.store = new THREE.Vector3(8.2, 0.7, -2.5);
-    this.anchors.bones = new THREE.Vector3(10.4, 0.4, -2.4);
-    const torch = glow(0xff9040, 1.2, 0.5); torch.position.set(8.0, 2.2, BACK + 0.6); g.add(torch);
-    const tl = new THREE.PointLight(0xff8a40, 4, 6, 1.5); tl.position.set(8.0, 2.0, -1.8); g.add(tl);
-    this.storeLight = tl;
-  }
-
-  buildExit() {
-    const g = this.groups.exit = new THREE.Group(); this.root.add(g);
-    // the side alcove where Puriel lies (L3)
-    const al = this.mat('alcove', { color: 0x2a2420, roughness: 1, flatShading: true });
-    this.boulder(940, 12.2, -3.0, 0.8, 1.6, 0.6, g, { colA: 0x5a4434, colB: 0x3a2a20 });
-    this.boulder(941, 14.3, -3.0, 0.7, 1.4, 0.6, g, { colA: 0x5a4434, colB: 0x3a2a20 });
-    this.purielGroup = new THREE.Group(); g.add(this.purielGroup);
-    const st = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1.2), new THREE.MeshLambertMaterial({ map: bloodTex(2), transparent: true, alphaTest: 0.3, depthWrite: false }));
-    st.rotation.x = -Math.PI / 2; st.position.set(13.2, 0.013, -2.2); this.purielGroup.add(st);
-    // the tunnel narrows; moonlight at the mouth
-    for (let i = 0; i < 5; i++) this.boulder(950 + i, 16 + i * 1.3, 1.1 + (i % 2) * 0.3, 0.5, 0.45, 0.35, g);
-    const mouthOpen = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 2.4), new THREE.MeshBasicMaterial({ map: outsideTex(), alphaMap: archMask(), transparent: true, depthWrite: false }));
-    mouthOpen.position.set(21.0, 1.2, BACK + 0.55); g.add(mouthOpen);
-    this.boulder(960, 19.8, BACK + 0.9, 0.7, 2.2, 0.6, g, { colA: 0x4a3828, colB: 0x2a1e16 });
-    this.boulder(961, 22.3, BACK + 0.9, 0.8, 2.4, 0.6, g, { colA: 0x4a3828, colB: 0x2a1e16 });
-    const lintel = this.boulder(962, 21.0, BACK + 0.8, 1.6, 0.5, 0.6, g, { colA: 0x4a3828, colB: 0x2a1e16 }); lintel.position.y = 2.35;
-    const pool = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 2.0), new THREE.MeshBasicMaterial({ map: glowTex(), color: 0x6a88c0, transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending }));
-    pool.rotation.x = -Math.PI / 2; pool.position.set(20.6, 0.03, -1.4); g.add(pool);
-    const moon = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 2.6), new THREE.MeshBasicMaterial({ map: outsideTex() }));
-    moon.position.set(22.6, 1.3, -1.4); moon.rotation.y = -Math.PI / 2; g.add(moon);
-    const mg = glow(0xa8b8d8, 4.0, 0.35); mg.position.set(22.0, 1.3, -0.8); g.add(mg);
-    // cold light falling in from the mouth: soft shafts in the dust
-    const shT = shaftTexture();
-    for (let i = 0; i < 5; i++) {
-      const sh = new THREE.Mesh(new THREE.PlaneGeometry(1.4 + i * 0.3, 6), new THREE.MeshBasicMaterial({ map: shT, color: 0x9ab0d4, transparent: true, opacity: 0.07, depthWrite: false, blending: THREE.AdditiveBlending }));
-      sh.position.set(20.4 - i * 0.55, 1.6, -1.4 + i * 0.2); sh.rotation.z = 1.05 + i * 0.04; g.add(sh);
-    }
-    const moonSpot = new THREE.SpotLight(0x9ab4e0, 18, 16, 0.55, 0.6, 1.2);
-    moonSpot.position.set(22.2, 2.6, -1.6); moonSpot.target.position.set(15.5, 0, -0.4); g.add(moonSpot, moonSpot.target);
-    this.moonLight = new THREE.PointLight(0x8aa0c8, 9, 12, 1.2); this.moonLight.position.set(21.4, 2.2, -0.6); g.add(this.moonLight);
-    const snowM = this.mat('caveSnowIn', { color: 0xc8d0dc, roughness: 1 });
-    const sn = new THREE.Mesh(new THREE.PlaneGeometry(3.6, 2.2), new THREE.MeshLambertMaterial({ map: glowTexture(), color: 0xc8d0dc, transparent: true, opacity: 0.8, depthWrite: false })); sn.rotation.x = -Math.PI / 2; sn.position.set(21.4, 0.012, -0.6); g.add(sn); void snowM;
-    this.anchors.mouth = new THREE.Vector3(21.6, 1.4, -0.8);
-  }
-
-  buildForeground() {
-    const fg = (name) => { const g = new THREE.Group(); g.name = name; this.root.add(g); this.foregroundGroups.push(g); return g; };
-    for (const [x, w, h] of [[-17.6, 1.3, 0.55], [-3.2, 1.1, 0.4], [9.0, 1.0, 0.4]]) {
-      const g = fg(`fg-rock-${x}`);
-      this.boulder(970 + Math.round(x * 5), x, 2.5, w, h, 0.6, g, { colA: 0x4a3828, colB: 0x2a1e16, dark: 0.6 });
-    }
-  }
-
-  skull(x, y, z, m) {
+  skull(x, y, z, m = this.boneMat()) {
     const g = new THREE.Group();
     g.scale.setScalar(1.5);
     const cr = new THREE.Mesh(new THREE.SphereGeometry(0.1, 14, 10), m); cr.scale.set(1, 0.85, 1.15); g.add(cr);
@@ -512,9 +525,11 @@ export class CaveScene extends LocationBase {
     return g;
   }
 
-  antlers(x, y, z, m) {
+  boneMat() { return this.mat('caveBone', { color: 0xcfc4b0, roughness: 0.8 }); }
+
+  antlers(x, y, z, m = this.boneMat()) {
     const g = new THREE.Group();
-    const tube = (pts, r) => new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts.map(([a, b, c]) => new THREE.Vector3(a, b, c))), 16, r, 8), m);
+    const tube = (pts, r) => new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts.map(([a, b, c]) => V3(a, b, c))), 16, r, 8), m);
     for (const s of [-1, 1]) {
       g.add(tube([[s * 0.05, 0, 0], [s * 0.22, 0.12, 0.04], [s * 0.34, 0.36, 0.06], [s * 0.36, 0.66, 0.02], [s * 0.3, 0.86, -0.02]], 0.034));
       for (const [t0, len, lean] of [[0.12, 0.22, 0.4], [0.36, 0.26, 0.2], [0.6, 0.2, 0.1]]) {
@@ -529,22 +544,71 @@ export class CaveScene extends LocationBase {
     return g;
   }
 
-  longBone(m) {
+  /** Antlers hung on the rock at x (set against the relief, with a soft shadow). */
+  wallAntlers(x, y, parent = this.root) {
+    const az = this.wallZ(x, y + 0.15) + 0.1;
+    parent.add(this.antlers(x, y, az));
+    const shd = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 1.2), new THREE.MeshBasicMaterial({ map: glowTexture(), color: 0x000000, transparent: true, opacity: 0.5, depthWrite: false }));
+    shd.position.set(x + 0.08, y - 0.05, az - 0.06); parent.add(shd);
+  }
+
+  /** A decal cut into the wall (claw furrows, tally marks). */
+  wallMark(kind, x, y, s = 0.6, parent = this.root) {
+    const z = Math.max(this.wallZ(x - s / 2, y), this.wallZ(x + s / 2, y), this.wallZ(x, y + s / 2), this.wallZ(x, y - s / 2)) + 0.04;
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(s, s), new THREE.MeshLambertMaterial({ map: scratchTex(kind), transparent: true, alphaTest: 0.3, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }));
+    m.position.set(x, y, z); parent.add(m);
+    return m;
+  }
+
+  longBone(m = this.boneMat()) {
     const g = new THREE.Group();
     g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.36, 16), m));
     for (const s of [-1, 1]) { const k = new THREE.Mesh(new THREE.SphereGeometry(0.03, 14, 10), m); k.position.y = s * 0.18; k.scale.set(1.2, 0.8, 1); g.add(k); }
     return g;
   }
 
+  /** A heap of bones with a skull or two on top. */
+  bonePile(x, z, n = 9, parent = this.root, skulls = 1) {
+    const bone = this.boneMat();
+    for (let i = 0; i < n; i++) { const b = this.longBone(bone); b.position.set(x + Math.sin(i * 1.7) * 0.32, 0.04 + (i % 4) * 0.025, z + Math.cos(i * 2.3) * 0.22); b.rotation.set(Math.PI / 2, 0, i * 0.9); parent.add(b); }
+    for (let k = 0; k < skulls; k++) parent.add(this.skull(x + 0.2 * k - 0.1, 0.14, z + 0.1 * k, bone));
+  }
+
   /** A pelt / blanket thrown on the floor: soft, lumpy, uneven edge. */
-  pelt(x, z, rot, parent, color = 0x4a3a2c, scale = 0.12) {
+  pelt(x, z, rot, parent = this.root, color = 0x4a3a2c, scale = 0.12, sx = 0.65, sz = 0.42) {
     const m = new THREE.Mesh(rockGeometry(990 + Math.round(x * 3), { detail: 3, rough: 0.4, flat: -0.05, colA: 0xffffff, colB: 0xb8b0a8, dark: 0.3 }), this.mat(`pelt${color}`, { color, roughness: 1, vertexColors: true }));
-    m.position.set(x, 0.0, z); m.scale.set(0.65, scale, 0.42); m.rotation.y = rot;
+    m.position.set(x, 0.0, z); m.scale.set(sx, scale, sz); m.rotation.y = rot;
     parent.add(m);
     return m;
   }
 
-  /** A blood decal on the floor (the story adds them during L5). */
+  /** Loose heaps of straw stalks (beds). */
+  straw(beds, parent = this.root, n = 540, seed = 744) {
+    const stalk = new THREE.PlaneGeometry(0.018, 0.34); stalk.translate(0, 0.17, 0);
+    const stM = this.mat('strawStalk', { color: 0xc8a45a, roughness: 1, side: THREE.DoubleSide });
+    const sr = rng(seed);
+    const st = new THREE.InstancedMesh(stalk, stM, n);
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), col = new THREE.Color();
+    for (let i = 0; i < n; i++) {
+      const [bx, bz] = beds[i % beds.length], a = sr() * 6.28, d = Math.sqrt(sr());
+      q.setFromEuler(e.set(Math.PI / 2 - 0.15 - sr() * 0.5, sr() * 6.28, (sr() - 0.5) * 0.6));
+      m4.compose(V3(bx + Math.cos(a) * d * 0.75, 0.02 + (1 - d) * 0.1 * sr(), bz + Math.sin(a) * d * 0.42), q, V3(1, 0.6 + sr() * 0.8, 1));
+      st.setMatrixAt(i, m4); st.setColorAt(i, col.setScalar(0.65 + sr() * 0.5));
+    }
+    parent.add(st);
+    const lumpM = this.mat('straw', { color: 0xa88a4a, roughness: 1, flatShading: true });
+    for (const [x, z] of beds) { const lump = this.rock(x, 0.0, z, 0.7, 0.07, 0.4, lumpM, parent, x); lump.position.y = 0.02; }
+  }
+
+  /** A floor decal (drag marks, stains) lying on the sand. */
+  floorDecal(tex, x, z, w, d, rot = 0, parent = this.root, opacity = 1) {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshLambertMaterial({ map: tex, transparent: true, opacity, alphaTest: 0.2, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }));
+    m.rotation.x = -Math.PI / 2; m.rotation.z = rot; m.position.set(x, 0.02, z);
+    parent.add(m);
+    return m;
+  }
+
+  /** A blood decal on the floor (the story adds them). */
   addBlood(x, z, s = 1, seed = 3) {
     const d = new THREE.Mesh(new THREE.PlaneGeometry(0.9 * s, 0.9 * s), new THREE.MeshLambertMaterial({ map: bloodTex(seed), transparent: true, alphaTest: 0.3, depthWrite: false }));
     d.rotation.x = -Math.PI / 2; d.rotation.z = Math.random() * 6; d.position.set(x, 0.015 + this.decals.children.length * 0.0005, z);
@@ -552,35 +616,121 @@ export class CaveScene extends LocationBase {
     return d;
   }
 
-  clearBlood() { this.decals.clear(); }
+  clearBlood() { this.decals?.clear(); }
+
+  // ------------------------------------------------------------------ states
 
   setState(name) {
+    if (this.state !== name) this.clearBlood();
     this.state = name;
-    const z = this.zones[name] || this.zones.L3;
-    this.bounds.walk.areas = z.walk;
-    this.bounds.camera = { ...z.cam };
-    const L5 = name === 'L5';
-    this.ritualLight.intensity = L5 ? 12 : 0;
-    this.ritualFire.g.visible = L5;
-    this.ritualFire.light.intensity = L5 ? this.ritualFire.base : 0;
-    for (const f of this.hallFires) { f.g.visible = name !== 'L3'; f.light.intensity = name !== 'L3' ? f.base : 0; }
-    this.nicheFire.g.visible = true;
-    this.purielGroup.visible = name === 'L3';
-    this.lights.hemi.intensity = L5 ? 0.7 : 0.95;
-    this.lights.rake.intensity = L5 ? 0.9 : name === 'L4' ? 1.5 : 2.0;
-    this.lights.rake.color.set(L5 ? 0x9ab0d0 : 0xe8c8a0);
-    for (const t of this.torches) t.intensity = L5 ? 2.5 : 5;
-    this.clearBlood();
+    const L5 = name === 'L5', N = name === 'L3N';
+    const k = this.cfg.ambient ?? 1;
+    this.lights.hemi.intensity = (L5 ? 0.62 : N ? 0.36 : 0.95) * k;
+    this.lights.rake.intensity = (L5 ? 0.9 : N ? 0.75 : name === 'L4' ? 1.5 : 2.0) * k;
+    this.lights.rake.color.set(L5 || N ? 0x9ab0d0 : 0xe8c8a0);
+    for (const t of this.torches) t.intensity = L5 ? 2.6 : N ? 2.4 : 5;
+    this.roomState(name);
   }
+
+  /** The chamber's own reaction to the state (overridden). */
+  roomState() {}
 
   update(dt) {
     super.update(dt);
     const t = this.time;
     if (this.followTarget) this.fill.position.x = this.followTarget().position.x;
-    for (const f of this.flames || []) { const k = 0.85 + Math.sin(t * 11 + f.ph) * 0.1 + Math.sin(t * 27 + f.ph * 3) * 0.06; f.s.scale.set(0.16 * (2 - k), 0.3 * k, 1); f.s.material.opacity = 0.75 + 0.25 * k; }
+    for (const f of this.flames) { const k = 0.85 + Math.sin(t * 11 + f.ph) * 0.1 + Math.sin(t * 27 + f.ph * 3) * 0.06; f.s.scale.set(0.16 * (2 - k), 0.3 * k, 1); f.s.material.opacity = 0.75 + 0.25 * k; }
     for (const f of this.fires) {
       const k = 0.82 + Math.sin(t * 9 + f.ph) * 0.08 + Math.sin(t * 23 + f.ph * 2) * 0.06;
       if (f.g.visible && f.light.intensity > 0) { f.light.intensity = f.base * k; f.flame.scale.y = f.baseH * (0.8 + 0.3 * k); f.flame.material.opacity = 0.75 + 0.2 * k; }
     }
+  }
+}
+
+// ==================================================================== the hall
+
+/**
+ * `cave` — the hall, the heart of the system. Left: the pack's fires, a carcass on the spit,
+ * furs, a crate of stolen beer. Right: the girls' niche — straw beds, a small fire, a heap of
+ * food that is far too much food. Passages: the den (far left), the deep (the dark hole in the
+ * middle of the back wall), the store (far right).
+ */
+export class CaveScene extends CaveBase {
+  constructor(opts) {
+    super(opts, {
+      id: 'cave', title: 'Пещера · зал', x0: -12.5, x1: 12.5, nx: 0,
+      openings: [
+        { x: -10.4, w: 1.9, h: 2.4, tint: 0x6a4a30, door: { id: 'hall_den', label: 'В логово', to: 'cave_den', spawn: { x: 6.6, z: -1.5, facing: -1 } } },
+        { x: -0.6, w: 1.6, h: 2.2, tint: 0x401010, tintOpacity: 0.12, door: { id: 'hall_deep', label: 'Вглубь', to: 'cave_deep', spawn: { x: 7.0, z: -0.7, facing: -1 } } },
+        { x: 10.4, w: 2.0, h: 2.5, tint: 0x8a6040, door: { id: 'hall_store', label: 'В кладовую', to: 'cave_store', spawn: { x: -4.9, z: -1.4, facing: 1 } } },
+      ],
+      cam: { minX: -7.8, maxX: 7.8 },
+      torches: [-6.0, 2.2, 8.4],
+      lights: [[-7.2, 0.6, 1.05], [-3.4, 0.6, 0.95], [5.2, 0.6, 0.95]],
+      fg: [[-10.8, 1.4, 0.75], [-4.4, 1.0, 0.5], [2.8, 0.9, 0.45], [9.6, 1.3, 0.65]],
+      lips: [[-8.2, 0.42, 1.1], [0.8, 0.34, 0.8], [6.4, 0.4, 1.0]],
+    });
+  }
+
+  buildRoom() {
+    // the pack's side of the hall
+    const g = this.groups.hall = new THREE.Group(); this.root.add(g);
+    this.hallFires = [this.fire(-7.2, -1.5, 1.1, g), this.fire(-3.4, -2.0, 0.9, g)];
+    for (const [x, z, rot] of [[-8.9, -2.5, 0.3], [-5.4, -2.7, -0.4], [-2.2, -2.5, 0.8]]) this.pelt(x, z, rot, g);
+    const spit = this.mat('spit', { color: 0x3a2a1c, roughness: 1 });
+    const stick = (x0, y0, x1, y1) => { const L = Math.hypot(x1 - x0, y1 - y0); const c = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.03, L, 16), spit); c.position.set((x0 + x1) / 2, (y0 + y1) / 2, -1.5); c.rotation.z = Math.atan2(x0 - x1, y1 - y0); g.add(c); };
+    stick(-8.1, 0, -7.75, 1.05); stick(-7.45, 0, -7.8, 1.05); stick(-6.95, 0, -6.6, 1.05); stick(-6.3, 0, -6.65, 1.05); stick(-8.0, 1.0, -6.4, 1.0);
+    this.meat = new THREE.Mesh(rockGeometry(905, { detail: 3, rough: 0.35, flat: -2, colA: 0x7a3420, colB: 0x4a1a10, dark: 0.5 }), this.mat('meatV', { vertexColors: true, color: 0xffffff, roughness: 0.6 }));
+    this.meat.scale.set(0.45, 0.22, 0.22); this.meat.position.set(-7.2, 0.92, -1.5); g.add(this.meat);
+    const crate = new THREE.Mesh(roundedBox(0.6, 0.4, 0.4, 0.03), this.mat('crate', { color: 0x7a5a34, roughness: 1 })); crate.position.set(-4.9, 0.2, -2.6); crate.rotation.y = 0.3; g.add(crate);
+    const can = this.mat('can', { color: 0xa8b0b8, metalness: 0.7, roughness: 0.3 });
+    for (let i = 0; i < 5; i++) { const c = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.12, 16), can); c.position.set(-4.4 + i * 0.16, 0.05, -2.2 + (i % 2) * 0.14); c.rotation.z = i % 2 ? Math.PI / 2 : 0; if (!(i % 2)) c.position.y = 0.06; g.add(c); }
+    this.colliders.push({ x: -4.9, z: -2.6, r: 0.38 });
+    // sitting stones round the big fire
+    this.solidBoulder(1101, -8.9, -0.6, 0.55, 0.42, 0.42, g);
+    this.solidBoulder(1102, -5.6, -0.5, 0.5, 0.36, 0.4, g);
+    // the middle of the hall: a fallen block and a stalagmite split it into two halves
+    this.solidBoulder(1103, 1.4, -2.2, 0.95, 1.25, 0.7);
+    this.stalagmite(1104, -1.9, 0.35, 1.3, 0.3);
+    this.solidBoulder(1105, -11.4, 0.4, 0.8, 0.8, 0.6);
+    this.solidBoulder(1106, 11.6, 0.1, 0.7, 0.9, 0.6);
+    this.anchors.hallSeats = [{ x: -8.6, z: -1.0 }, { x: -6.0, z: -0.9 }, { x: -4.2, z: -1.2 }, { x: -2.6, z: -1.4 }];
+    this.anchors.ashes = V3(-7.2, 0.5, -1.5);
+    this.anchors.spit = V3(-7.2, 1.1, -1.5);
+    // the girls' niche: straw beds, a blanket, a small fire, a heap of food (too much food)
+    const n = this.groups.niche = new THREE.Group(); this.root.add(n);
+    const beds = [[3.6, -2.2], [5.0, -2.5], [6.4, -2.2]];
+    this.straw(beds, n);
+    this.pelt(5.0, -2.5, 0.2, n, 0x5a2a2a, 0.15);
+    const meat = this.mat('rawMeat', { color: 0x5a1c14, roughness: 0.7, flatShading: true });
+    const berry = this.mat('berries', { color: 0x3a2a5a, roughness: 0.6 });
+    for (let i = 0; i < 6; i++) this.rock(7.7 + (i % 3) * 0.35, 0.1 + Math.floor(i / 3) * 0.14, -2.7 + (i % 2) * 0.2, 0.2, 0.1, 0.14, meat, n, i);
+    for (let i = 0; i < 4; i++) { const b = this.longBone(); b.position.set(7.7 + i * 0.28, 0.24, -2.6 + (i % 2) * 0.15); b.rotation.set(0.3, i, 1.2); n.add(b); }
+    for (let i = 0; i < 12; i++) { const b = new THREE.Mesh(new THREE.SphereGeometry(0.04, 14, 10), berry); b.position.set(7.2 + (i % 4) * 0.08, 0.05, -2.2 + Math.floor(i / 4) * 0.08); n.add(b); }
+    for (let i = 0; i < 4; i++) { const c = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.12, 16), can); c.position.set(8.6 + i * 0.13, 0.06, -2.1 + (i % 2) * 0.1); if (i === 3) { c.rotation.z = Math.PI / 2; c.position.y = 0.05; } n.add(c); }
+    this.colliders.push({ x: 8.0, z: -2.55, r: 0.4 });
+    const bucket = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.13, 0.3, 20, 1, true), this.mat('bucket', { color: 0x5a6068, metalness: 0.5, roughness: 0.4, side: THREE.DoubleSide })); bucket.position.set(2.6, 0.15, -1.6); n.add(bucket);
+    const water = new THREE.Mesh(new THREE.CircleGeometry(0.15, 18), this.mat('bucketWater', { color: 0x1a1e22, metalness: 0.2, roughness: 0.1 })); water.rotation.x = -Math.PI / 2; water.position.set(2.6, 0.24, -1.6); n.add(water);
+    const handle = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.008, 6, 20, Math.PI), this.mats.cache.get('bucket')); handle.position.set(2.6, 0.3, -1.6); handle.rotation.z = 0.3; n.add(handle);
+    this.colliders.push({ x: 2.6, z: -1.6, r: 0.2 });
+    this.nicheFire = this.fire(5.2, -0.9, 0.7, n);
+    // drag marks from the niche into the deep (L4/L5)
+    this.drag = new THREE.Group(); this.root.add(this.drag);
+    this.floorDecal(dragTex(), 1.6, -1.5, 3.8, 0.7, -0.15, this.drag, 0.9);
+    this.floorDecal(dragTex(), -0.3, -2.3, 1.6, 0.6, -0.9, this.drag, 0.9);
+    this.anchors.niche = { x: 5.0, z: -0.8 };
+    this.anchors.bedL = { x: 4.4, z: -1.6 };
+    this.anchors.food = V3(8.0, 0.5, -2.5);
+    this.anchors.beds = V3(5.0, 0.4, -2.4);
+    this.anchors.bucket = V3(2.6, 0.6, -1.6);
+    this.anchors.deep = { x: -0.6, z: -2.4 };
+  }
+
+  roomState(name) {
+    const lit = name === 'L4';
+    for (const f of this.hallFires) this.setFire(f, lit);
+    this.meat.visible = lit;
+    this.setFire(this.nicheFire, name !== 'L5', name === 'L3N' ? 0.35 : 1);
+    this.drag.visible = name === 'L5';
   }
 }

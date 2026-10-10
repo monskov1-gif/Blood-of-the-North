@@ -156,6 +156,9 @@ export class Game {
     this.rotateHint(root);
     this.registerSaves();
     this.wireEvents();
+    // a clicked button must not keep the keyboard focus: Enter / Space advance the dialogue and
+    // would press it again (open the menu, load a save…)
+    document.addEventListener('click', (e) => { const b = e.target.closest?.('button'); if (b) setTimeout(() => b.blur(), 0); }, true);
     this.progress(1, '');
     this.resize();
     this.bus.on('resize', () => this.resize());

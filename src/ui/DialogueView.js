@@ -105,7 +105,7 @@ export class DialogueView {
 
   // ------------------------------------------------------------------ open / close
 
-  async open(d) {
+  async open(d, id, from) {
     this.mode = d.mode;
     if (d.mode === 'vn') {
       this.cast = { ...(d.cast || {}) };
@@ -273,8 +273,10 @@ export class DialogueView {
       this.nextEl.classList.remove('show');
       this.barkHint.classList.remove('show');
       this.waiter = { resolve, line, done: false, textEl };
+      const w = this.waiter;
       this.type(textEl, line.text, () => {
-        this.waiter.done = true;
+        if (this.waiter !== w) return;   // closed / replaced while typing
+        w.done = true;
         if (line.choices) { this.showChoices(line.choices); return; }
         this.nextEl.classList.add('show');
         this.barkHint.classList.add('show');
