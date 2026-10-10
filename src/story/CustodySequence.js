@@ -1034,6 +1034,7 @@ const methods = {
     g.cameraSys.shake = 1.4;
     clearInterval(whispers);
     g.audio.play('sfx.tear');
+    g.audio.play('sfx.bloodrip');                                 // the horror sting
     g.audio.play('sfx.shatter', { volume: 0.35, rate: 0.5 });   // a low, wrong crack under the tear
     g.audio.play('inner.ring', { volume: 1.2 });
     g.audio.play('inner.breath', { volume: 1.0, delay: 0.3 });

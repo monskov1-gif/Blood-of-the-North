@@ -552,6 +552,7 @@ export class BarStory {
     this.updateCustody(dt);
     this.updateInvestigation(dt);
     this.updateLizzie(dt);
+    this.updateMirror?.(dt);
     const J = this.julian;
     // Kayden calls out when Julian gets close the first time
     if (g.state.stage === 'explore' && !g.state.get('kayden_called') && J.position.x > -3.5) {

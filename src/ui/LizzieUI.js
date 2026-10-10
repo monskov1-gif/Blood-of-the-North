@@ -102,7 +102,7 @@ export class LizzieUI {
   cctv(frames, need = 2) {
     return new Promise((resolve) => {
       const w = el('div', 'lz-map-wrap cctv', this.root);
-      el('div', 'cc-title', w, 'ЗАПИСИ КАМЕР · «СЕВЕРНАЯ РОЗА» · 4–5 ДЕКАБРЯ');
+      el('div', 'cc-title', w, 'ЗАПИСИ КАМЕР · «СЕВЕРНАЯ РОЗА» · 25–26 НОЯБРЯ');
       const grid = el('div', 'cc-grid', w);
       const note = el('div', 'lz-map-hint', w, `Найдите, что не так на записях (${need})`);
       let found = 0;

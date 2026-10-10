@@ -72,6 +72,30 @@ const methods = {
 
   lzSay(id) { return () => this.g.dialogue.start(id); },
 
+  /**
+   * Lay someone down on the cave floor where the body reads: out of the back-wall rubble (the
+   * sprite lies in the screen plane, so anything behind or under it cuts it), on the open floor,
+   * clear of the boulders, lifted over the floor relief.
+   */
+  lzLie(ch, dir = 1) {
+    const w = this.g.world;
+    ch.lieDown(dir);
+    const areas = w.bounds?.walk?.areas || [];
+    const x = ch.position.x;
+    const a = areas.find((r) => x >= r.minX && x <= r.maxX) || areas[0];
+    let z = ch.position.z;
+    if (a) z = Math.min(a.maxZ - 0.15, Math.max(z, a.minZ + 0.9));
+    // the body spans ~1.7 m to one side of its feet: slide it off any boulder in that span
+    let nx = x;
+    for (const c of w.colliders || []) {
+      const cx0 = Math.min(nx, nx + dir * 1.7), cx1 = Math.max(nx, nx + dir * 1.7);
+      if (c.x + c.r > cx0 && c.x - c.r < cx1 && Math.abs(c.z - z) < c.r + 0.35) z = Math.min(a ? a.maxZ - 0.15 : z + 0.6, c.z + c.r + 0.4);
+    }
+    ch.root.position.set(nx, ch.root.position.y || 0, z);
+    if ((ch.root.position.y || 0) < 0.08) ch.root.position.y = 0.08;
+    return ch;
+  },
+
   /** A blood pool on the snow / stone (L2, L5). */
   lzBlood(x, z, s = 1, y = 0.014) {
     const w = this.g.world;
@@ -435,17 +459,24 @@ const methods = {
     g.letterbox.set(true, 800);
     if (!(await this.lines(g.dialogue.dialogues.l2_noticed))) return;
     g.audio.play('inner.heartbeat', { volume: 0.9 });
-    // Puriel runs first — he goes for her; she vanishes behind the trees
-    pu.faceTowards(-14);
+    // they all run — Puriel is the fastest and the furthest out, so he goes for her first;
+    // Olivia and Vicky scatter the other ways, Lizzie stumbles after them
     this.lzFollow = null;
+    for (const c of [pu, ol, vi]) c.setPose('idle');
+    pu.faceTowards(-14);
     const puRun = pu.walkTo({ x: -14.5, z: 1.2 }, { speed: 3.6, direct: true });
+    ol.faceTowards(-14); ol.walkTo({ x: -13.0, z: -1.6 }, { speed: 3.1, direct: true });
+    vi.faceTowards(-14); vi.walkTo({ x: -15.0, z: 0.4 }, { speed: 3.3, direct: true });
+    L.face(-1); L.walkTo({ x: L.position.x - 2.4, z: L.position.z + 0.2 }, { speed: 2.6, direct: true });
     await sleep(0.4);
     const chase = dark.walkTo({ x: -14.0, z: 1.0 }, { speed: 7.5, direct: true });
     await Promise.race([puRun, chase]);
     g.audio.play('sfx.shouts', { volume: 0.8 });
     g.narrative.setChar('puriel', 'attacked');
     pu.setVisible(false); dark.setVisible(false);
-    for (const wf of wolves.slice(1)) { wf.setPose('idle'); wf.walkTo({ x: L.position.x + 0.8, z: L.position.z - 0.3 }, { speed: 6.5, direct: true }); }
+    // the rest of the pack cuts the others off
+    const prey = [ol, vi, L];
+    wolves.slice(1).forEach((wf, i) => { const t = prey[i % prey.length]; wf.setPose('idle'); wf.walkTo({ x: t.position.x + 0.8, z: t.position.z - 0.3 }, { speed: 6.5, direct: true }); });
     await sleep(0.9);
     await this.lzHit(1.4);
     g.state.set('lz_phone_dropped', true);
@@ -548,7 +579,7 @@ const methods = {
     const L = this.julian;
     const A = () => g.world.anchors;
     L.placeAt(A().bedL.x, A().bedL.z, 1);
-    L.lieDown(1);
+    this.lzLie(L, 1);
     const ol = this.lzCastIn('olivia', 'lz_olivia', 6.2, -1.4, -1);
     const vi = this.lzCastIn('vikki', 'lz_vikki', 7.3, -1.0, -1);
     this.lzCast = { ol, vi, guards: [] };
@@ -574,7 +605,7 @@ const methods = {
       if (phase === 'day' && looked() && g.state.get('objective') === 'lz_cave') g.state.set('objective', 'lz_l3_girls');
     };
     const girlsDay = () => { this.lzCastIn('olivia', 'lz_olivia', 6.2, -1.4, -1); this.lzCastIn('vikki', 'lz_vikki', 7.3, -1.0, -1); };
-    const girlsAsleep = () => { this.lzCastIn('olivia', 'lz_olivia', 6.9, -1.9, 1).lieDown(-1); this.lzCastIn('vikki', 'lz_vikki', 8.7, -1.1, 1).lieDown(1); };
+    const girlsAsleep = () => { this.lzLie(this.lzCastIn('olivia', 'lz_olivia', 5.5, -0.9, 1), -1); this.lzLie(this.lzCastIn('vikki', 'lz_vikki', 8.7, -0.5, 1), 1); };
     const items = (loc) => {
       const a = A();
       switch (loc) {
@@ -645,7 +676,7 @@ const methods = {
       }
       if (loc === 'cave_rift' && phase !== 'day') {
         const pu = this.lzCastIn('puriel', 'lz_puriel', A().puriel.x, A().puriel.z, -1);
-        pu.lieDown(-1);
+        this.lzLie(pu, -1);
         this.lzCast.pu = pu;
         if (phase === 'night') this.lzWatch = () => { if (L.position.x < -1.6 && !g.dialogue.busy && !this.traveling) { this.lzWatch = null; go(); } };
       }

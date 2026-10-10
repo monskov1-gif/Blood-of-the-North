@@ -340,6 +340,20 @@ export const SOUND_DEFS = {
     volume: 0.8,
     synth: (am, out, t) => { noise(am, out, t, { freq: 2600, q: 0.8, dur: 0.25, vol: 0.4, attack: 0.005 }); tone(am, out, t + 0.05, { freq: 300, slide: 120, dur: 0.15, vol: 0.2 }); clink(am, out, t + 0.2, 0.05); },
   },
+  // the blood bag torn from the drip: a wet rip, a cluster of dissonant low hits (a horror "sting"),
+  // a rising scream-like whine of feedback and a heartbeat thump underneath
+  'sfx.bloodrip': {
+    volume: 1.0,
+    synth: (am, out, t) => {
+      noise(am, out, t, { freq: 1800, q: 0.7, dur: 0.35, vol: 0.55, attack: 0.003, sweep: 600 });
+      noise(am, out, t + 0.05, { freq: 420, q: 1.2, dur: 0.5, vol: 0.4, attack: 0.01 });
+      for (const [f, d] of [[49, 1.6], [52, 1.5], [73.4, 1.3], [103.8, 1.1]]) tone(am, out, t + 0.02, { freq: f, slide: f * 0.7, dur: d, vol: 0.32, type: 'sawtooth' });
+      tone(am, out, t + 0.1, { freq: 1200, slide: 2600, dur: 1.4, vol: 0.08, type: 'sawtooth' });
+      tone(am, out, t + 0.14, { freq: 1270, slide: 2500, dur: 1.3, vol: 0.06, type: 'square' });
+      tone(am, out, t + 0.0, { freq: 70, slide: 35, dur: 0.35, vol: 0.7 });
+      tone(am, out, t + 0.45, { freq: 62, slide: 30, dur: 0.3, vol: 0.55 });
+    },
+  },
   'sfx.cell': {
     volume: 0.8,
     synth: (am, out, t) => { noise(am, out, t, { freq: 900, sweep: 300, q: 2, dur: 0.9, vol: 0.25, attack: 0.05 }); tone(am, out, t + 0.85, { freq: 110, slide: 60, dur: 0.3, vol: 0.5 }); clink(am, out, t + 0.86, 0.1); },

@@ -62,7 +62,7 @@ export class CaseFiles {
     el('div', 'cf-sheet-head', sheet, `<b>КОРОЛЕВСКАЯ КАНАДСКАЯ КОННАЯ ПОЛИЦИЯ · М-ОТДЕЛ</b>
       <span>Уайтхорс, Юкон · дело № 1204-УБ</span>
       <h2>Список погибших — бар «Северная роза»</h2>
-      <span>ночь с 4 на 5 декабря · подтверждено: ${VICTIMS.length}</span>`);
+      <span>ночь с 25 на 26 ноября · подтверждено: ${VICTIMS.length}</span>`);
     const t = el('table', 'cf-list', sheet);
     t.innerHTML = VICTIMS.map((v, i) => `<tr><td>${i + 1}.</td><td>${v.name.toUpperCase()}</td><td>${v.age}</td><td>${v.where}</td></tr>`).join('');
     el('div', 'cf-sheet-foot', sheet, 'Причина смерти во всех случаях: острая кровопотеря.<br>Следов крови на месте происшествия не обнаружено.<br><b>Выживший:</b> Рид, Джулиан, детектив — госпитализирован.');
@@ -170,7 +170,7 @@ export class CaseFiles {
     const body = el('div', 'cf-rbody', right);
     el('div', 'cf-rmeta', right, id === 'WEREWOLF'
       ? '<span>Место</span>долина р. Такхини, 40 км к С от Уайтхорса<span>Открыто</span>2 ноября<span>Пропавшая</span>Элизабет Рид, 26 л.'
-      : '<span>Место</span>бар «Северная роза», Эндрю-стрит<span>Дата</span>ночь с 4 на 5 декабря<span>Погибших</span>11');
+      : '<span>Место</span>бар «Северная роза», Эндрю-стрит<span>Дата</span>ночь с 25 на 26 ноября<span>Погибших</span>11');
     el('div', 'cf-rstamp', right, preview ? 'RCMP' : 'В РАБОТЕ');
     const sections = preview ? [['case', 'Дело', 'FILE']] : [['case', 'Дело', 'FILE'], ['ev', 'Улики', 'EVIDENCE'], ['tasks', 'Задачи', 'TASKS'], ['victims', 'Жертвы', 'VICTIMS']];
     const tabEls = {};

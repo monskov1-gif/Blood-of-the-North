@@ -824,11 +824,16 @@ const methods = {
       const lx = 49.0 + s * 0.4;
       this.bx(0.78, 2.45, 0.06, doorM, lx, 1.225, BACK);
       this.bx(0.78, 0.3, 0.065, steel, lx, 0.15, BACK + 0.005);
-      const portM = this.mat('hxPort', { color: 0x9ab8c0, emissive: 0xe8f4f0, emissiveIntensity: 0.35, roughness: 0.1 });
+      // portholes: dim wired glass onto the dark theatre (they used to glow like daylight)
+      const portM = this.mat('hxPort2', { color: 0x30403e, emissive: 0x8aa8a0, emissiveIntensity: 0.06, roughness: 0.15, metalness: 0.2 });
       const port = new THREE.Mesh(new THREE.CircleGeometry(0.15, 16), portM);
       port.position.set(lx, 1.6, BACK + 0.035); root.add(port);
       const ring = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.02, 6, 16), steel); ring.position.set(lx, 1.6, BACK + 0.04); root.add(ring);
     }
+    // a steel frame closes the gap round the leaves (the wall opening is a little bigger than the doors)
+    this.bx(1.78, 0.14, 0.16, steel, 49.0, 2.5, BACK + 0.01);
+    for (const sx of [-1, 1]) this.bx(0.08, 2.56, 0.16, steel, 49.0 + sx * 0.83, 1.28, BACK + 0.01);
+    this.bx(1.66, 0.06, 0.4, this.mat('hxOrFloor'), 49.0, 0.03, BACK - 0.15);
     const sign = this.textSign('ОПЕРАЦИОННАЯ · ВХОД ВОСПРЕЩЁН', { w: 1.6, h: 0.18, bg: '#1a2a24', fg: '#e8f0e8' });
     sign.position.set(49.0, 2.8, BACK + 0.03); root.add(sign);
     const redM = this.mat('hxInUse', { color: 0x200000, emissive: 0xff2020, emissiveIntensity: 0.3 });
@@ -841,7 +846,7 @@ const methods = {
       lampGlow.material.opacity = night ? 0 : 0.45;
       pool.material.opacity = night ? 0.03 : 0.3;
       redM.emissiveIntensity = night ? 2.2 : 0.3;
-      this.mats.cache.get('hxPort').emissiveIntensity = night ? 0.04 : 0.35;
+      this.mats.cache.get('hxPort2').emissiveIntensity = night ? 0.02 : 0.06;
     });
   },
 

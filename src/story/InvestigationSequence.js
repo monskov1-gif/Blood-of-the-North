@@ -305,6 +305,8 @@ const methods = {
     wolf.root.scale.setScalar(1.7);
     wolf.setPose('eat');
     wolf.eatT = 0;
+    // what it is eating: a deer, under its muzzle
+    w.addKill?.(w.anchors.wolf.x - 1.7, w.anchors.wolf.z + 0.12, -1);
     const man = this.castIn(w, 'stranger', 'stranger');
     man.setVisible(false);
     this.beast = wolf; this.stranger = man;

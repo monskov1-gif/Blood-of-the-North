@@ -5,7 +5,7 @@
  * Evidence `req` = flag that must be set before the item shows in the folder.
  */
 
-// RCMP list of the dead, Saturday 4 December (pinned next to Lizzie's poster)
+// RCMP list of the dead, Thursday 26 November (pinned next to Lizzie's poster)
 export const VICTIMS = [
   { name: 'Кайден Альварес', age: 32, where: 'столик у стойки' },
   { name: 'Кристиан Кокс', age: 41, where: 'барная стойка, табурет №2' },
@@ -29,7 +29,7 @@ export const CASES = {
     no: 'ДЕЛО № 0417-ФН',
     status: 'закрыто кап. Морроу · «нападение волков»',
     summary: 'Долина реки Такхини, 40 км к северу от Уайтхорса. Двадцать три туши: олени, лоси, медведь. Не съедены — разорваны. Борозды на коре на высоте двух метров. 11 ноября там же пропала Элизабет Рид.',
-    personal: 'Лиззи. Моя сестра. Тридцать дней.',
+    personal: 'Лиззи. Моя сестра. Третья неделя.',
     evidence: [
       { id: 'carcasses', title: 'Фото: туши у реки', text: 'Двадцать три животных на одном пятачке. Ни одно не съедено. Как будто кто-то убивал не от голода.' },
       { id: 'track', title: 'Слепок следа · 19 см', text: 'Передняя лапа. Волчья — по форме. По размеру — нет. Криминалист приписал: «вероятно, деформация в оттаявшем грунте».' },

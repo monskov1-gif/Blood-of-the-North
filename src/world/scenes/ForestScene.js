@@ -941,9 +941,40 @@ export class ForestScene extends LocationBase {
     }
   }
 
+  /**
+   * The wolf's kill at the river (chapter 10): a torn deer on the snow, the ribs open, a dark
+   * spread of blood and drag marks. Only at night; built once.
+   */
+  addKill(x, z, facing = -1) {
+    if (!this.kill) {
+      const g = this.kill = new THREE.Group();
+      const dm = new THREE.MeshLambertMaterial({ map: deerTex('dead', 1), transparent: true, alphaTest: 0.5, emissive: 0x1a1612, side: THREE.DoubleSide });
+      const dg = new THREE.PlaneGeometry(1.7, 1.25); dg.translate(0, 0.6 - 0.64, 0);
+      const deer = new THREE.Mesh(dg, dm); g.add(deer);
+      const pool = new THREE.Mesh(new THREE.CircleGeometry(0.8, 24), this.mat('killBlood', { color: 0x2a0606, roughness: 0.5, transparent: true, opacity: 0.85, depthWrite: false }));
+      pool.rotation.x = -Math.PI / 2; pool.scale.set(1.7, 0.65, 1); pool.position.set(0.1, 0.014, 0.12); g.add(pool);
+      const smear = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 0.22), this.mat('killSmear', { color: 0x3a0a08, roughness: 0.6, transparent: true, opacity: 0.6, depthWrite: false }));
+      smear.rotation.x = -Math.PI / 2; smear.rotation.z = 0.15; smear.position.set(1.2, 0.012, 0.3); g.add(smear);
+      const ribM = this.mat('killRib', { color: 0xc8b8a8, roughness: 0.7 });
+      const raw = this.mat('killFlesh', { color: 0x6a1410, roughness: 0.5, emissive: 0x200000 });
+      for (let k = 0; k < 5; k++) {
+        const rib = new THREE.Mesh(new THREE.TorusGeometry(0.17 - k * 0.012, 0.012, 6, 16, Math.PI * 0.9), ribM);
+        rib.position.set(-0.15 + k * 0.08, 0.26, 0.06); rib.rotation.set(0, Math.PI / 2, 0.2); g.add(rib);
+      }
+      const flesh = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 10), raw); flesh.scale.set(1.8, 0.6, 0.9); flesh.position.set(0.0, 0.16, 0.08); g.add(flesh);
+      for (let k = 0; k < 6; k++) { const s = new THREE.Mesh(new THREE.SphereGeometry(0.03 + Math.random() * 0.03, 6, 5), raw); s.position.set(-0.8 + Math.random() * 1.8, 0.02, -0.2 + Math.random() * 0.6); g.add(s); }
+      this.root.add(g);
+    }
+    this.kill.position.set(x, 0, z);
+    this.kill.scale.x = facing > 0 ? -1 : 1;
+    this.kill.visible = true;
+    return this.kill;
+  }
+
   setState(name) {
     this.state = name;
     const night = name === 'night';
+    if (this.kill) this.kill.visible = night;
     const nov = name === 'l1' || name === 'l2';
     this.bounds.walk.areas = night ? this.areasNight : name === 'l1' ? [{ minX: -12, maxX: 28, minZ: -2.3, maxZ: 1.5 }] : this.areasDay;
     this.bounds.camera = night ? { minX: -8, maxX: 40 } : name === 'l1' ? { minX: -8, maxX: 25 } : { minX: -8, maxX: 9 };

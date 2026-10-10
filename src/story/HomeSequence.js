@@ -283,6 +283,38 @@ const methods = {
     });
   },
 
+  /**
+   * The bedroom mirror reflects whoever stands in front of it — Lizzie sees herself; Julian, after
+   * the hospital, sees the room and nothing else.
+   */
+  updateMirror() {
+    const g = this.g, J = this.julian;
+    const w = g.world;
+    const m = w?.anchors?.mirror;
+    const here = g.locationId === 'apt_bedroom' && m && J.root.parent === w.root;
+    if (!here) { if (this.mirrorMesh) this.mirrorMesh.visible = false; return; }
+    if (!this.mirrorMesh || this.mirrorMesh.parent !== w.root) {
+      const tex = J.tex.clone(); tex.needsUpdate = true;
+      const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, alphaTest: 0.5, color: 0x8a8278, depthWrite: false });
+      this.mirrorMesh?.removeFromParent();
+      this.mirrorMesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat);
+      this.mirrorMesh.renderOrder = 3;
+      w.root.add(this.mirrorMesh);
+    }
+    const R = this.mirrorMesh;
+    const dx = J.position.x - m.x;
+    const vampire = this.outfit !== 'lizzy';
+    R.visible = !vampire && Math.abs(dx) < 1.4 && J.sprite.visible;
+    if (!R.visible) return;
+    // the top ~55 % of the current frame (head and shoulders), smaller and set back in the glass
+    const src = J.tex, t = R.material.map, part = 0.55;
+    t.offset.set(src.offset.x, src.offset.y + src.repeat.y * (1 - part));
+    t.repeat.set(src.repeat.x, src.repeat.y * part);
+    const sw = Math.abs(J.sprite.scale.x) * 0.62, sh = J.sprite.scale.y * part * 0.62;
+    R.scale.set(sw * -J.facing, sh, 1);
+    R.position.set(m.x + Math.max(-0.2, Math.min(0.2, dx * 0.35)), m.y + 0.46 - sh / 2 - 0.04, m.z - 0.045);
+  },
+
   homeCommands() {
     return { photos: async (arg) => this.vnPhotos(arg ? String(arg).split(',').filter(Boolean) : []) };
   },

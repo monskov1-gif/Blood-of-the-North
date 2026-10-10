@@ -136,3 +136,10 @@
 .lz-chat-wrap .hint { position: absolute; bottom: 4%; font: 10px/1 var(--sc, sans-serif); letter-spacing: .25em; color: rgba(233,220,197,.45); }
 @keyframes bubbleIn { from { opacity: 0; transform: translateY(8px) scale(.96); } }
 @keyframes typingDot { 50% { opacity: .3; transform: translateY(-2px); } }
+/* v0.14.2: bigger, unmissable pins (a red head with a pulsing ring until it is placed) */
+.lz-pin { width: 56px; height: 56px; }
+.lz-pin::after { width: 28px; height: 28px; margin: -22px 0 0 -14px; background: radial-gradient(circle at 34% 30%, #fff 0 10%, #ffd27a 24%, #e0a020 62%, #7a5208 100%); box-shadow: 5px 8px 6px rgba(20,10,0,.5), inset -2px -3px 3px rgba(0,0,0,.3), 0 0 0 3px rgba(255,240,200,.65); }
+.lz-pin:not(.on):not(.next):not(.ghost) { animation: pinCall 1.6s ease-in-out infinite; }
+.lz-pin::before { width: 3px; height: 18px; margin: -4px 0 0 -1.5px; }
+.lz-pin b { font-size: 27px; top: 96%; }
+@keyframes pinCall { 50% { filter: drop-shadow(0 0 10px rgba(255,200,80,.95)); } }

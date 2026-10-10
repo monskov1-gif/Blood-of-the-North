@@ -302,3 +302,22 @@
 .cf-an-msg { min-height: 2.6em; font-family: inherit; font-style: italic; color: #8a1016; font-size: calc(var(--f) * 1.15); }
 .cf-take.locked { cursor: not-allowed; opacity: .75; filter: grayscale(.5); border-style: dashed; }
 .cf-folder.fv { filter: saturate(.7) brightness(.9); }
+/* v0.14.2: the notebook text was too small to read — a readable floor on every screen, larger body type */
+.casefiles { --f: max(calc(var(--W) / 100), 10.5px); }
+.cf-text { font-size: calc(var(--f) * 1.8); line-height: 1.45; }
+.cf-hand { font-size: calc(var(--f) * 2.5); }
+.cf-task, .cf-task.act { font-size: calc(var(--f) * 1.75); }
+.cf-evrow { font-size: calc(var(--f) * 1.65); }
+.cf-evtitle { font-size: calc(var(--f) * 2.1); }
+.cf-list { font-size: calc(var(--f) * 1.4); }
+.cf-rmeta { font-size: calc(var(--f) * 1.35); }
+.cf-an-note { font-size: calc(var(--f) * 1.4); }
+.cf-an-ans { font-size: calc(var(--f) * 1.55); }
+.cf-an-msg { font-size: calc(var(--f) * 1.5); }
+.cf-link { font-size: calc(var(--f) * 1.5); }
+.cf-tab { font-size: calc(var(--f) * 1.45); }
+.cf-tab { width: calc(var(--f) * 9.6); }
+.cf-rhead span { font-size: calc(var(--f) * 1.2); }
+.cf-rhead em { font-size: calc(var(--f) * 1.4); }
+.cf-rhead h3 { font-size: calc(var(--f) * 2.4); }
+.cf-rbody { overflow-y: auto; }

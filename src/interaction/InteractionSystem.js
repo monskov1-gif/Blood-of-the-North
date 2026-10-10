@@ -41,13 +41,16 @@ export class InteractionSystem {
   }
 
   update(player) {
-    if (!this.enabled || this.running || !player) { this.setFocus(null); return; }
+    if (!this.enabled || this.running || !player) { this.near = []; this.setFocus(null); return; }
     let best = null, bestD = Infinity;
     const px = player.position.x, pz = player.position.z;
+    // everything within a few metres, for the faint "something here" hints (HUD.updateHints)
+    this.near = [];
     for (const it of this.items) {
       if (!this.available(it)) continue;
       const dx = px - it.at.x, dz = (pz - it.at.z) * 0.7;
       const d = Math.hypot(dx, dz);
+      if (d < 6) this.near.push({ item: it, d: d - (it.radius ?? 1.1) });
       if (d < (it.radius ?? 1.1) && d < bestD) { best = it; bestD = d; }
     }
     this.setFocus(best);

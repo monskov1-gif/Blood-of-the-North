@@ -2,43 +2,43 @@ import { InteractionSystem } from '../interaction/InteractionSystem.js';
 import { el, ICONS } from './dom.js';
 
 const OBJECTIVES = {
-  kayden: { ru: 'Кайден ждёт за столиком у стойки', en: 'JOIN KAYDEN' },
-  air: { ru: 'Воздух. Дойти до двери', en: 'GET OUTSIDE' },
-  morning: { ru: 'Что здесь произошло?', en: 'WHAT HAPPENED HERE' },
-  car: { ru: 'Осмотреться. Подумать', en: 'LOOK AROUND' },
-  cell: { ru: 'Ждать', en: 'WAIT' },
-  survivors: { ru: 'Поговорить с выжившими', en: 'TALK TO THE SURVIVORS' },
-  medpost: { ru: 'Медпункт: сдать анализы', en: 'MEDICAL POST' },
-  interrogation: { ru: 'Вторая допросная', en: 'INTERROGATION ROOM 2' },
-  sit: { ru: 'Сесть за стол', en: 'TAKE A SEAT' },
-  hospital: { ru: 'Пройтись по отделению', en: 'WALK THE WARD' },
-  bed: { ru: 'Вернуться в палату 109', en: 'BACK TO ROOM 109' },
-  night: { ru: 'Жажда', en: 'THIRST' },
-  back: { ru: 'Вернуться в палату 109', en: 'BACK TO ROOM 109' },
-  victims: { ru: 'Список погибших — на доске объявлений', en: 'THE LIST OF THE DEAD' },
-  kowalski: { ru: 'Ковальски ждёт у кабинетов', en: 'SEE KOWALSKI' },
-  valley: { ru: 'Долина у реки. Где пропала Лиззи', en: 'THE RIVER VALLEY' },
-  forest: { ru: 'Осмотреть оцепленное место', en: 'SEARCH THE CORDONED SITE' },
-  watch: { ru: 'Не спугнуть. Смотреть', en: 'STAY DOWN. WATCH' },
-  follow: { ru: 'Проследить за ним', en: 'FOLLOW HIM' },
-  cave: { ru: 'Пещера', en: 'THE CAVE' },
-  lz_girls: { ru: 'Девочки ждут в столовой', en: 'THE GIRLS · CAFETERIA' },
-  lz_home: { ru: 'Джул на кухне', en: 'JULIAN IN THE KITCHEN' },
-  lz_upstairs: { ru: 'Подняться к себе', en: 'UPSTAIRS' },
-  jh_attic: { ru: 'Её комната — наверху', en: 'HER ROOM' },
-  jh_out: { ru: 'Собраться. Выйти', en: 'GET READY' },
-  lz_sites: { ru: 'Сфотографировать следы. Идти вдоль реки', en: 'PHOTOGRAPH THE TRACES' },
-  lz_herd: { ru: 'Стадо у реки. Подойти тихо', en: 'THE HERD BY THE RIVER' },
-  lz_cave: { ru: 'Осмотреться. Понять, где мы', en: 'WHERE ARE WE' },
-  lz_l3_girls: { ru: 'Вернуться к Оливии и Викки', en: 'BACK TO THE GIRLS' },
-  lz_l3_night: { ru: 'Найти Пуриэль. Щель в тоннеле', en: 'FIND PURIEL' },
-  lz_l3_back: { ru: 'Вернуться в зал, к девочкам', en: 'BACK TO THE HALL' },
-  lz_l3_escape: { ru: 'К выходу. Тихо, по стенке', en: 'TO THE MOUTH. QUIETLY' },
-  lz_pack: { ru: 'Слушать стаю', en: 'LISTEN TO THE PACK' },
-  lz_l4_back: { ru: 'Вечер. Вернуться к девочкам', en: 'EVENING. BACK TO THE GIRLS' },
-  lz_l5_deep: { ru: 'Голос — из глубины. Вниз по узкому ходу', en: 'THE VOICE BELOW' },
-  lz_follow: { ru: 'Найти Оливию', en: 'FIND OLIVIA' },
-  lz_escape: { ru: 'БЕГИ', en: 'RUN' },
+  kayden: { ru: 'Найти Кайдена — он ждёт за столиком у бара', en: 'JOIN KAYDEN' },
+  air: { ru: 'Мне плохо. Дойти до выхода — дверь слева', en: 'GET OUTSIDE' },
+  morning: { ru: 'Осмотреть бар: что здесь случилось ночью?', en: 'WHAT HAPPENED HERE' },
+  car: { ru: 'Меня везут в участок. Осмотреться, поговорить с Куинн', en: 'LOOK AROUND' },
+  cell: { ru: 'Ждать в камере, пока вызовут', en: 'WAIT' },
+  survivors: { ru: 'Поговорить с выжившими в зале ожидания', en: 'TALK TO THE SURVIVORS' },
+  medpost: { ru: 'Пройти в медпункт и сдать анализы', en: 'MEDICAL POST' },
+  interrogation: { ru: 'Пройти во вторую допросную', en: 'INTERROGATION ROOM 2' },
+  sit: { ru: 'Сесть за стол напротив офицера', en: 'TAKE A SEAT' },
+  hospital: { ru: 'Пройтись по отделению, поговорить с персоналом', en: 'WALK THE WARD' },
+  bed: { ru: 'Вернуться в свою палату — 109', en: 'BACK TO ROOM 109' },
+  night: { ru: 'Жажда. Найти, чем её утолить', en: 'THIRST' },
+  back: { ru: 'Вернуться в палату 109, пока не заметили', en: 'BACK TO ROOM 109' },
+  victims: { ru: 'Прочитать список погибших на доске объявлений', en: 'THE LIST OF THE DEAD' },
+  kowalski: { ru: 'Подойти к Ковальски у кабинетов — справа', en: 'SEE KOWALSKI' },
+  valley: { ru: 'Выйти из участка (дверь слева) и ехать к реке, где пропала Лиззи', en: 'THE RIVER VALLEY' },
+  forest: { ru: 'Осмотреть оцепленное место: ленту, маркеры, осину, реку', en: 'SEARCH THE CORDONED SITE' },
+  watch: { ru: 'Пригнуться и наблюдать за волком. Не подходить', en: 'STAY DOWN. WATCH' },
+  follow: { ru: 'Держаться на расстоянии и проследить за ним до логова', en: 'FOLLOW HIM' },
+  cave: { ru: 'Подойти ко входу в пещеру', en: 'THE CAVE' },
+  lz_girls: { ru: 'Девочки ждут в столовой — дверь в конце коридора, справа', en: 'THE GIRLS · CAFETERIA' },
+  lz_home: { ru: 'Поговорить с Джулом — он на кухне, справа', en: 'JULIAN IN THE KITCHEN' },
+  lz_upstairs: { ru: 'Подняться к себе в мансарду — лестница у кухни', en: 'UPSTAIRS' },
+  jh_attic: { ru: 'Подняться в её комнату — лестница у кухни', en: 'HER ROOM' },
+  jh_out: { ru: 'Взять пальто с вешалки и выйти — входная дверь', en: 'GET READY' },
+  lz_sites: { ru: 'Найти и сфотографировать следы здесь — девочки помогут', en: 'PHOTOGRAPH THE TRACES' },
+  lz_herd: { ru: 'Тихо подойти к стаду у реки и осмотреться', en: 'THE HERD BY THE RIVER' },
+  lz_cave: { ru: 'Осмотреться в пещере: где мы, где выход?', en: 'WHERE ARE WE' },
+  lz_l3_girls: { ru: 'Вернуться к Оливии и Викки в зал', en: 'BACK TO THE GIRLS' },
+  lz_l3_night: { ru: 'Найти Пуриэль — щель за тоннелем к выходу', en: 'FIND PURIEL' },
+  lz_l3_back: { ru: 'Вернуться в зал и рассказать девочкам', en: 'BACK TO THE HALL' },
+  lz_l3_escape: { ru: 'Пробраться к выходу — тихо, вдоль стены', en: 'TO THE MOUTH. QUIETLY' },
+  lz_pack: { ru: 'Поговорить со стаей — они в залах и в логове', en: 'LISTEN TO THE PACK' },
+  lz_l4_back: { ru: 'Вечер. Вернуться к девочкам в зал', en: 'EVENING. BACK TO THE GIRLS' },
+  lz_l5_deep: { ru: 'Голос Оливии из глубины — вниз по узкому ходу', en: 'THE VOICE BELOW' },
+  lz_follow: { ru: 'Найти Оливию — дальше, вглубь', en: 'FIND OLIVIA' },
+  lz_escape: { ru: 'БЕГИ — к выходу из пещеры', en: 'RUN' },
 };
 
 /** Exploration overlay: objective, interaction marker, phone & menu buttons, toasts. */
@@ -93,6 +93,28 @@ export class HUD {
     if (!f) return;
     const key = this.input.isTouch ? '' : '<span class="key">E</span>';
     this.marker.querySelector('.lbl').innerHTML = `${key}${f.label}`;
+  }
+
+  /**
+   * Faint white dots over interactables the player is approaching but can't use yet: they fade in
+   * as the distance closes (≈5 m → nothing, at the edge of reach → clearly visible).
+   */
+  updateHints(near, camera) {
+    this.hints = this.hints || new Map();
+    const seen = new Set();
+    const k = window.__uiScale || 1;
+    if (this.visible) {
+      for (const { item, d } of near || []) {
+        if (item === this.focus || d <= 0 || !item.anchor) continue;
+        let h = this.hints.get(item);
+        if (!h) { h = el('div', 'hint-dot', this.el); this.hints.set(item, h); }
+        const p = InteractionSystem.project(item.anchor, camera, window.innerWidth, window.innerHeight);
+        h.style.left = `${p.x / k}px`; h.style.top = `${Math.max(60, p.y / k)}px`;
+        h.style.opacity = String(Math.max(0, Math.min(0.75, 0.85 * (1 - d / 4.5))));
+        seen.add(item);
+      }
+    }
+    for (const [item, h] of this.hints) if (!seen.has(item)) { h.remove(); this.hints.delete(item); }
   }
 
   update(camera) {

@@ -468,6 +468,7 @@ export class Game {
       this.cameraSys.update(dt);
       this.world.safeZones?.update(this.cameraSys.camera, dt);
       this.hud.update(this.cameraSys.camera);
+      this.hud.updateHints(this.mode === 'play' && this.player.enabled && !this.blocked ? this.interactions.near : null, this.cameraSys.camera);
       // the dialogue screen covers everything: skip the 3D render to save power
       const covered = this.view.mode === 'vn' && !this.view.vn.classList.contains('hidden') && this.view.vn.classList.contains('show');
       this.windowLight.update(dt, { world: this.world, julian: this.story.julian, camera: this.cameraSys.camera, keyScene: this.keyScene, active: this.mode === 'play' && !covered });
@@ -526,7 +527,7 @@ const TITLE_PLACES = {
 const INTERACTIVE_STAGES = new Set(['explore', 'morning', 'car', 'station', 'interrogation', 'hospital_day', 'hospital_night', 'hospital_return', 'station_return', 'forest', 'forest_night', 'lizzie_1', 'lizzie_2', 'lizzie_3', 'lizzie_4', 'lizzie_5', 'home_1', 'home_2']);
 
 // locations (or location:state) whose floor under the subtitles is light
-const LIGHT_FLOORS = new Set(['school', 'cafeteria', 'station', 'interrogation', 'hospital:day', 'street', 'forest:day', 'apartment:day']);
+const LIGHT_FLOORS = new Set(['school', 'cafeteria', 'hospital:day', 'street']);
 
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 

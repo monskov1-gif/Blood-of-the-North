@@ -197,7 +197,7 @@ export const DIALOGUES = {
       e2b: { speaker: 'kayden', text: 'Можешь не говорить. Я и так вижу, как ты держишь стакан.', expr: { kayden: 'concerned' } },
 
       f: { speaker: 'kayden', text: 'Мне жаль, Джул. Правда. Если бы я мог хоть что-то сделать…', expr: { kayden: 'sad' }, pose: { kayden: 'idle' } },
-      f2: { speaker: 'kayden', text: 'Двадцать три дня — это не приговор. Людей находили и позже.', expr: { kayden: 'concerned' } },
+      f2: { speaker: 'kayden', text: 'Две недели — это не приговор. Людей находили и позже.', expr: { kayden: 'concerned' } },
       f3: { speaker: 'julian', text: 'В минус сорок?', expr: { julian: 'sad' } },
       f4: { speaker: 'narrator', text: 'Кайден не отвечает.' },
       f5: { speaker: 'kayden', text: 'Давай так. На выходных едем в долину вместе. Возьму у шурина снегоход. Неофициально.', expr: { kayden: 'smile' }, pose: { kayden: 'talk' } },

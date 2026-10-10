@@ -31,7 +31,7 @@ export class Fader {
   }
 }
 
-// In-story clock per stage (minutes from Sat 4 Dec, 00:00) — the phone shows the
+// In-story clock per stage (minutes from Thu 25 Nov, 00:00) — the phone shows the
 // current time and every notification's age relative to it.
 const DAY = 24 * 60;
 const STAGE_CLOCK = {
@@ -41,9 +41,10 @@ const STAGE_CLOCK = {
   hospital_day: DAY + 13 * 60 + 27, hospital_evening: DAY + 19 * 60 + 38,
   hospital_night: 2 * DAY + 3 * 60 + 12, hospital_return: 2 * DAY + 3 * 60 + 31,
   recovery: 6 * DAY + 10 * 60 + 5, street: 6 * DAY + 11 * 60 + 4, ended: 6 * DAY + 11 * 60 + 10,
-  station_return: 7 * DAY + 10 * 60 + 20, forest: 7 * DAY + 14 * 60 + 5, forest_night: 9 * DAY + 16 * 60 + 40,
+  home_1: 6 * DAY + 23 * 60 + 40,
+  station_return: 13 * DAY + 10 * 60 + 20, home_2: 15 * DAY + 7 * 60 + 30, forest: 15 * DAY + 13 * 60 + 5, forest_night: 17 * DAY + 16 * 60 + 40,
 };
-const WEEKDAYS = ['суббота', 'воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница'];
+const WEEKDAYS = ['четверг', 'пятница', 'суббота', 'воскресенье', 'понедельник', 'вторник', 'среда'];
 const TEMPS = [-34, -31, -36, -29, -27, -30, -26];
 // messages: t = when it arrived (same minute scale); older ones show a date
 const MESSAGES = [
@@ -52,8 +53,14 @@ const MESSAGES = [
   { t: DAY + 7 * 60 + 41, who: 'Куинн', text: '3 пропущенных вызова', missed: true },
   { t: DAY + 7 * 60 + 44, who: 'Куинн', text: 'джул, ответь. в «розе» что-то случилось. ты где??' },
   { t: DAY + 12 * 60 + 50, who: 'Куинн', text: 'мне сказали, что тебя положили. я приду вечером. держись' },
-  { t: 2 * DAY + 9 * 60 + 15, who: 'Мама', text: 'Сынок, видела новости. Позвони, как сможешь.' },
+  { t: 2 * DAY + 9 * 60 + 15, who: 'Кайден', text: '[сообщение не доставлено]', missed: true },
   { t: 5 * DAY + 20 * 60 + 2, who: 'Куинн', text: 'врачи говорят — чудо. завтра выписка? я заеду.' },
+  { t: 6 * DAY + 11 * 60 + 40, who: 'Куинн', text: 'видела тебя у больницы. езжай домой. мы ищем её, слышишь?' },
+  { t: 6 * DAY + 21 * 60 + 5, who: 'Ковальски', text: 'Рид. Через неделю жду в участке. Не раньше.' },
+  { t: 13 * DAY + 8 * 60 + 50, who: 'Ковальски', text: 'Ты едешь? Есть кое-что по «розе». И по твоей сестре.' },
+  { t: 15 * DAY + 6 * 60 + 40, who: 'Куинн', text: 'волонтёры собираются у моста в 9. я с ними. держись.' },
+  { t: 17 * DAY + 14 * 60 + 2, who: 'Куинн', text: 'туристы у каньона Майлс. та же картина. позвони мне.' },
+  { t: 17 * DAY + 15 * 60 + 30, who: 'Ковальски', text: 'Не геройствуй. Рация на 4-м канале.' },
 ];
 const pad = (n) => String(n).padStart(2, '0');
 function ago(now, t) {
@@ -63,7 +70,13 @@ function ago(now, t) {
   const dayDiff = Math.floor(now / DAY) - Math.floor(t / DAY);
   if (dayDiff === 0) return `${pad(Math.floor((t % DAY) / 60))}:${pad(t % 60)}`;
   if (dayDiff === 1) return 'вчера';
-  return `${4 + Math.floor(t / DAY)} дек.`;
+  return dayLabel(Math.floor(t / DAY), true);
+}
+
+/** The night in the bar is 25→26 November (two weeks after Lizzie went missing on the 11th). */
+function dayLabel(day, short = false) {
+  const d = 25 + day;
+  return d <= 30 ? `${d} ${short ? 'нояб.' : 'ноября'}` : `${d - 30} ${short ? 'дек.' : 'декабря'}`;
 }
 
 /** Julian's phone: lock screen with Lizzie's missed call and voicemail. */
@@ -87,10 +100,12 @@ export class PhoneView {
     const now = STAGE_CLOCK[this.state.stage] ?? STAGE_CLOCK.explore;
     const day = Math.floor(now / DAY);
     el('div', 'time', sc, `${pad(Math.floor((now % DAY) / 60))}:${pad(now % 60)}`);
-    el('div', 'date', sc, `${WEEKDAYS[day % 7]}, ${4 + day} декабря · −${Math.abs(TEMPS[day % 7])}°`);
+    el('div', 'date', sc, `${WEEKDAYS[day % 7]}, ${dayLabel(day)} · −${Math.abs(TEMPS[day % 7])}°`);
     const notes = el('div', 'notes', sc);
     // newest first; only what has already arrived
-    for (const m of MESSAGES.filter((m) => m.t <= now && m.t > -DAY * 2).sort((a, b) => b.t - a.t)) {
+    // only what has already arrived, and only the last couple of days of it (the bar night's
+    // messages are long gone from the lock screen a week later)
+    for (const m of MESSAGES.filter((m) => m.t <= now && m.t > now - 2.5 * DAY).sort((a, b) => b.t - a.t)) {
       if (m.who === 'Капитан Морроу') continue; // shown at the bottom, below Lizzie
       el('div', `ntf${m.missed ? ' missed' : ''}`, notes, `<b>${m.who} <span>${ago(now, m.t)}</span></b>${m.text}`);
     }

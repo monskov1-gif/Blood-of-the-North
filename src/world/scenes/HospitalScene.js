@@ -2072,7 +2072,8 @@ export class HospitalScene extends LocationBase {
     // privacy curtain bunched against the right wall, on a ceiling track
     this.bx(0.03, 0.03, depth - 0.6, this.mat('steel'), x1 - 0.18, H - 0.06, BACK - depth / 2 - 0.2);
     this.bx(w - 0.5, 0.03, 0.03, this.mat('steel'), cx + 0.1, H - 0.06, zb + 0.5);
-    this.curtain(x1 - 0.2, BACK - 1.0 - 1.05, 1.0, 2.2);
+    // (the bunched curtain itself is gone: seen edge-on through the glass front it read as a strip
+    // running down over the ward — owner, 0.14)
     // ceiling fixture
     this.troffer(cx, BACK - 1.9, 'A', 1.2, 0.6);
 
