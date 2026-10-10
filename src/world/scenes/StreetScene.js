@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { flareSource } from '../../fx/WindowLight.js';
 import { spruceStand, bareTree, rockGeometry, roundedBox } from '../nature.js';
 import { chamferBox, thickPath, profileX, lathe } from './StationScene.js';
 import { LocationBase } from '../LocationBase.js';
@@ -159,7 +158,8 @@ export class StreetScene extends LocationBase {
     this.buildAutumn();
     this.buildAtmosphere();
     this.anchors.door = { x: -1.0, z: -2.4 };
-    this.windowLights = [flareSource('LOWSUN', new THREE.Vector3(-16, 7.5, -40), { always: true })];
+    // overcast November morning: no sun to flare (the old LOWSUN sat right over the entrance sign)
+    this.windowLights = [];
     return this.root;
   }
 

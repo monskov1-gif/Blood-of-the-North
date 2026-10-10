@@ -53,11 +53,11 @@ const methods = {
     if (typeof gate === 'string') return this.g.dialogue.start(gate);
     if (typeof gate === 'function') return gate();
     if (gate === false || !d.to) return null;
-    return this.travel(d.to, d.spawn);
+    return this.travel(d.to, d.spawn, { sound: d.sound });
   },
 
   /** Fade out → another location → the player at `spawn` → fade in. */
-  async travel(to, spawn = {}, { state, ms = 420 } = {}) {
+  async travel(to, spawn = {}, { state, ms = 420, sound = 'sfx.door' } = {}) {
     const g = this.g;
     const S = this.session;
     if (this.traveling) return;
@@ -65,7 +65,7 @@ const methods = {
     const J = this.julian;
     g.player.enabled = false;
     J.stop?.();
-    g.audio.play('sfx.door', { volume: 0.45 });
+    if (sound) g.audio.play(sound, { volume: sound === 'sfx.door' ? 0.45 : 0.6 });
     await g.fader.to(true, ms);
     if (S !== this.session) { this.traveling = false; return; }
     this.clearCrowd();

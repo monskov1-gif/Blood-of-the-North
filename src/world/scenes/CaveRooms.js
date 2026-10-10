@@ -67,8 +67,8 @@ export class CaveDenScene extends CaveBase {
     this.colliders.push({ x: 1.7, z: -2.5, r: 0.4 });
     // their fire, antlers on the rock, days scratched into the wall by somebody before us
     this.denFire = this.fire(-0.6, -1.0, 0.8, g);
-    this.wallAntlers(-5.4, 1.5, g);
-    this.wallAntlers(-0.9, 1.65, g);
+    this.wallAntlers(-5.4, 2.0, g);
+    this.wallAntlers(-0.9, 2.15, g);
     this.wallMark('tally', 5.2, 1.25, 0.7, g);
     this.stalagmite(1210, -5.6, 0.5, 1.2, 0.3);
     this.stalagmite(1211, 5.2, 0.35, 1.0, 0.26);
@@ -98,7 +98,7 @@ export class CaveDeepScene extends CaveBase {
         { x: 7.6, w: 1.5, h: 2.0, tint: 0x8a6040, door: { id: 'deep_hall', label: 'В зал', to: 'cave', spawn: { x: -0.6, z: -1.6, facing: 1 } } },
       ],
       minZ: -1.6, maxZ: 0.35,
-      vault: 3.15, lean: 2.0, distance: 7.0, ambient: 0.85,
+      vault: 3.15, lean: 2.0, distance: 7.0, ambient: 1.0,
       cam: { minX: -4.8, maxX: 4.8 },
       torches: [-3.8, 4.2],
       fg: [[-7.0, 1.4, 0.95], [-1.4, 1.2, 0.8], [4.2, 1.3, 0.85], [8.6, 1.2, 0.85]],
@@ -194,7 +194,7 @@ export class CaveAltarScene extends CaveBase {
     for (const [x, y, z] of [[-6.9, 0.14, -2.45], [-6.6, 0.14, -2.25], [-6.75, 0.32, -2.37], [2.4, 0.14, -2.5], [2.7, 0.14, -2.3], [-4.4, 0.14, -2.4]]) g.add(this.skull(x, y, z, bone));
     this.colliders.push({ x: -6.7, z: -2.35, r: 0.35 }, { x: 2.55, z: -2.4, r: 0.3 });
     this.bonePile(-5.4, -2.1, 7, g, 0);
-    for (const x of [-5.2, -1.6, 2.0]) this.wallAntlers(x, 1.5, g);
+    for (const x of [-5.2, -1.6, 2.0]) this.wallAntlers(x, 2.0, g);
     this.stalagmite(1401, -7.3, 0.3, 1.3, 0.3);
     this.stalagmite(1402, 4.3, 0.55, 1.1, 0.26);
     this.solidBoulder(1403, 3.6, -2.25, 0.6, 0.8, 0.5);
