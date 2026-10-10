@@ -36,6 +36,10 @@ export class Character2D {
     this.path = null;
     this.life = CharacterState.ALIVE;
     this.deadUniform = { value: 0 };
+    // body height (v0.14): `def.height` in cm sets the standing idle frame to that height; every
+    // other frame of the character scales with it (the painted sheets came in different sizes)
+    const f0 = def.height && atlas.has?.(def.poses?.idle) ? atlas.frame(def.poses.idle) : null;
+    this.sizeK = f0 ? def.height / (f0.h * (f0.s || 1)) : 1;
 
     this.root = new THREE.Group();
     this.root.name = `char:${def.id}`;
@@ -141,7 +145,7 @@ export class Character2D {
       map.repeat.set(f.w / W, f.h / H);
       // painted frames lie head-left: flip when the head goes to the right
       // (`s`: some frames use bigger pixels — cm per pixel)
-      const px = PX * (f.s || 1);
+      const px = PX * (f.s || 1) * this.sizeK;
       L.scale.set(f.w * px * (dir > 0 ? -1 : 1), f.h * px, 1);
       L.position.set(dir * f.w * px * 0.5, 0.004, 0.002);
       L.userData.frame = this.lieFrameName; L.userData.dir = dir;
@@ -197,7 +201,7 @@ export class Character2D {
     const [W, H] = this.atlas.size;
     this.tex.offset.set(f.x / W, 1 - (f.y + f.h) / H);
     this.tex.repeat.set(f.w / W, f.h / H);
-    const px = PX * (f.s || 1);
+    const px = PX * (f.s || 1) * this.sizeK;
     this.sprite.scale.set(f.w * px * this.facing, f.h * px, 1);
     // anchor: keep the torso centre over the root position whatever the frame width
     this.sprite.position.x = (f.w / 2 - f.ax) * px * this.facing;
