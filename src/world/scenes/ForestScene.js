@@ -963,6 +963,17 @@ export class ForestScene extends LocationBase {
       }
       const flesh = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 10), raw); flesh.scale.set(1.8, 0.6, 0.9); flesh.position.set(0.0, 0.16, 0.08); g.add(flesh);
       for (let k = 0; k < 6; k++) { const s = new THREE.Mesh(new THREE.SphereGeometry(0.03 + Math.random() * 0.03, 6, 5), raw); s.position.set(-0.8 + Math.random() * 1.8, 0.02, -0.2 + Math.random() * 0.6); g.add(s); }
+      // the night's other kills: two hares and a young deer further up the bank, dragged and dropped
+      const hareM = (c) => new THREE.MeshLambertMaterial({ map: hareTex(c), transparent: true, alphaTest: 0.5, emissive: 0x0e0a08, color: 0xa8a090, side: THREE.DoubleSide });
+      [[1.5, 0.35, 0, 1.45], [2.3, -0.15, 1, -1.5], [-1.4, 0.4, 0, 1.6]].forEach(([hx, hz, c, rz]) => {
+        const hg = new THREE.PlaneGeometry(0.46, 0.23); hg.translate(0, 0.0, 0);
+        const h = new THREE.Mesh(hg, hareM(c)); h.rotation.set(-Math.PI / 2 + 0.25, 0, rz); h.position.set(hx, 0.06, hz); g.add(h);
+        const hp = new THREE.Mesh(new THREE.CircleGeometry(0.22, 16), this.mat('killBlood')); hp.rotation.x = -Math.PI / 2; hp.scale.set(1.4, 0.7, 1); hp.position.set(hx + 0.08, 0.013, hz + 0.05); g.add(hp);
+      });
+      const fawnM = new THREE.MeshLambertMaterial({ map: deerTex('dead', 0), transparent: true, alphaTest: 0.5, emissive: 0x120e0c, color: 0x9a948a, side: THREE.DoubleSide });
+      const fg = new THREE.PlaneGeometry(1.25, 0.92); fg.translate(0, 0.46 - 0.48, 0);
+      const fawn = new THREE.Mesh(fg, fawnM); fawn.position.set(3.4, 0, -0.55); fawn.scale.x = -1; g.add(fawn);
+      const fp = new THREE.Mesh(new THREE.CircleGeometry(0.5, 18), this.mat('killBlood')); fp.rotation.x = -Math.PI / 2; fp.scale.set(1.6, 0.6, 1); fp.position.set(3.4, 0.012, -0.45); g.add(fp);
       this.root.add(g);
     }
     this.kill.position.set(x, 0, z);

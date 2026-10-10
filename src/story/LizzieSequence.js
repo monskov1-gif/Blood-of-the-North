@@ -1029,7 +1029,7 @@ const methods = {
     if (S !== this.session) return;
     // her screams fade behind — outside
     g.narrative.setChar('olivia', 'dead');
-    await this.lzRunForest(route);
+    await this.lzRunForest(route, [holders[1], holders[3]]);
   },
 
   /**
@@ -1094,7 +1094,7 @@ const methods = {
   },
 
   /** Outside: the forest at night, from the cave mouth to the west. */
-  async lzRunForest(route) {
+  async lzRunForest(route, from = null) {
     const g = this.g;
     const S = this.session;
     await g.fader.to(true, 350);
@@ -1102,7 +1102,14 @@ const methods = {
     // chapter 12: the lines cross (a short card — the chase does not stop for long)
     await g.card.show('Пересечение', { num: 'Глава 12', en: 'The Crossing', sub: 'ДОЛИНА ТАКХИНИ · НОЧЬ', ms: 1100, style: 'chapter-b' });
     const w = g.world, L = this.julian;
-    const chasers = ['wolfGrey', 'wolfWhite'].map((k, i) => { const c = this.lzCastIn(k, `lz_out${i}`, 42.2 + i * 0.4, -4.6, -1); c.root.scale.setScalar(1.5); c.setVisible(false); return c; });
+    // the same two wolves that chased her through the cave come out after her (on a load, the same
+    // two of the pack: Martha and the young one)
+    const chasers = (from?.length ? from : ['packD', 'packB'].map((k) => this.lzCastIn(k, `lz_${k}`, 42.2, -4.6, -1))).map((c, i) => {
+      this.g.world.root.add(c.root); c.stop(); c.stand(); c.setPose('idle');
+      c.root.scale.setScalar(c.def?.scale || 1);
+      c.placeAt(42.2 + i * 0.4, -4.6, -1); c.setVisible(false);
+      return c;
+    });
     let julian = null;
     if (route === 'WEREWOLF') {
       julian = this.lzCastIn('julianL', 'lz_julian', 11.4, 0.2, 1);   // he went down to the river to wait for dawn
