@@ -426,7 +426,7 @@ function missingTex() {
     // head and shoulders of the standing portrait
     const sx = im.width * 0.28, sy = im.height * 0.035, sw = im.width * 0.68, sh = sw * (82 / 76);
     ctx.save();
-    ctx.filter = 'saturate(0.75) contrast(1.05) brightness(1.08)';
+    ctx.filter = 'saturate(0.85) contrast(1.1) brightness(1.45) sepia(0.12)';
     ctx.drawImage(im, sx, sy, sw, sh, 27, 29, 74, 80);
     ctx.restore();
     ctx.fillStyle = 'rgba(242,238,220,0.12)'; ctx.fillRect(27, 29, 74, 80);

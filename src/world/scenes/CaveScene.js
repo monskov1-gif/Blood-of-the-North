@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { LocationBase } from '../LocationBase.js';
 import { canvasTexture, rng, glowTexture } from '../../render/textures.js';
 import { glow } from '../props.js';
-import { fbm3, rockGeometry, rockMaterial, roundedBox, reliefSheet, smoothNormals } from '../nature.js';
+import { fbm3, noise3, rockGeometry, rockMaterial, roundedBox, reliefSheet, smoothNormals } from '../nature.js';
 
 export const sat = (v) => Math.max(0, Math.min(1, v));
 
@@ -34,14 +34,14 @@ export const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
 /** Packed earth, grit, straw and old dark stains. */
 const floorTex = () => PX('floor', 64, 64, (ctx, w, h) => {
   const r = rng(701);
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const n = (r() - 0.5) * 22 + Math.sin(x * 0.3 + y * 0.17) * 4; ctx.fillStyle = rgb(150 + n, 128 + n, 100 + n); ctx.fillRect(x, y, 1, 1); }
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const n = (r() - 0.5) * 22 + Math.sin(x * 0.3 + y * 0.17) * 4; ctx.fillStyle = rgb(132 + n, 120 + n, 106 + n); ctx.fillRect(x, y, 1, 1); }
   for (let i = 0; i < 90; i++) { ctx.fillStyle = rgb(60, 52, 44, 0.6); ctx.fillRect(r() * w, r() * h, 1 + r() * 2, 1); }
-  for (let i = 0; i < 40; i++) { ctx.fillStyle = rgb(170, 146, 84, 0.7); ctx.fillRect(r() * w, r() * h, 3 + r() * 4, 1); } // straw
+  for (let i = 0; i < 40; i++) { ctx.fillStyle = rgb(150, 132, 84, 0.55); ctx.fillRect(r() * w, r() * h, 3 + r() * 4, 1); } // straw
   for (let i = 0; i < 3; i++) { ctx.fillStyle = rgb(70, 30, 22, 0.25); ctx.beginPath(); ctx.arc(r() * w, r() * h, 2 + r() * 4, 0, 7); ctx.fill(); }
   for (let i = 0; i < 60; i++) { ctx.fillStyle = rgb(110, 96, 80, 0.8); ctx.fillRect(r() * w, r() * h, 1, 1); }   // grit
   for (let y = 2; y < h; y += 5) for (let x = 0; x < w; x++) {                       // wind ripples in the sand
     const yy = Math.round(y + Math.sin(x * 0.25 + y) * 1.5);
-    ctx.fillStyle = rgb(176, 150, 116, 0.35); ctx.fillRect(x, yy, 1, 1); ctx.fillStyle = rgb(96, 80, 62, 0.35); ctx.fillRect(x, yy + 1, 1, 1);
+    ctx.fillStyle = rgb(156, 144, 126, 0.3); ctx.fillRect(x, yy, 1, 1); ctx.fillStyle = rgb(80, 72, 62, 0.35); ctx.fillRect(x, yy + 1, 1, 1);
   }
 });
 
@@ -110,12 +110,15 @@ export const outsideTex = () => canvasTexture('cave-outside2', 128, 128, (ctx, w
   ctx.fillStyle = m; ctx.fillRect(0, h * 0.55, w, h * 0.25);
 });
 
-/** Sandstone grain for the vault and end walls: fine streaks along the layers, no crack lines. */
-const sandGrainTex = () => canvasTexture('cave-sandgrain', 256, 128, (ctx, w, h) => {
+/** Rock grain for the vault and end walls: oblique laminae, mottling and hairline cracks (grey). */
+const sandGrainTex = () => canvasTexture('cave-rockgrain', 256, 128, (ctx, w, h) => {
   const img = ctx.createImageData(w, h);
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-    const v = 170 + (fbm3(x / 40, y / 6, 1, 71, 4) - 0.5) * 90 + (fbm3(x / 4, y / 3, 2, 72, 2) - 0.5) * 40;
-    const i = (y * w + x) * 4; img.data[i] = v; img.data[i + 1] = v * 0.97; img.data[i + 2] = v * 0.93; img.data[i + 3] = 255;
+    const u = (y + x * 0.45) / 5 + fbm3(x / 30, y / 30, 1, 73, 2) * 3;
+    let v = 150 + (fbm3(x / 40, y / 12, 1, 71, 4) - 0.5) * 110 + (fbm3(x / 4, y / 3, 2, 72, 2) - 0.5) * 40 + Math.abs((u % 1) - 0.5) * 30;
+    const cr = 1 - Math.abs(noise3(x / 22, y / 9, 4, 74) - 0.5) * 2;
+    if (cr > 0.96) v *= 0.35;
+    const i = (y * w + x) * 4; img.data[i] = v; img.data[i + 1] = v * 0.98; img.data[i + 2] = v * 0.97; img.data[i + 3] = 255;
   }
   ctx.putImageData(img, 0, 0);
 }, { aniso: 4 });
@@ -151,7 +154,7 @@ export function wallHeight(x, y, fine = false, ox = 0) {
   d -= Math.pow(Math.max(0, fbm3(x * 1.1, y * 1.4, 6, 29, 3) - 0.52), 1.5) * 4.0;      // smaller wind-carved cups
   const fr = strata(x, y, ox);                                                       // cross-bedded layers
   const lay = fr < 0.75 ? fr / 0.75 : (1 - fr) / 0.25;
-  d += lay * lay * (3 - 2 * lay) * 0.15;
+  d += lay * lay * (3 - 2 * lay) * 0.06;
   if (fine) d += (fbm3(x * 4, y * 4, 2, 35, 3) - 0.5) * 0.1;
   d += Math.max(0, 0.9 - y) * 0.7;
   d += Math.pow(Math.max(0, y - 3.0), 1.4) * 0.6;                                    // leans gently over into the vault
@@ -159,36 +162,149 @@ export function wallHeight(x, y, fine = false, ox = 0) {
 }
 
 /**
- * The wall texture: the room's height field, shaded by light raking in from the right.
- * `hf(x, y)` is the height, `mf(x, y)` the passage mask (0…1, passages go black).
+ * Each chamber cuts its own rock: tone (lit / shadowed albedo, 0–255), the dip of its beds (rad,
+ * never horizontal), a seed for its cracks, an optional rust (iron seeping down) or wet sheen.
+ * Cold, dark rock; the warmth comes only from the fire light baked round torches and fires.
  */
-const wallBakedTex = (key, w, h, xmin, width, hf, mf, ox = 0, nx = 0) => canvasTexture(`cave-wallbake-${key}-${w}`, w, h, (ctx) => {
+const ROCK = {
+  cave: { a: [92, 84, 76], b: [54, 50, 48], dip: 0.42, seed: 3, rust: 0.5 },
+  cave_den: { a: [96, 82, 68], b: [56, 48, 42], dip: -0.52, seed: 11, rust: 0.7 },
+  cave_deep: { a: [70, 72, 72], b: [36, 40, 42], dip: 0.66, seed: 23, wet: 1 },
+  cave_altar: { a: [92, 70, 62], b: [48, 34, 32], dip: -0.34, seed: 37, rust: 1 },
+  cave_store: { a: [86, 82, 76], b: [50, 48, 46], dip: 0.3, seed: 41, rust: 0.3 },
+  cave_tunnel: { a: [74, 78, 84], b: [42, 44, 50], dip: -0.62, seed: 53, cold: 12.5 },
+  cave_rift: { a: [64, 68, 76], b: [32, 34, 40], dip: 0.82, seed: 67, wet: 1 },
+};
+const hash1 = (n, s) => { const v = Math.sin(n * 127.1 + s * 311.7) * 43758.5453; return v - Math.floor(v); };
+
+/**
+ * The fine relief of the rock that only the texture carries (metres): oblique beds that step out
+ * over each other, cross-laminae inside each bed at their own angle, and two sets of joints/cracks.
+ * Returns [height, crack 0…1, bed index].
+ */
+function rockDetail(x, y, st) {
+  const cd = Math.cos(st.dip), sd = Math.sin(st.dip);
+  const u = y * cd + x * sd + (fbm3(x * 0.18, y * 0.18, 9, st.seed, 2) - 0.5) * 1.3;
+  const bedF = u * 1.7, bi = Math.floor(bedF), bf = bedF - bi;
+  const hb = hash1(bi, st.seed);
+  const a2 = st.dip + (hb - 0.5) * 1.6;
+  const lam = (y * Math.cos(a2) + x * Math.sin(a2)) * (9 + hb * 8);
+  const lf = lam - Math.floor(lam);
+  let h = bf * (0.05 + hb * 0.05) + Math.abs(lf - 0.5) * 0.012;
+  // joints: near-vertical set and an oblique set, thin and sharp
+  const j1 = 1 - Math.abs(noise3(x * 1.6, y * 0.32, 3, st.seed + 1) - 0.5) * 2;
+  const j2 = 1 - Math.abs(noise3((x * sd - y * cd) * 0.9, (x * cd + y * sd) * 0.25, 7, st.seed + 2) - 0.5) * 2;
+  const crack = Math.max(sat((j1 - 0.955) / 0.035), sat((j2 - 0.965) / 0.03) * 0.8) * sat(fbm3(x * 0.4, y * 0.4, 1, st.seed + 4, 2) * 2.4 - 0.75);
+  h -= crack * 0.06;
+  return [h, crack, bi, bf, hb];
+}
+
+/**
+ * The wall texture: the room's height field + the fine rock detail, shaded per pixel by the light
+ * of its own torches and fires (warm, falling off into black a few metres away).
+ * `hf(x, y)` is the height, `mf(x, y)` the passage mask (0…1, passages go black),
+ * `lights` [[x, y, k]] the fire light.
+ */
+const wallBakedTex = (key, w, h, xmin, width, hf, mf, st, lights) => canvasTexture(`cave-wallbake2-${key}-${w}`, w, h, (ctx) => {
   const img = ctx.createImageData(w, h);
   const sx = width / w, sy = 6.4 / h;
-  const A = [0xc4, 0x9e, 0x76], B = [0x84, 0x62, 0x48], D = [0x30, 0x22, 0x18], S = [0xb4, 0x92, 0x6c];
-  const L = [0.62, 0.55, 0.56];
+  const A = st.a, B = st.b, S = [st.a[0] * 0.95, st.a[1] * 0.92, st.a[2] * 0.88];
+  const rowH = new Float32Array(w + 1), prevH = new Float32Array(w + 1);
+  const heightAt = (x, y) => hf(x, y, true) + rockDetail(x, y, st)[0];
+  for (let i = 0; i <= w; i++) prevH[i] = heightAt(xmin + i * sx, 6.4 + sy);
   for (let j = 0; j < h; j++) {
     const y = 6.4 - j * sy;
+    for (let i = 0; i <= w; i++) rowH[i] = heightAt(xmin + i * sx, y);
     for (let i = 0; i < w; i++) {
       const x = xmin + i * sx;
-      const hc = hf(x, y, true), hx = hf(x + sx, y, true), hy = hf(x, y + sy, true);
-      let nx = -(hx - hc) / sx * 0.6, ny = -(hy - hc) / sy * 0.6, nz = 1;
+      const hc = rowH[i], hx = rowH[i + 1], hy = prevH[i];
+      let nx = -(hx - hc) / sx * 0.7, ny = -(hy - hc) / sy * 0.7, nz = 1;
       const nl = Math.hypot(nx, ny, nz); nx /= nl; ny /= nl; nz /= nl;
-      const lit = Math.max(0, nx * L[0] + ny * L[1] + nz * L[2]);
-      const t = fbm3(x * 0.5, y * 0.5, 3, 21, 3);
-      const band = strata(x + nx, y, ox);
-      const k = sat(t * 1.8 - 0.4);
+      const [, crack, bi, bf, hb] = rockDetail(x, y, st);
+      // light: the sum of the fires, with the direction it comes from
+      let L = 0.035, lx = 0.3, ly = 0.5, lz = 0.5, warm = 0, cold = 0;
+      for (const [px, py, k] of lights) {
+        const dx = px - x, dy = py - y, d2 = dx * dx + dy * dy * 1.3;
+        const e = k * Math.exp(-d2 / 5.5);
+        if (e < 0.004) continue;
+        L += e; const dl = Math.hypot(dx, dy, 1.4); lx += dx / dl * e * 3; ly += dy / dl * e * 3; lz += 1.4 / dl * e * 3;
+        if (st.cold != null && px > st.cold) cold += e; else warm += e;
+      }
+      const ll = Math.hypot(lx, ly, lz);
+      const dif = Math.max(0, (nx * lx + ny * ly + nz * lz) / ll);
+      const t = fbm3(x * 0.5, y * 0.5, 3, 21 + st.seed, 3);
+      const k = sat(t * 1.8 - 0.4 + (hb - 0.5) * 0.5);
       const m = mf(x, y);
-      const shade = (0.3 + 1.0 * lit) * (0.8 + 0.28 * band) * (1 - m);
-      const hollow = Math.max(0, Math.min(0.8, -hc * 0.55 - 0.2)) * Math.min(1, y * 1.5) * (1 - m);
+      const hollow = Math.max(0, Math.min(0.85, -hc * 0.6 - 0.15)) * Math.min(1, y * 1.5);
+      const under = bf < 0.08 ? 0.55 : 1;                       // the shadowed underside of each bed
+      let shade = Math.min(1.25, L) * (0.25 + 1.05 * dif) * under * (1 - crack * 0.85) * (1 - hollow) * (1 - m);
       const o = (j * w + i) * 4;
-      const sand = sat((0.55 - y + (fbm3(x * 0.8, 0, 5, 83, 2) - 0.5) * 0.5) * 2.2) * (1 - m);   // sand drifted up the wall
-      for (let c = 0; c < 3; c++) img.data[o + c] = (((A[c] + (B[c] - A[c]) * k) * shade) * (1 - hollow) + D[c] * hollow) * (1 - sand) + S[c] * (0.7 + 0.35 * lit) * sand;
+      const sand = sat((0.45 - y + (fbm3(x * 0.8, 0, 5, 83, 2) - 0.5) * 0.5) * 2.2) * (1 - m);   // grit drifted up the wall
+      const rust = st.rust ? sat((fbm3(x * 5, y * 0.25, 4, st.seed + 6, 3) - 0.62) * 4) * sat(fbm3(x * 0.3, y * 0.3, 2, st.seed + 7, 2) * 2 - 0.6) * st.rust : 0;
+      const wet = st.wet ? sat((fbm3(x * 3, y * 0.4, 6, st.seed + 8, 3) - 0.58) * 5) : 0;
+      const cw = L > 0 ? warm / L : 0, cc = L > 0 ? cold / L : 0;
+      const tint = [1.0 + 0.32 * cw - 0.12 * cc, 0.92 + 0.04 * cw, 0.86 - 0.12 * cw + 0.22 * cc];
+      for (let c = 0; c < 3; c++) {
+        let v = A[c] + (B[c] - A[c]) * k;
+        v *= 0.86 + ((bi * 0.37 + hb) % 1) * 0.28;               // beds differ a little in tone
+        if (rust) v = v + ([118, 70, 40][c] - v) * rust * 0.55;
+        if (wet) v *= 1 - wet * 0.35;
+        v = v * shade * tint[c] + (wet ? wet * dif * Math.min(1, L) * 60 * Math.pow(dif, 6) : 0);
+        img.data[o + c] = v * (1 - sand) + S[c] * (0.4 + 0.7 * Math.min(1, L)) * tint[c] * Math.min(1.1, L * 1.6) * sand;
+      }
       img.data[o + 3] = 255;
     }
+    prevH.set(rowH);
   }
   ctx.putImageData(img, 0, 0);
 }, { aniso: 4 });
+
+/** Dirty old bone: yellow-grey, stained in the pores, darker where it lay in the dirt. */
+const boneTex = () => canvasTexture('cave-bone', 64, 64, (ctx, w, h) => {
+  const img = ctx.createImageData(w, h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const n = fbm3(x / 9, y / 9, 1, 401, 4), f = fbm3(x / 2.5, y / 2.5, 2, 402, 2);
+    const v = 150 + (n - 0.5) * 120 + (f - 0.5) * 40;
+    const stain = sat((fbm3(x / 14, y / 14, 3, 403, 3) - 0.55) * 4);
+    const o = (y * w + x) * 4;
+    img.data[o] = v * (1 - stain * 0.45); img.data[o + 1] = v * 0.93 * (1 - stain * 0.5); img.data[o + 2] = v * 0.8 * (1 - stain * 0.6); img.data[o + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+});
+
+/** Woven fabric for tents, packs, bags: weave, seams, grime, worn patches (grey; tinted by the material). */
+export const fabricTex = (kind = 'nylon') => canvasTexture(`cave-fabric-${kind}`, 128, 128, (ctx, w, h) => {
+  const img = ctx.createImageData(w, h);
+  const quilt = kind === 'quilt';
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    let v = 190 + ((x + y) % 2 ? 10 : -10) + (fbm3(x / 3, y / 3, 1, 411, 2) - 0.5) * 30;
+    v *= 1 - sat((fbm3(x / 18, y / 18, 2, 412, 3) - 0.5) * 2.5) * 0.45;      // grime
+    if (quilt) { const q = Math.abs(((y / 16) % 1) - 0.5); v *= 0.62 + 0.38 * Math.sqrt(sat(q * 2.2)); }   // quilted channels
+    if (!quilt && (x % 64 < 2 || y % 43 < 1)) v *= 0.62;                  // seams
+    v *= 0.85 + 0.15 * sat(fbm3(x / 6, y / 30, 3, 413, 2) * 2);             // creases
+    const o = (y * w + x) * 4;
+    img.data[o] = v; img.data[o + 1] = v * 0.97; img.data[o + 2] = v * 0.93; img.data[o + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+}, { aniso: 4 });
+
+/** A tube that tapers from r0 to r1 along a curve (antler tines, ribs): reads as bone, not pipe. */
+export function taperTube(pts, r0, r1, seg = 10, rad = 6) {
+  const curve = new THREE.CatmullRomCurve3(pts);
+  const geo = new THREE.TubeGeometry(curve, seg, 1, rad, false);
+  const p = geo.attributes.position, c = new THREE.Vector3(), v = new THREE.Vector3();
+  for (let i = 0; i <= seg; i++) {
+    curve.getPointAt(i / seg, c);
+    const t = i / seg, r = r0 + (r1 - r0) * Math.pow(t, 0.8);
+    for (let j = 0; j <= rad; j++) {
+      const k = i * (rad + 1) + j;
+      v.set(p.getX(k), p.getY(k), p.getZ(k)).sub(c).multiplyScalar(r * (1 + (hash1(k, 5) - 0.5) * 0.25)).add(c);
+      p.setXYZ(k, v.x, v.y, v.z);
+    }
+  }
+  geo.computeVertexNormals();
+  return geo;
+}
 
 /**
  * One chamber of the cave. `cfg`:
@@ -220,6 +336,9 @@ export class CaveBase extends LocationBase {
     this.groups = {};
     this.doors = [];
     this.ox = (cfg.x0 + cfg.x1) / 2 + (cfg.nx || 0);
+    this.rockStyle = ROCK[cfg.id] || ROCK.cave;
+    const c3 = (v, k) => new THREE.Color(v[0] * k / 255, v[1] * k / 255, v[2] * k / 255).getHex();
+    this.stoneA = c3(this.rockStyle.a, 1.25); this.stoneB = c3(this.rockStyle.b, 1.2);
   }
 
   // ------------------------------------------------------------------ the rock
@@ -268,7 +387,7 @@ export class CaveBase extends LocationBase {
 
   /** A weathered sandstone boulder (reference: smooth, layered, warm). */
   boulder(seed, x, z, sx, sy, sz, parent = this.root, o = {}) {
-    const b = new THREE.Mesh(rockGeometry(seed, { detail: this.low ? 3 : 4, rough: 0.46, sharp: 0.45, strata: 1.2, flat: -0.1, colA: 0x9a7654, colB: 0x6e5038, dark: 0.6, ...o }), this.sandMat);
+    const b = new THREE.Mesh(rockGeometry(seed, { detail: this.low ? 3 : 4, rough: 0.46, sharp: 0.45 + (seed % 5) * 0.08, strata: 1.2, flat: -0.1, colA: this.stoneA, colB: this.stoneB, dark: 0.6, ...o }), this.sandMat);
     b.position.set(x, -0.3 * sy, z); b.scale.set(sx, sy * 0.85, sz); b.rotation.y = seed * 1.3;
     parent.add(b);
     return b;
@@ -306,7 +425,7 @@ export class CaveBase extends LocationBase {
 
   /** A stalactite / rock lip hanging from the vault. */
   stalactite(seed, x, z, len = 1.0, r = 0.3, parent = this.root, top = this.cfg.vault ?? 3.95) {
-    const b = this.boulder(seed, x, z, r, len * 1.6, r * 0.9, parent, { rough: 0.4, strata: 1.4, colA: 0x7a5c42, colB: 0x4a3626 });
+    const b = this.boulder(seed, x, z, r, len * 1.6, r * 0.9, parent, { rough: 0.4, strata: 1.4, colA: this.stoneB, colB: 0x2a2624 });
     b.position.y = top - len * 0.2;
     b.rotation.z = Math.PI;
     return b;
@@ -329,7 +448,10 @@ export class CaveBase extends LocationBase {
         const open = this.openMask(x, 0.4), dk = open * this._dark;
         const edge = sat((-z - 2.3) / 1.3) * (1 - open);                      // rises into the foot of the wall
         p.setY(i, edge * edge * 0.35 + (fbm3(x * 0.6, 0, z * 0.6, 11, 3) - 0.5) * 0.12 * (0.3 + edge));
-        cc.setHex(0xc8a47c).lerp(new THREE.Color(0x7a5c46), sat(edge * 0.8 + (fbm3(x * 0.25, 1, z * 0.25, 12, 2) - 0.4)));
+        cc.setHex(0xa4968a).lerp(new THREE.Color(0x5a524a), sat(edge * 0.8 + (fbm3(x * 0.25, 1, z * 0.25, 12, 2) - 0.4)));
+        let fl = 0.3;
+        for (const [lx, , k] of lightsAt) fl += k * 0.8 * Math.exp(-((x - lx) ** 2) / 10);
+        cc.multiplyScalar(Math.min(1.05, fl) * (1 - edge * 0.25));
         if (dk > 0 && z < -2.4) cc.multiplyScalar(1 - dk * sat((-z - 2.4) / 1.4));   // the passage floor goes into the dark
         col.set([cc.r, cc.g, cc.b], i * 3);
       }
@@ -342,13 +464,11 @@ export class CaveBase extends LocationBase {
     const segX = Math.round(W * (this.low ? 3.2 : 4.4)), segY = this.low ? 30 : 44;
     const wgeo = reliefSheet(W, 6.4, segX, segY, (x, y) => this.wallH(x + cx, y + 3.2), (col, x, y, d) => {
       const wx = x + cx, wy = y + 3.2;
-      let lit = 0.32;
-      for (const [lx, ly, k] of lightsAt) lit = Math.max(lit, k * Math.exp(-((wx - lx) ** 2) / 18 - ((wy - ly) ** 2) / 10));
-      col.setScalar(Math.min(1.1, lit) * (1 - sat(-d * 0.5 - 0.2) * 0.5) * (1 - 0.98 * this.darkMask(wx, wy)));
+      col.setScalar(1.5 * (1 - sat(-d * 0.5 - 0.2) * 0.4) * (1 - 0.98 * this.darkMask(wx, wy)));
     });
     const wallMat = rockMaterial(this.low, { roughness: 0.95 });
     const texW = Math.round(W * (this.low ? 30 : 42));
-    wallMat.map = wallBakedTex(this.id, texW, this.low ? 214 : 286, cx - W / 2, W, (x, y, f) => this.wallH(x, y, f), (x, y) => this.darkMask(x, y), this.ox, c.nx || 0);
+    wallMat.map = wallBakedTex(this.id, texW, this.low ? 214 : 286, cx - W / 2, W, (x, y, f) => this.wallH(x, y, f), (x, y) => this.darkMask(x, y), this.rockStyle, lightsAt);
     wallMat.map.wrapS = wallMat.map.wrapT = THREE.ClampToEdgeWrapping;
     this.wallMat = wallMat;
     const wall = new THREE.Mesh(wgeo, wallMat);
@@ -364,9 +484,10 @@ export class CaveBase extends LocationBase {
       return d;
     }, (col, x, y, d) => {
       const xx = x + cx;
-      let lit = 0.25;
-      for (const [lx, , k] of lightsAt) lit = Math.max(lit, k * 0.8 * Math.exp(-((xx - lx) ** 2) / 14));
-      col.setRGB(0.62, 0.5, 0.4).multiplyScalar(lit * (0.75 + 0.25 * sat(d + 1)));
+      let lit = 0.08;
+      for (const [lx, , k] of lightsAt) lit += k * 0.7 * Math.exp(-((xx - lx) ** 2) / 6);
+      const [ra, ga, ba] = this.rockStyle.a;
+      col.setRGB(ra / 160, ga / 160, ba / 160).multiplyScalar(Math.min(1, lit) * (0.6 + 0.4 * sat(d + 1)));
     });
     cgeo.rotateX(Math.PI / 2);
     const vault = new THREE.Mesh(cgeo, vaultMat);
@@ -380,13 +501,13 @@ export class CaveBase extends LocationBase {
       const geo = reliefSheet(8, 7, 40, 40, (u, y) => {
         const z = -u * side;                     // sheet u runs along the world z
         return wallHeight(z * 1.1 + 300 + ex, y + 3.5, false, 300 + ex) * 0.7 + Math.max(0, z - 1.5) * 0.25;
-      }, (col, u, y, d) => col.setRGB(0.58, 0.46, 0.36).multiplyScalar(0.35 + 0.25 * sat(d + 0.8) - Math.max(0, y) * 0.03));
+      }, (col, u, y, d) => { const [ra, ga, ba] = this.rockStyle.b; col.setRGB(ra / 110, ga / 110, ba / 110).multiplyScalar(0.25 + 0.25 * sat(d + 0.8) - Math.max(0, y) * 0.03); });
       const cap = new THREE.Mesh(geo, capMat);
       cap.rotation.y = side < 0 ? Math.PI / 2 : -Math.PI / 2;
       cap.position.set(ex + side * 0.4, 3.0, -0.4);
       root.add(cap);
       // a heap of fallen rock where the end wall meets the floor
-      for (let i = 0; i < 4; i++) this.boulder(840 + i + Math.round(ex * 2), ex - side * (0.2 + r() * 0.5), -2.6 + i * 1.3, 0.6 + r() * 0.5, 0.5 + r() * 0.5, 0.6, root, { colA: 0x7a5c42, colB: 0x4e3a2a });
+      for (let i = 0; i < 4; i++) this.boulder(840 + i + Math.round(ex * 2), ex - side * (0.2 + r() * 0.5), -2.6 + i * 1.3, 0.6 + r() * 0.5, 0.5 + r() * 0.5, 0.6, root, { colA: this.stoneB, colB: 0x2e2a28 });
     }
     // boulders along the foot of the wall (not in front of a passage)
     const nearOpening = (x, pad = 0.4) => (c.openings || []).some((o) => Math.abs(x - o.x) < o.w / 2 + pad);
@@ -397,27 +518,38 @@ export class CaveBase extends LocationBase {
       this.boulder(800 + Math.round(x * 3 + (c.nx || 0)), x, z, sx, sy, sz);
       if (z + sz * 0.8 > minZ - 0.25) this.solid(x, z, sx, sz);
     }
-    // sand drifted against the foot of the wall (no hard seam)
+    // grit drifted against the foot of the wall (no hard seam)
     const nD = Math.round(W);
-    const drift = new THREE.InstancedMesh(rockGeometry(880, { detail: 3, rough: 0.2, flat: -0.05, colA: 0xb89470, colB: 0x9a7a5a, dark: 0.25 }), this.sandMat, nD);
+    const drift = new THREE.InstancedMesh(rockGeometry(880 + (c.nx || 0) % 7, { detail: 3, rough: 0.2, flat: -0.05, colA: 0x8a8076, colB: 0x6a625a, dark: 0.25 }), this.sandMat, nD);
     { const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
-      for (let i = 0; i < nD; i++) { let x = cx - W / 2 + i * 0.95 + r() * 0.5; if (nearOpening(x, 0.1)) x = cx - W / 2 - 4; q.setFromEuler(e.set(0, r() * 6, 0)); m.compose(V3(x, -0.04, BACK + 0.15 + r() * 0.5), q, V3(1.0 + r() * 0.9, 0.22 + r() * 0.3, 0.6 + r() * 0.4)); drift.setMatrixAt(i, m); } }
+      for (let i = 0; i < nD; i++) { let x = cx - W / 2 + i * 0.95 + r() * 0.5; if (nearOpening(x, 0.1)) x = cx - W / 2 - 4; q.setFromEuler(e.set(0, r() * 6, 0)); m.compose(V3(x, -0.04, BACK + 0.15 + r() * 0.5), q, V3(1.0 + r() * 0.9, 0.18 + r() * 0.3, 0.6 + r() * 0.4)); drift.setMatrixAt(i, m); } }
     root.add(drift);
-    // talus: broken rock fallen from the layers, piled along the base
-    const nT = Math.round(W * 4.5);
-    { const tal = new THREE.InstancedMesh(rockGeometry(885, { detail: 2, rough: 0.4, sharp: 0.8, flat: -0.3, strata: 1, colA: 0x9a7654, colB: 0x6e5038, dark: 0.5 }), this.sandMat, nT);
+    // broken rock: angular slabs and chips fallen from the beds, round cobbles, flat flakes —
+    // three shapes, every piece its own size, squash, tilt and tone; clustered at the wall, sparse on the floor
+    const kinds = [
+      rockGeometry(885 + (c.nx || 0) % 5, { detail: 1, rough: 0.5, sharp: 1.0, flat: -0.35, strata: 1, colA: this.stoneA, colB: this.stoneB, dark: 0.5 }),
+      rockGeometry(870 + (c.nx || 0) % 3, { detail: 2, rough: 0.3, sharp: 0.3, flat: -0.4, colA: this.stoneA, colB: this.stoneB, dark: 0.45 }),
+      rockGeometry(890 + (c.nx || 0) % 4, { detail: 1, rough: 0.7, sharp: 0.7, flat: -0.2, colA: this.stoneB, colB: 0x34302c, dark: 0.4 }),
+    ];
+    const nT = Math.round(W * (this.low ? 5 : 7));
+    const counts = [Math.round(nT * 0.5), Math.round(nT * 0.2), Math.round(nT * 0.3)];
+    const col = new THREE.Color();
+    kinds.forEach((geo, kI) => {
+      const im = new THREE.InstancedMesh(geo, this.sandMat, counts[kI]);
       const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
-      for (let i = 0; i < nT; i++) { const x = cx - W / 2 + r() * W, sc = 0.06 + r() * r() * 0.3; q.setFromEuler(e.set(r() * 3, r() * 6, r() * 3)); m.compose(V3(x, sc * 0.3, BACK + 0.35 + r() * 0.9), q, V3(sc * (1 + r()), sc, sc)); tal.setMatrixAt(i, m); }
-      root.add(tal); }
-    // grit and pebbles along the foot of the wall and across the floor
-    const nP = Math.round(W * 3.4);
-    const peb = new THREE.InstancedMesh(rockGeometry(870, { detail: 2, rough: 0.35, flat: -0.3, strata: 0.5, colA: 0x9a7a5a, colB: 0x5a4434, dark: 0.4 }), this.sandMat, nP);
-    { const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
-      for (let i = 0; i < nP; i++) {
-        const x = cx - W / 2 + r() * W, z = r() < 0.6 ? BACK + 0.9 + r() * 0.8 : -2 + r() * 3.4, sc = r() < 0.6 ? 0.04 + r() * 0.06 : 0.1 + r() * 0.12;
-        q.setFromEuler(e.set(0, r() * 6, 0)); m.compose(V3(x, 0, z), q, V3(sc * (1 + r()), sc, sc)); peb.setMatrixAt(i, m);
-      } }
-    root.add(peb);
+      for (let i = 0; i < counts[kI]; i++) {
+        const atWall = r() < 0.72;
+        const x = cx - W / 2 + r() * W, z = atWall ? BACK + 0.35 + Math.pow(r(), 1.6) * 1.3 : -2 + r() * 3.4;
+        const big = r() < (atWall ? 0.22 : 0.06);
+        const sc = big ? 0.12 + r() * 0.22 : 0.025 + r() * r() * 0.09;
+        const flatK = kI === 2 ? 0.25 + r() * 0.2 : kI === 0 ? 0.4 + r() * 0.5 : 0.55 + r() * 0.35;
+        q.setFromEuler(e.set((r() - 0.5) * (kI === 1 ? 0.3 : 1.2), r() * 6.3, (r() - 0.5) * (kI === 1 ? 0.3 : 1.2)));
+        m.compose(V3(x, sc * flatK * 0.25, z), q, V3(sc * (0.8 + r() * 0.9), sc * flatK, sc * (0.7 + r() * 0.6)));
+        im.setMatrixAt(i, m);
+        const v = 0.6 + r() * 0.55; im.setColorAt(i, col.setRGB(v * (0.96 + r() * 0.1), v, v * (0.9 + r() * 0.12)));
+      }
+      root.add(im);
+    });
     // the passages: darkness inside, a faint breath of light from where they lead
     for (const o of c.openings || []) {
       if (o.tint) {
@@ -449,36 +581,73 @@ export class CaveBase extends LocationBase {
   /** The chamber's own things (overridden). */
   buildRoom() {}
 
-  /** A torch wedged in the rock: warm, dirty pool of light. */
+  /**
+   * A torch wedged in a crack of the rock: a crooked stick, a head of tarred rags, soot on the
+   * rock above. Every one is different (length, lean, height, flame).
+   */
   torch(x, y = 2.12) {
     const root = this.root;
+    const n = this.torches.length, hs = hash1(x * 3.7 + n, 9);
+    y += (hs - 0.5) * 0.4;
+    const len = 0.38 + hash1(x, 11) * 0.3, rx = -0.25 - hash1(x, 12) * 0.35, rz = (hash1(x, 13) - 0.5) * 0.7;
     const zw = Math.max(BACK + 0.55, Math.min(BACK + 1.3, this.wallZ(x, y) + 0.12));
-    const t = glow(0xff9a48, 0.55, 0.4); t.position.set(x, y, zw + 0.1); root.add(t);
+    const g = new THREE.Group(); g.position.set(x, y - len, zw); g.rotation.set(rx, 0, rz); root.add(g);
+    const stickGeo = new THREE.CylinderGeometry(0.018, 0.03, len, 7, 3); stickGeo.translate(0, len / 2, 0);
+    { const p = stickGeo.attributes.position; for (let i = 0; i < p.count; i++) { const t = p.getY(i) / len; p.setX(i, p.getX(i) + Math.sin(t * 3 + x) * 0.02); } stickGeo.computeVertexNormals(); }
+    g.add(new THREE.Mesh(stickGeo, this.mat('torchStick', { color: 0x3a2c20, roughness: 1 })));
+    const head = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.035, 0.13, 8, 2), this.mat('torchHead', { color: 0x1a1410, roughness: 1, flatShading: true }));
+    head.position.y = len + 0.03; head.rotation.y = hs * 3; g.add(head);
+    for (let k = 0; k < 2; k++) { const w = new THREE.Mesh(new THREE.TorusGeometry(0.044, 0.008, 4, 10), this.mat('torchWrap', { color: 0x4a3a2a, roughness: 1 })); w.rotation.x = Math.PI / 2 + (k - 0.5) * 0.3; w.position.y = len - 0.02 + k * 0.07; g.add(w); }
+    g.updateMatrixWorld(true);
+    const top = V3(0, len + 0.1, 0).applyMatrix4(g.matrixWorld);
+    // soot licked up the rock above the flame
+    const soot = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 1.1), new THREE.MeshBasicMaterial({ map: glowTexture(), color: 0x000000, transparent: true, opacity: 0.55, depthWrite: false }));
+    soot.position.set(top.x + rz * -0.2, top.y + 0.45, Math.max(this.wallZ(top.x, top.y + 0.45) + 0.06, zw - 0.05)); root.add(soot);
+    const fs = 0.8 + hash1(x, 14) * 0.5;
+    const t = glow(0xff9a48, 0.4 * fs, 0.28); t.position.set(top.x, top.y + 0.02, top.z + 0.08); root.add(t);
     const fl = new THREE.Sprite(new THREE.SpriteMaterial({ map: flameTex(), color: 0xffc070, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
-    fl.scale.set(0.16, 0.3, 1); fl.position.set(x, y + 0.04, zw + 0.15); root.add(fl);
-    this.flames.push({ s: fl, ph: x });
+    fl.scale.set(0.16 * fs, 0.3 * fs, 1); fl.position.set(top.x, top.y + 0.1 * fs, top.z + 0.06); root.add(fl);
+    this.flames.push({ s: fl, ph: x * 5.3, k: fs });
     const l = new THREE.PointLight(0xff8a40, 5, 7, 1.4); l.position.set(x, y - 0.12, -1.4); root.add(l);
     this.torches.push(l);
-    const tst = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.035, 0.5, 16), this.mat('torchStick', { color: 0x2a1c12 })); tst.position.set(x, y - 0.32, zw); tst.rotation.x = -0.3; root.add(tst);
     return l;
   }
 
   buildForeground() {
     const fg = (name) => { const g = new THREE.Group(); g.name = name; this.root.add(g); this.foregroundGroups.push(g); return g; };
-    const dark = { colA: 0x4a3828, colB: 0x2a1e16, dark: 0.6 };
-    // big rocks between the camera and the floor: the chamber closes in around the player
+    const dark = { colA: 0x3e3a36, colB: 0x1e1c1a, dark: 0.6 };
+    // big rocks between the camera and the floor: the chamber closes in around the player.
+    // Each one is its own kind: a mound with fallen pieces, a leaning slab, a flat shelf, a heap of blocks.
     for (const [x, w, h, z = 2.6] of this.cfg.fg || []) {
       const g = fg(`fg-rock-${this.id}-${x}`);
       const W = w * 1.35, Hh = h * 1.9;
-      this.boulder(970 + Math.round(x * 5 + (this.cfg.nx || 0)), x, z, W, Hh, 0.9, g, dark);
-      this.boulder(975 + Math.round(x * 5), x + W * 0.75, z + 0.35, W * 0.55, Hh * 0.6, 0.6, g, dark);
-      this.boulder(978 + Math.round(x * 5), x - W * 0.8, z + 0.5, W * 0.45, Hh * 0.4, 0.5, g, dark);
+      const sd = 970 + Math.round(x * 5 + (this.cfg.nx || 0));
+      const kind = Math.floor(hash1(sd, 21) * 4), r2 = (k) => hash1(sd + k, 22);
+      if (kind === 0) {
+        this.boulder(sd, x, z, W, Hh, 0.9, g, dark);
+        this.boulder(sd + 5, x + W * 0.75, z + 0.35, W * 0.55, Hh * 0.6, 0.6, g, { ...dark, sharp: 0.9 });
+        this.boulder(sd + 8, x - W * 0.8, z + 0.5, W * 0.45, Hh * 0.4, 0.5, g, dark);
+      } else if (kind === 1) {
+        const s1 = this.boulder(sd, x, z, W * 0.6, Hh * 1.5, 0.45, g, { ...dark, rough: 0.3, sharp: 1.1, strata: 2 });
+        s1.rotation.z = (r2(1) - 0.5) * 0.8; s1.position.y = -0.1;
+        this.boulder(sd + 3, x + W * 0.6, z + 0.2, W * 0.5, Hh * 0.45, 0.55, g, { ...dark, sharp: 0.8 });
+      } else if (kind === 2) {
+        this.boulder(sd, x, z, W * 1.3, Hh * 0.75, 0.8, g, { ...dark, top: 0.35, rough: 0.35, sharp: 1.0, strata: 2.2 });
+        for (let k = 0; k < 3; k++) this.boulder(sd + 10 + k, x + (r2(k) - 0.5) * W * 2, z + 0.4 + r2(k + 4) * 0.4, 0.15 + r2(k + 7) * 0.2, 0.12 + r2(k + 9) * 0.15, 0.15, g, dark);
+      } else {
+        for (let k = 0; k < 4; k++) this.boulder(sd + k * 3, x + (k - 1.5) * W * 0.55, z + r2(k) * 0.5, W * (0.35 + r2(k + 3) * 0.35), Hh * (0.45 + r2(k + 5) * 0.75), 0.5, g, { ...dark, sharp: 1.0, rough: 0.55 });
+      }
     }
+    // the vault hangs down near the camera: lips, broken teeth of rock, a heavy overhang
     for (const [x, w, len = 1.0] of this.cfg.lips || []) {
       const g = fg(`fg-lip-${this.id}-${x}`);
       const top = (this.cfg.vault ?? 3.95) + 0.4;
-      this.stalactite(985 + Math.round(x * 3), x, 2.0, len, w, g, top);
-      this.stalactite(986 + Math.round(x * 3), x + w * 1.3, 2.3, len * 0.6, w * 0.6, g, top);
+      const sd = 985 + Math.round(x * 3);
+      const kind = Math.floor(hash1(sd, 31) * 3);
+      this.stalactite(sd, x, 2.0, len * (kind === 1 ? 1.3 : 1), w * (kind === 2 ? 1.8 : 1), g, top);
+      this.stalactite(sd + 1, x + w * 1.3, 2.3, len * 0.6, w * 0.6, g, top);
+      if (kind === 1) this.stalactite(sd + 2, x - w * 1.1, 2.15, len * 0.45, w * 0.4, g, top);
+      if (kind === 2) { const o = this.boulder(sd + 3, x - w * 0.6, 1.6, w * 2.6, 0.5, 0.9, g, { colA: this.stoneB, colB: 0x1e1c1a, sharp: 1, strata: 2 }); o.position.y = top - 0.15; }
     }
   }
 
@@ -639,7 +808,7 @@ export class CaveBase extends LocationBase {
     super.update(dt);
     const t = this.time;
     if (this.followTarget) this.fill.position.x = this.followTarget().position.x;
-    for (const f of this.flames) { const k = 0.85 + Math.sin(t * 11 + f.ph) * 0.1 + Math.sin(t * 27 + f.ph * 3) * 0.06; f.s.scale.set(0.16 * (2 - k), 0.3 * k, 1); f.s.material.opacity = 0.75 + 0.25 * k; }
+    for (const f of this.flames) { const k = 0.85 + Math.sin(t * 11 + f.ph) * 0.1 + Math.sin(t * 27 + f.ph * 3) * 0.06; f.s.scale.set(0.16 * (2 - k) * (f.k ?? 1), 0.3 * k * (f.k ?? 1), 1); f.s.material.opacity = 0.75 + 0.25 * k; }
     for (const f of this.fires) {
       const k = 0.82 + Math.sin(t * 9 + f.ph) * 0.08 + Math.sin(t * 23 + f.ph * 2) * 0.06;
       if (f.g.visible && f.light.intensity > 0) { f.light.intensity = f.base * k; f.flame.scale.y = f.baseH * (0.8 + 0.3 * k); f.flame.material.opacity = 0.75 + 0.2 * k; }

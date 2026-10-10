@@ -242,23 +242,20 @@ export class LocationBase {
   monitor(x, y, z) {
     const g = new THREE.Group();
     const c = document.createElement('canvas');
-    c.width = 256; c.height = 160;
+    c.width = 320; c.height = 200;
     const tex = new THREE.CanvasTexture(c);
     tex.colorSpace = THREE.SRGBColorSpace;
     // housing: a rounded shell, a lighter bezel with the screen set into it, keys and a knob
     // under the screen, a carry handle on top (the screen sits clearly in front of every face —
     // a coplanar screen z-fought with the shell into a black slab)
-    const shell = new THREE.Mesh(roundedBox(0.52, 0.42, 0.13, 0.03, 3), this.mat('monitorShell', { color: 0x3a3f44, roughness: 0.55 }));
+    const shell = new THREE.Mesh(roundedBox(0.52, 0.42, 0.13, 0.03, 3), this.mat('monitorShell2', { color: 0x2c2f31, roughness: 0.85 }));
     shell.position.set(0, -0.02, -0.075);
     g.add(shell);
-    const bezel = new THREE.Mesh(roundedBox(0.49, 0.38, 0.02, 0.012, 2), this.mat('monitorBezel', { color: 0x9aa2a6, roughness: 0.45 }));
+    const bezel = new THREE.Mesh(roundedBox(0.49, 0.38, 0.02, 0.012, 2), this.mat('monitorBezel2', { color: 0x4a4e50, roughness: 0.8 }));
     bezel.position.set(0, -0.02, -0.004);
     g.add(bezel);
-    const recess = new THREE.Mesh(new THREE.PlaneGeometry(0.45, 0.29), this.mat('monitorRecess', { color: 0x0c0e10, roughness: 0.8 }));
-    recess.position.set(0, 0.015, 0.0075);
-    g.add(recess);
     const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.43, 0.27), new THREE.MeshBasicMaterial({ map: tex }));
-    screen.position.set(0, 0.015, 0.009);
+    screen.position.set(0, 0.015, 0.02);   // clear of the bezel face (no depth fight)
     g.add(screen);
     const keyM = this.mat('monitorKey', { color: 0x2a2e32, roughness: 0.4 });
     for (let i = 0; i < 5; i++) {
@@ -272,11 +269,20 @@ export class LocationBase {
     const led = new THREE.Mesh(new THREE.CircleGeometry(0.005, 10), new THREE.MeshBasicMaterial({ color: 0x40ff90 }));
     led.position.set(0.12, -0.17, 0.0075);
     g.add(led);
-    const handle = new THREE.Mesh(new THREE.TorusGeometry(0.07, 0.009, 8, 20, Math.PI), this.mat('monitorShell', { color: 0x3a3f44, roughness: 0.55 }));
+    const handle = new THREE.Mesh(new THREE.TorusGeometry(0.07, 0.009, 8, 20, Math.PI), this.mat('monitorShell2', { color: 0x2c2f31, roughness: 0.85 }));
     handle.position.set(0, 0.185, -0.075); handle.scale.y = 0.55;
     g.add(handle);
-    const halo = glow(0x40ff90, 0.55, 0.16);
+    // leads hanging from the side of the monitor down towards the bed
+    const leadM = this.mat('monitorLead', { color: 0x1a1c1e, roughness: 0.7 });
+    for (let i = 0; i < 3; i++) {
+      const curve = new THREE.CatmullRomCurve3([new THREE.Vector3(0.25, -0.12 - i * 0.03, -0.06), new THREE.Vector3(0.33 + i * 0.02, -0.4, 0.02), new THREE.Vector3(0.36 + i * 0.03, -0.75, 0.12 + i * 0.03)]);
+      g.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 12, 0.004, 5), leadM));
+    }
+    // the halo stays as the monitor's anchor (scripts read its position and colour) but no longer
+    // draws a glowing square over the screen
+    const halo = glow(0x40ff90, 0.4, 0.1);
     halo.position.z = 0.06;
+    halo.scale.setScalar(0.0001);
     g.add(halo);
     g.position.set(x, y, z);
     this.root.add(g);
@@ -316,24 +322,52 @@ export class LocationBase {
         continue;
       }
       if (m.offDrawn) { m.offDrawn = false; m.halo.visible = true; }
-      ctx.fillStyle = '#031208'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.strokeStyle = 'rgba(40,120,60,0.25)'; ctx.lineWidth = 1;
-      for (let gx = 0; gx < canvas.width; gx += 32) { ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, canvas.height); ctx.stroke(); }
-      // fault: the leads are on but the machine reads nothing — amber, "no signal"
-      const col = m.fault ? '#ffb040' : m.flat ? '#ff5050' : '#4dff8a';
-      ctx.strokeStyle = col; ctx.lineWidth = 2.5;
+      // a real bedside monitor: ECG (green), SpO2 pleth (cyan), respiration (yellow) on the left,
+      // a column of readings on the right
+      const W = canvas.width, H = canvas.height, TW = 214;
+      ctx.fillStyle = '#020604'; ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = '#0a1a24'; ctx.fillRect(0, 0, W, 14);
+      ctx.fillStyle = '#7a9aa8'; ctx.font = '9px monospace'; ctx.fillText('BED 2  ADULT  03:12', 4, 10);
+      ctx.strokeStyle = 'rgba(60,90,80,0.35)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(TW + 2, 14); ctx.lineTo(TW + 2, H); ctx.stroke();
+      for (const y of [76, 132]) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(TW, y); ctx.stroke(); }
+      const dead = m.fault || m.flat || m.bpm <= 0;
+      const ecgCol = m.fault ? '#ffb040' : m.flat ? '#ff5050' : '#4dff8a';
+      const n = m.trace.length, sx = TW / n;
+      // ECG
+      ctx.strokeStyle = ecgCol; ctx.lineWidth = 2;
       ctx.beginPath();
-      for (let i = 0; i < m.trace.length; i++) {
-        const idx = (m.head + i) % m.trace.length;
-        const yy = 92 - m.trace[idx] * 52;
-        i ? ctx.lineTo(i, yy) : ctx.moveTo(i, yy);
-      }
+      for (let i = 0; i < n; i++) { const v = m.trace[(m.head + i) % n]; const yy = 52 - v * 30; i ? ctx.lineTo(i * sx, yy) : ctx.moveTo(i * sx, yy); }
       ctx.stroke();
-      ctx.fillStyle = col;
-      ctx.font = 'bold 26px monospace';
-      ctx.fillText(m.fault || m.flat || m.bpm <= 0 ? '---' : String(Math.round(m.bpm)), 180, 34);
-      ctx.font = '12px monospace'; ctx.fillText('HR', 160, 18);
-      if (m.fault && (m.t % 1.2) < 0.8) { ctx.font = 'bold 14px monospace'; ctx.fillText('NO SIGNAL', 12, 140); }
+      ctx.fillStyle = ecgCol; ctx.font = '9px monospace'; ctx.fillText('II', 4, 26);
+      // pleth: a smooth wave following the beats (flat when the heart is)
+      ctx.strokeStyle = '#4ad8ff'; ctx.lineWidth = 1.6; ctx.beginPath();
+      for (let i = 0; i < n; i++) {
+        const v = dead ? 0 : Math.max(0, Math.sin(((i + m.head) / n) * Math.PI * 2 * Math.max(1, m.bpm / 20)));
+        const yy = 116 - v * 26; i ? ctx.lineTo(i * sx, yy) : ctx.moveTo(i * sx, yy);
+      }
+      ctx.stroke(); ctx.fillStyle = '#4ad8ff'; ctx.fillText('PLETH', 4, 88);
+      // respiration: slow
+      ctx.strokeStyle = '#f0d040'; ctx.lineWidth = 1.4; ctx.beginPath();
+      for (let i = 0; i < n; i++) {
+        const v = dead ? 0 : Math.sin(((i + m.head * 0.25) / n) * Math.PI * 2 * 2.2);
+        const yy = 168 - v * 14; i ? ctx.lineTo(i * sx, yy) : ctx.moveTo(i * sx, yy);
+      }
+      ctx.stroke(); ctx.fillStyle = '#f0d040'; ctx.fillText('RESP', 4, 144);
+      // readings
+      const R = TW + 8;
+      ctx.fillStyle = ecgCol; ctx.font = '9px monospace'; ctx.fillText('HR', R, 26);
+      ctx.font = 'bold 28px monospace'; ctx.fillText(dead ? '---' : String(Math.round(m.bpm)), R, 54);
+      ctx.fillStyle = '#4ad8ff'; ctx.font = '9px monospace'; ctx.fillText('SpO2 %', R, 76);
+      ctx.font = 'bold 22px monospace'; ctx.fillText(dead ? '--' : String(m.spo2 ?? 97), R, 98);
+      ctx.fillStyle = '#e8e8e8'; ctx.font = '9px monospace'; ctx.fillText('NIBP', R, 116);
+      ctx.font = 'bold 14px monospace'; ctx.fillText(dead ? '--/--' : '118/76', R, 132);
+      ctx.fillStyle = '#f0d040'; ctx.font = '9px monospace'; ctx.fillText('RR', R, 150);
+      ctx.font = 'bold 16px monospace'; ctx.fillText(dead ? '--' : '14', R, 168);
+      if (m.fault && (m.t % 1.2) < 0.8) { ctx.fillStyle = '#ffb040'; ctx.font = 'bold 12px monospace'; ctx.fillText('LEADS OFF', 70, 190); }
+      if (m.flat && !m.fault) { ctx.fillStyle = '#ff4040'; ctx.font = 'bold 12px monospace'; ctx.fillText('ASYSTOLE', 70, 190); }
+      // scanline grain
+      ctx.fillStyle = 'rgba(0,0,0,0.18)'; for (let y = 0; y < H; y += 3) ctx.fillRect(0, y, W, 1);
       m.tex.needsUpdate = true;
       m.halo.material.color.set(m.fault ? 0xffa030 : m.flat ? 0xff3030 : 0x40ff90);
     }
