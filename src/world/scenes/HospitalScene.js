@@ -2095,7 +2095,7 @@ export class HospitalScene extends LocationBase {
       this.bx(0.05, winY1 - winY0, 0.06, alu, winX, (winY0 + winY1) / 2, zb - 0.2);
       this.bx(winW, 0.05, 0.06, alu, winX, winY0 + 0.6, zb - 0.2);
       this.bx(winW + 0.2, 0.04, 0.2, this.mat('hSill', { color: 0xeeeee8, roughness: 0.5 }), winX, winY0 - 0.02, zb + 0.1);
-      this.pl(winW, winY1 - winY0, this.texMat('hFrost', TX.frost(), { transparent: true }), winX, (winY0 + winY1) / 2, zb - 0.18);
+      // (no frost plane: its pale edge read as a strip down the window — owner, after 0.13)
       const blm = this.texMat('hBlindsW', tiled(TX.blinds(), 6, 3), { transparent: true });
       this.pl(winW + 0.04, 0.5, blm, winX, winY1 - 0.25, zb + 0.07);
       this.bx(winW + 0.1, 0.06, 0.06, alu, winX, winY1 + 0.03, zb + 0.08);
