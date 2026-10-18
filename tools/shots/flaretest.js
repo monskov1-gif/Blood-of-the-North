@@ -1,0 +1,12 @@
+const wl = g.windowLight; wl.update = () => {};
+document.getElementById('view').style.visibility = 'hidden';
+document.body.style.background = '#000';
+document.querySelectorAll('.hud').forEach(e => e.style.display = 'none');
+const cam = g.cameraSys.camera;
+const V = cam.position.constructor;
+const id = window.__FL || 'D';
+const zone = g.world.windowLights.find(z => z.id === id);
+const pos = new V(-0.42, 0.42, 0.5).unproject(cam);
+const z2 = { ...zone, position: pos, dir: new V().copy(cam.position).sub(pos).normalize() };
+const s = { w: 1 }; wl.reseed(z2, s);
+wl.draw([[z2, s]], cam, null, 1);

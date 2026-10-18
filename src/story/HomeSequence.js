@@ -1,0 +1,334 @@
+import * as THREE from 'three';
+import { sleep } from './Director.js';
+
+/**
+ * The Reeds' apartment (v0.14): living room + kitchen, Julian's bedroom, Lizzie's attic —
+ * three locations joined by doors (src/story/Places.js).
+ *   lzHome()      — L1 prologue, Wednesday 3 November, evening: Julian tells Lizzie about the
+ *                   valley case at the kitchen table; she copies his photos and pins the map.
+ *   startHome(1)  — chapter 5 → 6: Julian comes home after the discharge, at night; her room,
+ *                   her map with a fourth pin.
+ *   startHome(2)  — chapter 7 → 8: the morning he sets out on his own investigation (both routes).
+ */
+
+export const HOME_STAGES = ['home_1', 'home_2'];
+
+const methods = {
+  /** Interactable `at` in front of an anchor, inside the walkable strip. */
+  homeAt(a, fallbackX = 0) {
+    const area = this.g.world.bounds.walk.areas?.[0] || { minZ: -2, maxZ: 0.8 };
+    const x = a?.x ?? fallbackX;
+    const z = THREE.MathUtils.clamp((a?.z ?? -2) + 0.9, area.minZ + 0.15, area.maxZ - 0.15);
+    return { at: { x, z }, anchor: a || new THREE.Vector3(x, 1.5, -2) };
+  },
+
+  /** Builds interactables from [anchorKey, label, run] rows; rows whose anchor is missing are skipped. */
+  homeItems(rows) {
+    const A = this.g.world.anchors || {};
+    return rows.filter(([k]) => A[k]).map(([k, label, run, radius]) => ({ id: `home_${this.g.locationId}_${k}`, label, ...this.homeAt(A[k]), radius: radius ?? 0.75, run }));
+  },
+
+  /** The VN background for talks in the flat: the kitchen table. */
+  homeShot() {
+    const w = this.g.world;
+    const t = w.anchors?.table || new THREE.Vector3(0, 1.2, -2);
+    w.shots = { ...(w.shots || {}), home: { fov: 36, pos: [t.x - 0.4, 1.55, 2.8], look: [t.x + 0.2, 1.25, t.z - 0.6] } };
+  },
+
+  // ------------------------------------------------------------------ L1 prologue (Lizzie)
+
+  async lzHome() {
+    const g = this.g;
+    const S = this.session;
+    const say = (id) => () => g.dialogue.start(id);
+    const f = () => g.state.flags;
+    await this.lzEnter('apartment', 'evening', 'lizzie_1');
+    if (S !== this.session) return false;
+    const w = g.world, L = this.julian, sp = w.spots || {};
+    const e = sp.entry || { x: -3, z: -0.6 };
+    L.placeAt(e.x, e.z, 1);
+    this.homeShot();
+    // Julian at the kitchen table, over the case photos
+    const st = sp.kitchenStand || { x: (w.anchors.table?.x ?? 2) + 0.6, z: -1.4 };
+    const jul = this.lzCastIn('julianL', 'lz_julian_home', st.x, st.z, st.facing ?? -1);
+    jul.setPose('think');
+    this.lzHomeJul = jul;
+    this.setAmbience(['amb.room']);
+    g.hud.show(false);
+    g.player.enabled = false;
+    g.cameraSys.snap();
+    await g.fader.to(false, 1400);
+    if (!(await this.lines(g.dialogue.dialogues.lh_open))) return false;
+    g.hud.show(true);
+    g.player.enabled = true;
+    g.state.set('objective', 'lz_home');
+    return new Promise((resolve) => {
+      const talk = async () => {
+        g.player.enabled = false;
+        jul.faceTowards(L.position.x); jul.setPose('talk');
+        await g.dialogue.start('lh_julian');
+        this.vnPhotos([]);
+        if (S !== this.session) return;
+        jul.setPose('idle');
+        // he goes to his room to finish a report: the folder stays open on the table
+        const bd = (w.doors || []).find((d) => d.id === 'to_bedroom');
+        const gone = jul.walkTo({ x: bd ? bd.x : st.x + 3, z: bd ? bd.z : -2 }, { speed: 1.2, direct: true }).then(() => jul.setVisible(false));
+        await this.lines(g.dialogue.dialogues.lh_after);
+        await gone;
+        if (S !== this.session) return;
+        g.state.set('objective', 'lz_upstairs');
+        this.placeItems();
+        g.player.enabled = true;
+      };
+      const sleepNow = async () => {
+        if (!f().lh_pins) return g.dialogue.start('lh_bed_wait');
+        g.player.enabled = false;
+        g.hud.show(false);
+        if (!(await this.lines(g.dialogue.dialogues.lh_night))) return;
+        await this.phoneChat('Девчонки', [
+          ['lizzy', 'Пятница. Столовая. У меня дело века.'],
+          ['Пуриэль', 'УБИЙСТВА?? я в деле'],
+          ['Викки', 'нет.'],
+          ['Викки', 'ладно. но я против, запишите'],
+          ['Оливия', 'а еду брать?'],
+          ['lizzy', 'бери всё. и пластыри'],
+          ['Пуриэль', 'у меня машина сестры до воскресенья 🚗'],
+        ]);
+        if (S !== this.session) return;
+        await g.fader.to(true, 1400);
+        this.endPlace();
+        resolve(S === this.session);
+      };
+      this.setPlace({
+        state: { apartment: 'evening', apt_bedroom: 'evening', apt_attic: 'evening' },
+        onEnter: (loc) => {
+          if (loc === 'apartment') { this.homeShot(); g.world.root.add(jul.root); jul.setVisible(!f().lh_talked); }
+          // after the talk he is in his room, at the desk under his case board
+          if (loc === 'apt_bedroom' && f().lh_talked) {
+            const d = g.world.spots?.desk || { x: 1.5, z: -1.6 };
+            g.world.root.add(jul.root); jul.setVisible(true); jul.stop(); jul.stand();
+            jul.placeAt(d.x, d.z, d.facing ?? 1); jul.setPose('think');
+          }
+        },
+        items: (loc) => {
+          if (loc === 'apartment') {
+            return this.homeItems([
+              ['table', f().lh_talked ? 'Фото по делу' : 'Джул', () => (f().lh_talked ? g.dialogue.start('lh_photos') : talk()), 1.0],
+              ['fridge', 'Холодильник', say('lh_fridge')], ['photo', 'Фото на стене', say('lh_photo')],
+              ['coat', 'Вешалка', say('lh_coat')], ['window', 'Окно', say('lh_window')],
+              ['tv', 'Телевизор', say('lh_tv')], ['sofa', 'Диван', say('lh_sofa')],
+            ]);
+          }
+          if (loc === 'apt_bedroom') {
+            const it = this.homeItems([['board', 'Доска', say('lh_board')], ['mirror', 'Зеркало', say('lh_mirror')], ['bed', 'Кровать', say('lh_jbed')]]);
+            if (f().lh_talked) {
+              const d = g.world.spots?.desk || { x: 1.5, z: -1.6 };
+              it.unshift({ id: 'home_bed_jul', label: 'Джул', at: { x: d.x - 0.6, z: d.z + 0.4 }, radius: 0.8, anchor: new THREE.Vector3(d.x, 2.0, d.z), run: async () => { jul.faceTowards(this.julian.position.x); jul.setPose('talk'); await g.dialogue.start('lh_jul_room'); jul.setPose('think'); jul.face(1); } });
+            }
+            return it;
+          }
+          if (loc === 'apt_attic') {
+            return this.homeItems([
+              ['map', 'Карта', say('lh_map')], ['desk', 'Стол', say('lh_desk')], ['camera', 'Фотоаппарат', say('lh_camera')],
+              ['posters', 'Бабочки', say('lh_posters')], ['window', 'Окно', say('lh_awindow')], ['bed', 'Спать', sleepNow],
+            ]);
+          }
+          return [];
+        },
+        door: (d) => {
+          if (d.id === 'front') return 'lh_door_wait';
+          if ((d.id === 'to_attic' || d.id === 'to_bedroom') && !f().lh_talked) return 'lh_need_talk';
+          if (d.id === 'to_bedroom' && f().lh_talked) return null;
+          return null;
+        },
+      });
+    });
+  },
+
+  // ------------------------------------------------------------------ Julian at home
+
+  async startHome(n) {
+    const g = this.g;
+    const S = this.session;
+    const say = (id) => () => g.dialogue.start(id);
+    const f = () => g.state.flags;
+    const night = n === 1;
+    g.fader.set(true);
+    await this.enter('apartment', night ? 'night' : 'day', `home_${n}`);
+    if (S !== this.session) return;
+    const w = g.world, J = this.julian, sp = w.spots || {};
+    const e = sp.entry || { x: -3, z: -0.6 };
+    J.placeAt(e.x, e.z, 1);
+    this.homeShot();
+    this.setAmbience(['amb.room']);
+    g.hud.show(false);
+    g.player.enabled = false;
+    g.cameraSys.snap();
+    await g.card.show(night ? 'Дом' : 'Утро', { en: night ? 'Home' : 'Morning', sub: night ? 'НОЧЬ ПОСЛЕ ВЫПИСКИ' : 'ДОМ · ДО РАССВЕТА НЕ СПАЛ', ms: 2000 });
+    if (S !== this.session) return;
+    g.audio.play('sfx.door', { volume: 0.5 });
+    await g.fader.to(false, 1600);
+    if (!(await this.lines(g.dialogue.dialogues[night ? 'jh1_open' : 'jh2_open']))) return;
+    g.hud.show(true);
+    g.player.enabled = true;
+    g.state.set('objective', night ? 'jh_attic' : 'jh_out');
+    const done = new Promise((resolve) => {
+      const finish = async () => {
+        if (this.homeLeaving) return;
+        this.homeLeaving = true;
+        g.player.enabled = false;
+        g.hud.show(false);
+        const route = g.state.get('investigation_route');
+        const lines = night ? 'jh1_end' : route === 'WEREWOLF' ? 'jh2_go_wolf' : 'jh2_go_vampire';
+        await this.lines(g.dialogue.dialogues[lines]);
+        await g.fader.to(true, 1800);
+        this.homeLeaving = false;
+        this.endPlace();
+        resolve(S === this.session);
+      };
+      // night: once her desk and her map are seen, he knows enough
+      const attic = (id) => async () => { await g.dialogue.start(id); if (night && f().jh1_map && f().jh1_desk) finish(); };
+      const J1 = (id) => say(`jh1_${id}`);
+      this.setPlace({
+        state: { apartment: night ? 'night' : 'day', apt_bedroom: night ? 'night' : 'day', apt_attic: night ? 'night' : 'day' },
+        onEnter: (loc) => { if (loc === 'apartment') this.homeShot(); },
+        items: (loc) => {
+          if (loc === 'apartment') {
+            const p = night ? 'jh1' : 'jh2';
+            return this.homeItems([
+              ['table', 'Стол', say(`${p}_table`), 1.0], ['fridge', 'Холодильник', say(`${p}_fridge`)], ['photo', 'Фото на стене', say(`${p}_photo`)],
+              ['coat', 'Вешалка', say(`${p}_coat`)], ['window', 'Окно', say(`${p}_window`)], ['tv', 'Телевизор', say(`${p}_tv`)], ['sofa', 'Диван', say(`${p}_sofa`)],
+            ]);
+          }
+          if (loc === 'apt_bedroom') return this.homeItems([['board', 'Доска', J1('board')], ['mirror', 'Зеркало', J1('mirror')], ['bed', 'Кровать', J1('jbed')]]);
+          if (loc === 'apt_attic') {
+            return this.homeItems([
+              ['map', 'Карта', attic('jh1_map')], ['desk', 'Стол', attic('jh1_desk')], ['camera', 'Фотоаппарат', J1('camera')],
+              ['posters', 'Бабочки', J1('posters')], ['window', 'Окно', J1('awindow')], ['bed', 'Её кровать', J1('bed')],
+            ]);
+          }
+          return [];
+        },
+        door: (d) => {
+          if (d.id !== 'front') return null;
+          if (night) return 'jh1_need';
+          return f().jh2_ready ? finish : 'jh2_door_wait';
+        },
+      });
+    });
+    if (!(await done)) return;
+    if (night) return this.startStationReturn();
+    const route = g.state.get('investigation_route');
+    return route === 'WEREWOLF' ? this.startForest() : this.vampireChain();
+  },
+
+  /**
+   * Photos on the dialogue screen: the case prints Julian talks about, laid over the scene like
+   * polaroids on the table (`cmd: 'photos:carcass,claws'`; empty list clears them).
+   */
+  vnPhotos(kinds) {
+    const g = this.g;
+    const vn = g.view.vn;
+    vn.querySelector('.vn-photos')?.remove();
+    if (!kinds.length) return;
+    const row = document.createElement('div');
+    row.className = 'vn-photos';
+    vn.appendChild(row);
+    const CAP = { carcass: 'туши · Такхини', claws: 'кора · 2,1 м', track: 'слепок · 19 см', fur: 'шерсть', map: 'карта' };
+    kinds.forEach((k, i) => {
+      const p = document.createElement('div');
+      p.className = 'ph';
+      p.style.setProperty('--r', `${(i - (kinds.length - 1) / 2) * 5 + (i % 2 ? 2 : -2)}deg`);
+      p.style.animationDelay = `${i * 0.18}s`;
+      p.innerHTML = `<img alt=""><span>${CAP[k] || ''}</span>`;
+      row.appendChild(p);
+      g.cases.paint(k).then((url) => { p.querySelector('img').src = url; });
+    });
+  },
+
+  /** Lizzie's group chat on her phone screen: bubbles arrive one by one; click / key to put it away. */
+  phoneChat(title, msgs) {
+    const g = this.g;
+    return new Promise((resolve) => {
+      const root = document.getElementById('ui') || document.body;
+      const w = document.createElement('div');
+      w.className = 'lz-chat-wrap';
+      w.innerHTML = `<div class="lz-chat"><div class="bar"><b>${title}</b><small>Лиззи, Пуриэль, Викки, Оливия</small></div><div class="msgs"></div><div class="typing"><i></i><i></i><i></i></div></div><div class="hint">НАЖМИТЕ, ЧТОБЫ УБРАТЬ ТЕЛЕФОН</div>`;
+      root.appendChild(w);
+      g.bus.emit('panel', true);
+      const box = w.querySelector('.msgs');
+      let i = 0, done = false, timer = null;
+      const finish = () => {
+        if (done) return; done = true; clearTimeout(timer);
+        w.classList.add('out');
+        setTimeout(() => { w.remove(); g.bus.emit('panel', false); resolve(); }, 450);
+        window.removeEventListener('keydown', key, true);
+      };
+      const key = (e) => { if (i >= msgs.length) { e.preventDefault(); finish(); } };
+      const next = () => {
+        if (i >= msgs.length) { w.querySelector('.typing').style.visibility = 'hidden'; timer = setTimeout(finish, 6000 * (globalThis.__ts || 1)); return; }
+        const [who, text] = msgs[i++];
+        const me = who === 'lizzy';
+        const b = document.createElement('div');
+        b.className = `b ${me ? 'me' : ''}`;
+        b.innerHTML = `${me ? '' : `<em>${who}</em>`}${text}<s>${21 + Math.floor(i / 2)}:${String(10 + i * 3).padStart(2, '0')}</s>`;
+        box.appendChild(b);
+        box.scrollTop = box.scrollHeight;
+        g.audio.play('ui.hover', { volume: me ? 0.3 : 0.5 });
+        timer = setTimeout(next, (900 + text.length * 35) * (globalThis.__ts || 1));
+      };
+      w.addEventListener('pointerdown', () => { if (i >= msgs.length) finish(); });
+      window.addEventListener('keydown', key, true);
+      timer = setTimeout(next, 600 * (globalThis.__ts || 1));
+    });
+  },
+
+  /**
+   * The bedroom mirror reflects whoever stands in front of it — Lizzie sees herself; Julian, after
+   * the hospital, sees the room and nothing else.
+   */
+  updateMirror() {
+    const g = this.g, J = this.julian;
+    const w = g.world;
+    const m = w?.anchors?.mirror;
+    const here = g.locationId === 'apt_bedroom' && m && J.root.parent === w.root;
+    if (!here) { if (this.mirrorMesh) this.mirrorMesh.visible = false; return; }
+    if (!this.mirrorMesh || this.mirrorMesh.parent !== w.root) {
+      const tex = J.tex.clone(); tex.needsUpdate = true;
+      const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, alphaTest: 0.5, color: 0x8a8278, depthWrite: false });
+      this.mirrorMesh?.removeFromParent();
+      this.mirrorMesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat);
+      this.mirrorMesh.renderOrder = 3;
+      w.root.add(this.mirrorMesh);
+    }
+    const R = this.mirrorMesh;
+    const dx = J.position.x - m.x;
+    const vampire = this.outfit !== 'lizzy';
+    R.visible = !vampire && Math.abs(dx) < 1.4 && J.sprite.visible;
+    if (!R.visible) return;
+    // the top ~55 % of the current frame (head and shoulders), smaller and set back in the glass
+    const src = J.tex, t = R.material.map, part = 0.55;
+    t.offset.set(src.offset.x, src.offset.y + src.repeat.y * (1 - part));
+    t.repeat.set(src.repeat.x, src.repeat.y * part);
+    const sw = Math.abs(J.sprite.scale.x) * 0.62, sh = J.sprite.scale.y * part * 0.62;
+    R.scale.set(sw * -J.facing, sh, 1);
+    R.position.set(m.x + Math.max(-0.2, Math.min(0.2, dx * 0.35)), m.y + 0.46 - sh / 2 - 0.04, m.z - 0.045);
+  },
+
+  homeCommands() {
+    return { photos: async (arg) => this.vnPhotos(arg ? String(arg).split(',').filter(Boolean) : []) };
+  },
+
+  async loadHome(stage) {
+    this.bump();
+    await this.g.dialogue.abort();
+    this.homeLeaving = false;
+    await this.startHome(+stage.slice(-1));
+  },
+};
+
+export function installHome(Story) {
+  for (const [k, v] of Object.entries(Object.getOwnPropertyDescriptors(methods))) {
+    Object.defineProperty(Story.prototype, k, v);
+  }
+}

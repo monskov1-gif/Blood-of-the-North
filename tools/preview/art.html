@@ -1,0 +1,8 @@
+<!doctype html><meta charset="utf-8"><body style="background:#222;margin:0;display:flex;gap:6px;align-items:flex-start">
+<script type="importmap">{"imports":{"three":"../../vendor/three.module.min.js"}}</script>
+<script type="module">
+import { paintCocktail } from '../../src/ui/Overlays.js';
+import { streetTexture } from '../../src/render/textures.js';
+const c = paintCocktail(); c.style.width = '360px'; document.body.appendChild(c);
+for (const t of ['night', 'morning']) { const s = streetTexture(t).image; s.style.width = '560px'; document.body.appendChild(s); }
+</script>
