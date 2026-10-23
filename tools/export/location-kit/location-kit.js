@@ -1,21 +1,27 @@
 import * as THREE from 'three';
 
 /**
- * Furniture kit — interiors built from furniture and props, not from rooms.
+ * Location kit — whole locations: the room shell (walls with openings, floors, ceilings, sloped
+ * roofs, stairs, mouldings), windows with painted views and light falling in, lamps and the
+ * day / evening / night state system, furniture and props.
  * A standalone ES module (depends only on `three`, r150+), extracted from "Blood of the North".
+ * Companions: window-light.js (exposure + lens flare when the player passes a bright window or
+ * lamp), nature.js (outdoor: rocks, spruces, bare trees, relief ground, mist).
  *
- *   const kit = new FurnitureKit(scene, { low: false });   // root = any THREE.Object3D
+ *   const kit = new LocationKit(scene, { low: false });    // root = any THREE.Object3D
  *   kit.setupLights();                                     // hemi + fill, driven by states
- *   kit.sofa(-2, -2.2, 0);                                 // builders: x, z, ry, options
- *   kit.withT(1, -2.4, 0, () => { kit.rb(...); kit.mug(...); });   // free-form in a local frame
+ *   kit.wall(-6, 6, 2.8, BACK, wallM, [{ x0, x1, y0, y1 }]);    // shell: walls with holes, floor…
+ *   kit.sofa(-2, BACK, 0);                                 // builders: x, z, ry, options
+ *   kit.withT(1, BACK, 0, () => { kit.rb(...); kit.mug(...); });  // free-form in a local frame
  *   kit.flushBatches();                                    // ALWAYS at the end of the build
  *   kit.setState('evening');                               // 'evening' | 'night' | 'day'
- *   // per frame: kit.update(dt)
+ *   // per frame: kit.update(dt); windowLight.update(dt, { world: kit, player, camera })
  *
- * Conventions: metres; y up; a piece's local frame has its back against z = 0 ("the wall") and
- * its front facing +z (toward a side-on camera). Textures are small canvases with nearest
- * filtering, 1 texel ≈ 1 cm — the pixel-art register. Static geometry is batched per material
- * (one draw call per material); anything that changes (lamps, flames) is a separate mesh.
+ * Conventions: metres; y up; side-on "dollhouse" camera on +z, x along the location, back wall at
+ * z = BACK, the near wall cut away. A piece's local frame has its back against z = 0 and its front
+ * facing +z. Textures are small canvases with nearest filtering, 1 texel ≈ 1 cm — the pixel-art
+ * register. Static geometry is batched per material (one draw call per material); anything that
+ * changes (lamps, flames, doors that open) is a separate mesh.
  */
 
 // ------------------------------------------------------------------ small utils
@@ -54,6 +60,24 @@ export function canvasTexture(key, w, h, draw, { repeat = [1, 1], color = true, 
 }
 /** Pixel texture: nearest-filtered, no mipmaps. Size it so 1 texel ≈ 1 cm of the surface. */
 export const TX = (key, w, h, draw, o = {}) => canvasTexture(`fk-${key}`, w, h, draw, { nearest: true, aniso: 1, ...o });
+
+/**
+ * Posterise a painted canvas into pixel art: downscale by k, stepped tones with a 2×2 ordered
+ * dither, upscale with nearest. Smooth glows and fog become pixel bands (window views, backdrops).
+ */
+export function pixelate(ctx, w, h, k = 3) {
+  const sw = Math.max(1, Math.round(w / k)), sh = Math.max(1, Math.round(h / k));
+  const small = document.createElement('canvas'); small.width = sw; small.height = sh;
+  const sc = small.getContext('2d');
+  sc.imageSmoothingEnabled = true; sc.drawImage(ctx.canvas, 0, 0, sw, sh);
+  const img = sc.getImageData(0, 0, sw, sh), d = img.data, step = 14, bayer = [-0.375, 0.125, 0.375, -0.125];
+  for (let y = 0; y < sh; y++) for (let x = 0; x < sw; x++) {
+    const i = (y * sw + x) * 4, o = bayer[(y & 1) * 2 + (x & 1)] * step;
+    for (let c = 0; c < 3; c++) d[i + c] = Math.max(0, Math.min(255, Math.round((d[i + c] + o) / step) * step));
+  }
+  sc.putImageData(img, 0, 0);
+  ctx.save(); ctx.imageSmoothingEnabled = false; ctx.clearRect(0, 0, w, h); ctx.drawImage(small, 0, 0, w, h); ctx.restore();
+}
 
 export function glowTexture() {
   return canvasTexture('fk-glow', 128, 128, (ctx, w, h) => {
@@ -508,12 +532,166 @@ const artTex = (k = 0) => TX(`art-${k}`, 48, 32, (ctx, w, h) => {
   }
 });
 
+/** Soft vertical light shaft (a sunbeam through a window or between trees), additive alpha. */
+export function shaftTexture() {
+  return canvasTexture('fk-shaft', 64, 256, (ctx, w, h) => {
+    const img = ctx.createImageData(w, h);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const u = Math.abs(x / w - 0.5) * 2, v = y / h;
+      const a = Math.pow(1 - u, 2.2) * Math.sin(Math.PI * Math.min(1, v * 1.15)) * (0.75 + 0.25 * noise3(x / 9, y / 40, 1, 4));
+      const i = (y * w + x) * 4;
+      img.data[i] = 255; img.data[i + 1] = 255; img.data[i + 2] = 255; img.data[i + 3] = Math.max(0, a) * 255;
+    }
+    ctx.putImageData(img, 0, 0);
+  }, { color: false });
+}
+
+// ------------------------------------------------------------------ window views
+
+/**
+ * The view out of a window, painted per state ('day' | 'evening' | 'night') and pixelated:
+ * a small northern town in November — grey hills with snow on the tops, a spruce belt, wood-sided
+ * houses with lit windows, street lamps, a pickup. variant 'low' = across the street (ground
+ * floor), 'high' = over the roofs (upper floor). Write your own view functions with the same
+ * signature (time, variant) → texture and pass them to viewPlane / brightWindow.
+ * Never brighter than #E4DCCC on screen: the view material is tinted per state.
+ */
+export function townView(time, variant = 'low') {
+  return canvasTexture(`fk-view-${variant}-${time}`, 768, 512, (ctx, w, h) => {
+    const r = rng(variant === 'high' ? 77 : 41);
+    const day = time === 'day', eve = time === 'evening';
+    const pick = (d, e, n) => (day ? d : eve ? e : n);
+    const high = variant === 'high';
+    const hz = h * (high ? 0.44 : 0.36);
+    // sky
+    const sk = ctx.createLinearGradient(0, 0, 0, hz + 40);
+    if (day) { sk.addColorStop(0, '#7c8794'); sk.addColorStop(0.6, '#a6afb8'); sk.addColorStop(1, '#bcc3c8'); }
+    else if (eve) { sk.addColorStop(0, '#0a1226'); sk.addColorStop(0.55, '#1c2b4c'); sk.addColorStop(1, '#3c4668'); }
+    else { sk.addColorStop(0, '#02040a'); sk.addColorStop(0.6, '#070d1a'); sk.addColorStop(1, '#0e1628'); }
+    ctx.fillStyle = sk; ctx.fillRect(0, 0, w, h);
+    if (!day) for (let i = 0; i < (eve ? 12 : 40); i++) { ctx.fillStyle = `rgba(220,230,255,${0.3 + r() * 0.5})`; ctx.fillRect(r() * w, r() * hz * 0.6, 2, 2); }
+    if (time === 'night') { const m = ctx.createRadialGradient(600, 70, 2, 600, 70, 60); m.addColorStop(0, 'rgba(230,236,255,0.9)'); m.addColorStop(0.2, 'rgba(160,180,220,0.3)'); m.addColorStop(1, 'rgba(60,80,120,0)'); ctx.fillStyle = m; ctx.fillRect(520, 0, 160, 150); ctx.fillStyle = '#e4e8f0'; ctx.beginPath(); ctx.arc(600, 70, 11, 0, 7); ctx.fill(); }
+    if (eve) { const gl = ctx.createLinearGradient(0, hz - 40, 0, hz + 30); gl.addColorStop(0, 'rgba(140,110,120,0)'); gl.addColorStop(1, 'rgba(150,110,110,0.35)'); ctx.fillStyle = gl; ctx.fillRect(0, hz - 40, w, 70); }
+    // hills: two ranges, snow on the higher tops only (November)
+    for (let k = 0; k < 2; k++) {
+      const ridge = [];
+      for (let x = 0; x <= w; x += 4) ridge.push(hz - (k ? 50 : 110) + Math.sin(x * 0.006 + k * 2.1) * (k ? 22 : 46) + Math.sin(x * 0.019 + k) * 12 + Math.sin(x * 0.05) * 4);
+      ctx.fillStyle = pick(['#8892a0', '#6c7682'][k], ['#1d2844', '#151e36'][k], ['#0b1220', '#080e1a'][k]);
+      ctx.beginPath(); ctx.moveTo(0, h); ridge.forEach((y, i) => ctx.lineTo(i * 4, y)); ctx.lineTo(w, h); ctx.fill();
+      if (k === 0) {
+        const top = Math.min(...ridge);
+        ctx.fillStyle = pick('#d4d9de', '#4a5878', '#24304a');
+        ridge.forEach((y, i) => { const d = (top + 44 - y) * 0.7 + Math.sin(i * 1.7) * 6; if (d > 2) ctx.fillRect(i * 4, y, 4, d); });
+      }
+    }
+    // spruce belt
+    const spruce = (x, y, s, c) => {
+      ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(x, y - s);
+      for (let k = 1; k <= 6; k++) { const yy = y - s + (s * k) / 6, ww = s * (0.05 + 0.2 * k / 6); ctx.lineTo(x + ww, yy); ctx.lineTo(x + ww * 0.4, yy - s * 0.02); }
+      for (let k = 6; k >= 1; k--) { const yy = y - s + (s * k) / 6, ww = s * (0.05 + 0.2 * k / 6); ctx.lineTo(x - ww * 0.4, yy - s * 0.02); ctx.lineTo(x - ww, yy); }
+      ctx.fill();
+    };
+    const belt = hz + (high ? 20 : 10);
+    ctx.fillStyle = pick('#4a5450', '#0e1420', '#05080e'); ctx.fillRect(0, belt - 8, w, h);
+    for (let i = 0; i < 110; i++) spruce(r() * w, belt + r() * 10, 30 + r() * 30, pick(r() < 0.5 ? '#3a4640' : '#46524a', '#0a101a', '#04070c'));
+    // houses across the street
+    const groundY = high ? h * 0.78 : h * 0.72;
+    ctx.fillStyle = pick('#6e6656', '#16181e', '#0a0c10'); ctx.fillRect(0, groundY - 40, w, h);
+    const sidings = [[138, 74, 58], [90, 106, 120], [176, 150, 90], [95, 112, 90], [200, 192, 176], [120, 60, 50]];
+    const k0 = pick(1, 0.28, 0.12);
+    const lamps = [];
+    let hx = -40 + r() * 30;
+    while (hx < w) {
+      const bw = 120 + r() * 70, wh = 70 + r() * 30, rh = 34 + r() * 20, y = groundY - 10 + r() * 8;
+      const c = sidings[Math.floor(r() * sidings.length)];
+      const tint = (v, i) => v * k0 + (day ? 0 : [10, 14, 28][i]);
+      ctx.fillStyle = rgb(tint(c[0], 0), tint(c[1], 1), tint(c[2], 2)); ctx.fillRect(hx, y - wh, bw, wh);
+      ctx.fillStyle = 'rgba(0,0,0,0.12)'; for (let yy = y - wh; yy < y; yy += 5) ctx.fillRect(hx, yy, bw, 1);
+      ctx.fillStyle = pick('#3a3a40', '#0e1018', '#06080c');
+      ctx.beginPath(); ctx.moveTo(hx - 8, y - wh); ctx.lineTo(hx + bw / 2, y - wh - rh); ctx.lineTo(hx + bw + 8, y - wh); ctx.fill();
+      ctx.fillStyle = pick('rgba(226,230,234,0.75)', 'rgba(90,104,140,0.6)', 'rgba(50,62,90,0.6)');
+      for (let k = 0; k < 14; k++) { const t = r(), side = r() < 0.5 ? -1 : 1; const px = hx + bw / 2 + side * t * (bw / 2 + 6), py = y - wh - rh * (1 - t); ctx.fillRect(px - 6, py, 10 + r() * 8, 3); }
+      ctx.fillStyle = pick('#4a3a34', '#120e10', '#08080a'); ctx.fillRect(hx + bw * 0.7, y - wh - rh * 0.8, 10, rh * 0.6);
+      for (let k = 0; k < 3; k++) {
+        const wx = hx + 14 + k * (bw - 40) / 2, wy = y - wh + 18;
+        const lit = eve ? r() < 0.75 : time === 'night' ? r() < 0.22 : false;
+        ctx.fillStyle = pick('#e4e6e2', '#2a2e38', '#1a1c22'); ctx.fillRect(wx - 2, wy - 2, 24, 26);
+        ctx.fillStyle = lit ? (r() < 0.7 ? '#ffc878' : '#ffe2a8') : pick('#4a5868', '#141a28', '#0c1018');
+        ctx.fillRect(wx, wy, 20, 22);
+        if (lit) { const gg = ctx.createRadialGradient(wx + 10, wy + 11, 2, wx + 10, wy + 11, 30); gg.addColorStop(0, 'rgba(255,190,110,0.35)'); gg.addColorStop(1, 'rgba(255,190,110,0)'); ctx.fillStyle = gg; ctx.fillRect(wx - 20, wy - 20, 60, 62); }
+        ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(wx + 9, wy, 2, 22);
+      }
+      ctx.fillStyle = pick('#5a4030', '#120c0a', '#080606'); ctx.fillRect(hx + bw - 34, y - 46, 18, 46);
+      lamps.push(hx + bw + 12);
+      hx += bw + 30 + r() * 30;
+    }
+    // bare birches, the street, sidewalk, a pickup, lamp posts
+    for (let i = 0; i < 6; i++) {
+      const tx = r() * w, ty = groundY + 4, s = 90 + r() * 50;
+      ctx.strokeStyle = pick('#c8c4bc', '#2a2c34', '#14161c'); ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(tx, ty - s); ctx.stroke();
+      ctx.strokeStyle = pick('#5a4a40', '#181a20', '#0c0e12'); ctx.lineWidth = 1;
+      for (let k = 0; k < 14; k++) { const by = ty - s * (0.4 + r() * 0.6), a = (r() - 0.5) * 1.6; ctx.beginPath(); ctx.moveTo(tx, by); ctx.lineTo(tx + Math.sin(a) * 30, by - Math.cos(a) * 26); ctx.stroke(); }
+    }
+    ctx.fillStyle = pick('#8a8a86', '#24262c', '#121418'); ctx.fillRect(0, groundY + 6, w, 8);
+    ctx.fillStyle = pick('#4e5054', '#141820', '#0a0c10'); ctx.fillRect(0, groundY + 14, w, h);
+    ctx.fillStyle = pick('rgba(220,224,228,0.6)', 'rgba(80,90,120,0.5)', 'rgba(50,60,80,0.5)'); for (let i = 0; i < 50; i++) ctx.fillRect(r() * w, groundY + 4 + r() * 6, 6 + r() * 14, 2);
+    const px = 420, py = groundY + 40;
+    ctx.fillStyle = pick('#6a2a22', '#1e1418', '#0e0a0c'); ctx.fillRect(px, py - 26, 130, 26); ctx.fillRect(px + 10, py - 46, 56, 22);
+    ctx.fillStyle = pick('#8a9aa8', '#1a2230', '#0c1018'); ctx.fillRect(px + 16, py - 42, 44, 14);
+    ctx.fillStyle = '#0a0a0c'; ctx.fillRect(px + 14, py - 6, 24, 14); ctx.fillRect(px + 94, py - 6, 24, 14);
+    for (const lx of lamps.filter((_, i) => i % 2 === 0)) {
+      ctx.fillStyle = pick('#3a3c40', '#0c0e12', '#06070a'); ctx.fillRect(lx, groundY - 120, 4, 134); ctx.fillRect(lx - 14, groundY - 120, 18, 4);
+      if (!day) {
+        const gg = ctx.createRadialGradient(lx - 10, groundY - 114, 1, lx - 10, groundY - 114, 60); gg.addColorStop(0, 'rgba(255,200,120,0.95)'); gg.addColorStop(0.15, 'rgba(255,160,80,0.4)'); gg.addColorStop(1, 'rgba(255,140,60,0)');
+        ctx.fillStyle = gg; ctx.fillRect(lx - 80, groundY - 180, 140, 140);
+        const pool = ctx.createRadialGradient(lx - 10, groundY + 30, 2, lx - 10, groundY + 30, 70); pool.addColorStop(0, 'rgba(255,170,90,0.35)'); pool.addColorStop(1, 'rgba(255,170,90,0)');
+        ctx.fillStyle = pool; ctx.fillRect(lx - 90, groundY - 10, 160, 90);
+      }
+    }
+    pixelate(ctx, w, h, 3);
+  }, { nearest: true, aniso: 1 });
+}
+
+
+// ------------------------------------------------------------------ light profiles
+
+/**
+ * Lens-flare / exposure profiles for window-light.js. A "light zone" = profile + position + dir.
+ *   Windows (brightWindow):  A warm old window · B cold modern · C through blinds (streaks) · D very strong
+ *   Point sources (flareSource): LAMP warm lamp · PALE overcast window · MOON · MIST sun in fog ·
+ *   LOWSUN low sun / headlights ('anamorphic')
+ * shaft / patch = opacity of the light shaft and the floor patch that brightWindow builds.
+ */
+export const WINDOW_PROFILES = {
+  A: { id: 'A', color: 0xffd8a0, triggerDistance: 3.4, fadeDistance: 2.2, intensity: 1.0, exposure: 0.13, bloom: 0.18, shaft: 0.18, patch: 0.28,
+    flareSize: 1.0, starburstIntensity: 1.0, ghostIntensity: 0.8, ghostCount: 6, ghostSpacing: 0.42, ringIntensity: 0.5, colorTint: [1.0, 0.86, 0.6], ghostTints: [[0.5, 1.0, 0.6], [0.8, 1.0, 0.5], [1.0, 0.7, 0.3]], maxScreenOpacity: 0.85, old: true },
+  B: { id: 'B', color: 0xdfe8ff, triggerDistance: 2.8, fadeDistance: 1.8, intensity: 0.7, exposure: 0.12, bloom: 0.2, shaft: 0.14, patch: 0.18,
+    flareSize: 0.75, starburstIntensity: 0.45, ghostIntensity: 0.6, ghostCount: 5, ghostSpacing: 0.5, ringIntensity: 0.6, colorTint: [0.85, 0.92, 1.0], ghostTints: [[0.5, 0.6, 1.0], [0.8, 0.5, 1.0], [0.6, 0.9, 1.0]], maxScreenOpacity: 0.6 },
+  C: { id: 'C', color: 0xe8ecf4, triggerDistance: 2.6, fadeDistance: 1.6, intensity: 0.55, exposure: 0.08, bloom: 0.25, shaft: 0.12, patch: 0.14,
+    flareSize: 0.7, starburstIntensity: 0.3, ghostIntensity: 0.35, ghostCount: 3, ghostSpacing: 0.6, ringIntensity: 0.2, colorTint: [0.95, 0.97, 1.0], ghostTints: [[0.9, 0.95, 1.0]], streaks: true, maxScreenOpacity: 0.5, old: true },
+  D: { id: 'D', color: 0xfff0d4, triggerDistance: 4.5, fadeDistance: 4.0, intensity: 1.2, exposure: 0.24, bloom: 0.4, shaft: 0.2, patch: 0.3,
+    flareSize: 1.35, starburstIntensity: 1.4, ghostIntensity: 1.0, ghostCount: 8, ghostSpacing: 0.36, ringIntensity: 0.8, colorTint: [1.0, 0.94, 0.8], ghostTints: [[0.5, 1.0, 0.6], [0.4, 0.7, 1.0], [1.0, 0.4, 0.3], [1.0, 0.85, 0.4]], maxScreenOpacity: 0.95, old: true },
+};
+const fbase = { triggerDistance: 3.0, fadeDistance: 2.0, exposure: 0.08, bloom: 0.15, starburstIntensity: 0, ringIntensity: 0, ghostCount: 6, ghostSpacing: 0.4, ghostTints: [[1, 0.8, 0.5]] };
+export const FLARE_PROFILES = {
+  LAMP: { ...fbase, id: 'LAMP', style: 'star', intensity: 0.8, flareSize: 0.75, ghostIntensity: 0.7, colorTint: [1.0, 0.78, 0.5], maxScreenOpacity: 0.75 },
+  PALE: { ...fbase, id: 'PALE', style: 'star', intensity: 0.6, flareSize: 0.8, ghostIntensity: 0.5, colorTint: [0.9, 0.94, 1.0], maxScreenOpacity: 0.55, exposure: 0.1 },
+  MOON: { ...fbase, id: 'MOON', style: 'star', intensity: 0.5, flareSize: 0.6, ghostIntensity: 0.45, colorTint: [0.7, 0.82, 1.0], maxScreenOpacity: 0.5, exposure: 0.04, bloom: 0.08 },
+  MIST: { ...fbase, id: 'MIST', style: 'star', intensity: 0.55, flareSize: 1.3, ghostIntensity: 0.35, colorTint: [1.0, 0.92, 0.78], maxScreenOpacity: 0.5, exposure: 0.05, bloom: 0.12 },
+  LOWSUN: { ...fbase, id: 'LOWSUN', style: 'anamorphic', intensity: 0.9, flareSize: 0.9, ghostIntensity: 0.8, colorTint: [1.0, 0.66, 0.25], maxScreenOpacity: 0.8, exposure: 0.1, bloom: 0.2 },
+};
+/** A point light zone for window-light.js: profile + position (+ dir, default facing the camera). */
+export function flareSource(profile, position, opts = {}) {
+  return { ...FLARE_PROFILES[profile], position, dir: opts.dir || new THREE.Vector3(0, 0, 1), ...opts };
+}
+
 /** The texture library. Use with kit.texM(key, TEX.oak(1)). */
 export const TEX = {
   planks: planksTex, paint: paintTex, terracotta: terracottaTex, redTile: redTileTex, oak: oakTex,
   darkWood: darkWoodTex, stained: stainedTex, blinds: blindsTex, stripes: stripeTex, ticking: tickingTex,
   shag: shagTex, carpet: carpetTex, jute: juteTex, plaid: plaidTex, quilt: quiltTex, coir: coirTex,
   paper: paperTex, leaf: leafTex, mirror: mirrorTex, roman: romanTex, art: artTex,
+  view: townView, shaft: shaftTexture,
 };
 
 export const BOOK_COLS = [0x7a2a24, 0x2a4a5a, 0xc8a050, 0x3a5a3a, 0xd8d0c0, 0x5a3a5a, 0x2a2a30, 0x9a5a2a, 0x4a6a8a];
@@ -526,8 +704,9 @@ export const AMBIENT = {
 };
 
 // ------------------------------------------------------------------ the kit
+// (LocationKit; `FurnitureKit` is the same class under its old name)
 
-export class FurnitureKit {
+export class LocationKit {
   /**
    * @param root  THREE.Object3D everything is added to (a scene or a group)
    * @param low   true → MeshLambertMaterial everywhere (weak GPUs / swiftshader), false → Standard
@@ -543,6 +722,8 @@ export class FurnitureKit {
     this.lamps = [];
     this.stateFx = [];
     this.flames = [];
+    this.views = [];
+    this.windowLights = [];   // light zones for window-light.js (windows, lamps, sun, moon)
     this.state = 'evening';
     this.time = 0;
     this.background = ambient.evening?.bg ?? 0x000000;
@@ -645,15 +826,20 @@ export class FurnitureKit {
     this.fill.position.set(-2, 4, 6);
     this.root.add(this.hemi, this.fill);
   }
+  /** Run fn(stateName) on every state switch (custom per-state tweaks: hide a prop at night…). */
+  onState(fn) { this.stateFx.push(fn); }
   /**
-   * A switchable lamp. `on` = level per state (0…1); `light` = a PointLight (its intensity is the
-   * full-on value); `glows` = halo sprites; `mats` = [[material, emissiveIntensity when fully on]].
+   * A switchable lamp. `on` = level per state (0…1); `light` = a PointLight / SpotLight (its
+   * intensity is the full-on value); `glows` = halo sprites; `mats` = [[material, emissiveIntensity
+   * when fully on]]; `flare` = { pos } adds a lens-flare zone that shows while the lamp is lit.
    */
-  lamp(id, { light = null, glows = [], mats = [], on = { evening: 1, night: 0, day: 0 } } = {}) {
-    if (light) this.root.add(light);
+  lamp(id, { light = null, glows = [], mats = [], on = { evening: 1, night: 0, day: 0 }, flare = null } = {}) {
+    if (light) { this.root.add(light); if (light.target) this.root.add(light.target); }
     for (const s of glows) if (!s.parent) this.root.add(s);
     const L = { id, light, base: light ? light.intensity : 0, glows: glows.map((s) => ({ s, sc: s.scale.clone() })), mats, on, level: 0, forced: null };
     this.lamps.push(L);
+    // flare: { pos: world Vector3, opts } — a 'star' lens flare when the player walks up to the lit lamp
+    if (flare) this.windowLights.push(flareSource('LAMP', flare.pos, { triggerDistance: 2.2, intensity: 0.5, flareSize: 0.55, ...flare.opts, enabled: () => L.level > 0.3 }));
     return L;
   }
   applyLamp(L, level) {
@@ -693,6 +879,8 @@ export class FurnitureKit {
     if (this.fill) { this.fill.color.setHex(A.fill); this.fill.intensity = A.fillI; }
     this.background = A.bg;
     for (const L of this.lamps) this.applyLamp(L, L.forced ?? L.on[name] ?? 0);
+    const tint = { day: 0xd8d6d0, evening: 0xffffff, night: 0xd0d4dc }[name] ?? 0xffffff;
+    for (const v of this.views) { v.mat.map = v.fn(name, v.variant); v.mat.color.setHex(v.tint ?? tint); v.mat.needsUpdate = true; }
     for (const f of this.stateFx) f(name);
   }
   /** Per frame: candle flicker. */
@@ -704,6 +892,262 @@ export class FurnitureKit {
       f.flame.scale.set(1, 1.8 * k, 1);
       if (f.halo.visible) f.halo.scale.setScalar(f.size * k);
     }
+  }
+
+  // ---------------------------------------------------------------- room shell
+  // All batched, with world-space UVs: a texture covers `tile` metres, so it tiles evenly across
+  // walls of any size (no stretching). Walls face +z (toward the camera); the near wall is not built.
+
+  /** Floor rectangle at height y. */
+  floorRect(x0, x1, z0, z1, mat, { tile = 1.28, y = 0 } = {}) {
+    const g = new THREE.PlaneGeometry(x1 - x0, z1 - z0);
+    g.rotateX(-Math.PI / 2);
+    return this._add(g, mat, (x0 + x1) / 2, y, (z0 + z1) / 2, { uv: [tile, tile] });
+  }
+  /** Floor from a polygon [[x, z], …] with optional holes (a stairwell). */
+  floorPoly(pts, mat, { holes = [], tile = 1.28, y = 0 } = {}) {
+    const s = new THREE.Shape(pts.map(([x, z]) => new THREE.Vector2(x, -z)));
+    for (const h of holes) s.holes.push(new THREE.Path(h.map(([x, z]) => new THREE.Vector2(x, -z))));
+    const g = new THREE.ShapeGeometry(s);
+    g.rotateX(-Math.PI / 2);   // shape y = −z → world z, facing up
+    return this._add(g, mat, 0, y, 0, { uv: [tile, tile] });
+  }
+  /** Ceiling (facing down) from a polygon [[x, z], …] at height y, with optional holes. */
+  ceilingPoly(pts, y, mat, { holes = [], tile = 2 } = {}) {
+    const s = new THREE.Shape(pts.map(([x, z]) => new THREE.Vector2(x, z)));
+    for (const h of holes) s.holes.push(new THREE.Path(h.map(([x, z]) => new THREE.Vector2(x, z))));
+    const g = new THREE.ShapeGeometry(s);
+    g.rotateX(Math.PI / 2);    // shape y → world z, facing down
+    return this._add(g, mat, 0, y, 0, { uv: [tile, tile] });
+  }
+  /**
+   * Back wall along x at depth z, height h, with rectangular openings [{ x0, x1, y0, y1 }] for
+   * windows (y0 > 0) and doors (y0 = 0). Put windowUnit / panelDoor / brightWindow into the holes.
+   */
+  wall(x0, x1, h, z, mat, holes = [], { tile = 2 } = {}) {
+    const s = new THREE.Shape();
+    s.moveTo(x0, 0); s.lineTo(x1, 0); s.lineTo(x1, h); s.lineTo(x0, h); s.lineTo(x0, 0);
+    for (const o of holes) { const p = new THREE.Path(); p.moveTo(o.x0, o.y0); p.lineTo(o.x0, o.y1); p.lineTo(o.x1, o.y1); p.lineTo(o.x1, o.y0); p.lineTo(o.x0, o.y0); s.holes.push(p); }
+    return this._add(new THREE.ShapeGeometry(s), mat, 0, 0, z, { uv: [tile, tile] });
+  }
+  /** Any wall polygon in the xy plane at depth z (gables, walls under a slope): pts [[x, y], …]. */
+  wallPoly(pts, z, mat, { holes = [], tile = 2, ry = 0 } = {}) {
+    const s = new THREE.Shape(pts.map(([x, y]) => new THREE.Vector2(x, y)));
+    for (const o of holes) s.holes.push(new THREE.Path([[o.x0, o.y0], [o.x0, o.y1], [o.x1, o.y1], [o.x1, o.y0]].map(([x, y]) => new THREE.Vector2(x, y))));
+    return this._add(new THREE.ShapeGeometry(s), mat, 0, 0, z, { uv: [tile, tile], ry });
+  }
+  /** Side wall at x from z0 to z1, facing +x (dir 1, the left end) or −x (dir −1, the right end). */
+  sideWall(x, z0, z1, h, mat, dir, { tile = 2 } = {}) {
+    return this._add(new THREE.PlaneGeometry(z1 - z0, h), mat, x, h / 2, (z0 + z1) / 2, { ry: dir > 0 ? Math.PI / 2 : -Math.PI / 2, uv: [tile, tile] });
+  }
+  /** A partition with thickness d at z (x0…x1): the front face with openings + reveals inside them. */
+  partition(x0, x1, h, z, d, mat, holes = []) {
+    this.wall(x0, x1, h, z + d / 2, mat, holes);
+    for (const o of holes) {   // reveals inside each opening
+      this.pl(d, o.y1 - o.y0, mat, o.x0, (o.y0 + o.y1) / 2, z, { ry: Math.PI / 2 });
+      this.pl(d, o.y1 - o.y0, mat, o.x1, (o.y0 + o.y1) / 2, z, { ry: -Math.PI / 2 });
+      if (o.y1 < h) this.pl(o.x1 - o.x0, d, mat, (o.x0 + o.x1) / 2, o.y1, z, { rx: Math.PI / 2 });
+    }
+  }
+  /**
+   * A sloped roof plane (attic): a strip from x0 to x1 whose lower edge is at (y0, z0) and upper
+   * edge at (y1, z1). Faces the room (down / toward +z).
+   */
+  slope(x0, x1, y0, z0, y1, z1, mat, { tile = 2 } = {}) {
+    const L = Math.hypot(y1 - y0, z1 - z0);
+    const g = new THREE.PlaneGeometry(x1 - x0, L);
+    return this._add(g, mat, (x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2, { rx: Math.atan2(z1 - z0, y1 - y0), uv: [tile, tile] });
+  }
+  /** Skirting board and/or crown moulding along the back wall at z, over spans [[x0, x1], …]. */
+  trims(spans, z, H, { skirt = true, crown = true, color = null } = {}) {
+    const w = color ? this.M(`trim-${color}`, color, { roughness: 0.55 }) : this.white();
+    for (const [a, b] of spans) {
+      if (b - a < 0.05) continue;
+      if (skirt) this.rb(b - a, 0.11, 0.025, 0.008, w, (a + b) / 2, 0.055, z + 0.013);
+      if (crown) { this.rb(b - a, 0.07, 0.05, 0.015, w, (a + b) / 2, H - 0.035, z + 0.025); this.rb(b - a, 0.025, 0.08, 0.01, w, (a + b) / 2, H - 0.075, z + 0.02); }
+    }
+  }
+  /** Wainscot: a lower wall band (panelling or tile texture) up to y with a chair rail on top. */
+  wainscot(spans, z, y, mat, { rail = true, railColor = null } = {}) {
+    const rm = railColor ? this.M(`rail-${railColor}`, railColor, { roughness: 0.5 }) : this.white();
+    for (const [a, b] of spans) {
+      this.rb(b - a, y, 0.015, 0.004, mat, (a + b) / 2, y / 2, z + 0.008, { uv: [1, 1] });
+      if (rail) this.rb(b - a, 0.045, 0.035, 0.01, rm, (a + b) / 2, y, z + 0.018);
+    }
+  }
+  /** Square pilaster / column with base and capital (fronts of corridors, porches). */
+  column(x, z, h, mat, { w = 0.3, d = 0.3 } = {}) {
+    this.rb(w, h - 0.2, d, 0.02, mat, x, h / 2, z);
+    this.rb(w + 0.06, 0.1, d + 0.06, 0.02, mat, x, 0.05, z);
+    this.rb(w + 0.08, 0.1, d + 0.08, 0.02, mat, x, h - 0.05, z);
+  }
+  /**
+   * A straight flight of stairs rising along +x from x0 against the back wall (z0 = back, width
+   * w toward +z): treads, white risers, a closed side panel (sideMat) under the flight, stringer,
+   * balusters, handrail and newel. Returns railY(x) — the handrail height at x (for fairy lights,
+   * a hand on the rail, the camera).
+   */
+  stairs(x0, z0, { n = 12, run = 0.2, H = 2.8, w = 0.88, tread = null, riser = null, sideMat = null, rail = true } = {}) {
+    const rise = H / n, zc = z0 + w / 2;
+    const oak = tread || this.texM('oakMid', TEX.oak(1), { roughness: 0.55 });
+    const wm = riser || this.white();
+    for (let i = 0; i < n; i++) {
+      const xa = x0 + i * run, y = (i + 1) * rise;
+      this.rb(run + 0.035, 0.035, w, 0.01, oak, xa + run / 2 - 0.015, y - 0.0175, zc);
+      this.rb(0.02, rise - 0.03, w - 0.02, 0.004, wm, xa, y - rise / 2 - 0.02, zc);
+    }
+    if (sideMat) {
+      const s = new THREE.Shape([new THREE.Vector2(x0, 0), new THREE.Vector2(x0 + n * run, 0), new THREE.Vector2(x0 + n * run, H - 0.03), new THREE.Vector2(x0, rise - 0.03)]);
+      this._add(new THREE.ShapeGeometry(s), sideMat, 0, 0, z0 + w + 0.005, { uv: [2, 2] });
+    }
+    const L = Math.hypot(n * run, H), ang = Math.atan2(H, n * run);
+    this.rb(L + 0.1, 0.2, 0.04, 0.01, wm, x0 + n * run / 2 + 0.02, H / 2 - 0.02, z0 + w + 0.02, { rz: ang });
+    this.rb(L + 0.1, 0.16, 0.025, 0.008, wm, x0 + n * run / 2 + 0.02, H / 2 + 0.05, z0 + 0.013, { rz: ang });
+    const railY = (x) => (x - x0) / run * rise + 0.92;
+    if (rail) {
+      for (let i = 0; i < n; i++) { const x = x0 + i * run + run / 2; this.rod([x, (i + 1) * rise, z0 + w - 0.04], [x, railY(x) - 0.02, z0 + w - 0.04], 0.012, wm); }
+      this.rod([x0 + 0.02, railY(x0 + 0.02) + 0.05, z0 + w - 0.04], [x0 + n * run, railY(x0 + n * run), z0 + w - 0.04], 0.028, oak, { seg: 16 });
+      this.rb(0.1, 1.2, 0.1, 0.02, oak, x0 + 0.03, 0.6, z0 + w - 0.04);
+      this.lathe([[0.001, 0], [0.06, 0], [0.065, 0.04], [0.03, 0.07], [0.04, 0.1], [0.001, 0.12]], oak, x0 + 0.03, 1.2, z0 + w - 0.04);
+    }
+    return railY;
+  }
+
+  // ---------------------------------------------------------------- windows, views, light falling in
+
+  /**
+   * The painted view behind a window: a plane at depth z (put it 1.5–3 m behind the wall so it
+   * parallaxes a little as the camera moves). view(time, variant) → texture, re-painted per state.
+   * Make it much larger than the opening so no edge shows from any camera position.
+   */
+  viewPlane(w, h, x, y, z, { view = townView, variant = 'low', ry = 0, tint = null } = {}) {
+    const mat = new THREE.MeshBasicMaterial({ map: view(this.state, variant), color: 0xffffff, fog: false });
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
+    m.position.copy(this.P(x, y, z)); m.rotation.y = ry;
+    this.root.add(m);
+    this.views.push({ mat, variant, fn: view, tint });
+    return m;
+  }
+  /**
+   * A window that lets real daylight in (corridors, wards, classrooms, a station): opening
+   * x0…x1 × y0…y1 in the back wall at z, the view behind it, the glare of the glass, frame and
+   * mullions, optional blinds, an additive light shaft falling onto the floor, a warm patch where
+   * it lands, cold moonlit panes on the floor at night, and a light zone (exposure + lens flare)
+   * for window-light.js. profile: WINDOW_PROFILES key or object. Cut the hole in the wall yourself.
+   * World coordinates: call it outside withT.
+   */
+  brightWindow(x0, x1, y0, y1, z, { profile = 'A', view = townView, variant = 'low', blinds = false, fall = 2.6 } = {}) {
+    const P = typeof profile === 'string' ? WINDOW_PROFILES[profile] : profile;
+    const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, w = x1 - x0, h = y1 - y0;
+    this.viewPlane(w + 2.4, h + 1.8, cx, cy, z - 1.6, { view, variant, tint: 0xe4dccc });
+    const glareMat = new THREE.MeshBasicMaterial({ color: P.color, transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false });
+    const glare = new THREE.Mesh(new THREE.PlaneGeometry(w, h), glareMat);
+    glare.position.set(cx, cy, z - 0.05); glare.renderOrder = 2; this.root.add(glare);
+    const frame = this.M(P.old ? 'winWood' : 'winAlu', P.old ? 0x5a3c22 : 0xb8c0c4, P.old ? { roughness: 0.5 } : { metalness: 0.4, roughness: 0.35 });
+    this.rb(w + 0.14, 0.08, 0.14, 0.015, frame, cx, y1 + 0.04, z);
+    this.rb(w + 0.2, 0.06, 0.24, 0.015, frame, cx, y0 - 0.03, z + 0.05);
+    for (const x of [x0 - 0.04, x1 + 0.04]) this.rb(0.08, h, 0.14, 0.015, frame, x, cy, z);
+    const panes = P.old ? Math.max(2, Math.round(w / 0.45)) : 2;
+    for (let k = 1; k < panes; k++) this.rb(0.04, h, 0.06, 0.01, frame, x0 + (w * k) / panes, cy, z - 0.02);
+    if (P.old) this.rb(w, 0.04, 0.06, 0.01, frame, cx, y0 + h * 0.62, z - 0.02);
+    if (blinds) {
+      const bt = blindsTex().clone(); bt.needsUpdate = true; bt.repeat.set(w / 0.32, h * 0.7 / 0.08);
+      this.pl(w, h * 0.7, this.mat(`bwBlind-${w.toFixed(2)}`, { map: bt, color: 0xffffff, transparent: true, alphaTest: 0.5, side: THREE.DoubleSide }), cx, y1 - h * 0.35, z + 0.04);
+    }
+    // the shaft falling in and its patch on the floor
+    const shaftMat = new THREE.MeshBasicMaterial({ map: shaftTexture(), color: P.color, transparent: true, opacity: P.shaft * 1.6, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute([x0, y1, z + 0.05, x1, y1, z + 0.05, x0 + 0.6, 0.02, z + fall, x1 + 0.6, 0.02, z + fall], 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute([0, 1, 1, 1, 0, 0, 1, 0], 2));
+    geo.setIndex([0, 2, 1, 1, 2, 3]);
+    const shaft = new THREE.Mesh(geo, shaftMat); shaft.renderOrder = 3; this.root.add(shaft);
+    const patch = lightPool(P.color, w + 0.8, 2.2, P.patch);
+    patch.rotation.x = -Math.PI / 2; patch.position.set(cx + 0.5, 0.012, z + fall * 0.6); this.root.add(patch);
+    // at night the moon lays the panes on the floor (cold, faint)
+    const panesTex = canvasTexture(`fk-panes-${panes}`, 64, 64, (c, cw, ch) => {
+      c.filter = 'blur(2px)';
+      c.fillStyle = '#fff'; c.fillRect(6, 4, cw - 12, ch - 8);
+      c.fillStyle = '#000';
+      for (let k = 1; k < panes; k++) c.fillRect((cw * k) / panes - 2, 0, 4, ch);
+      c.fillRect(0, ch * 0.38 - 2, cw, 4);
+      c.globalCompositeOperation = 'destination-in';
+      const g = c.createLinearGradient(0, 0, 0, ch); g.addColorStop(0, 'rgba(0,0,0,0.2)'); g.addColorStop(0.3, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0.6)');
+      c.fillStyle = g; c.fillRect(0, 0, cw, ch);
+    });
+    const moonM = new THREE.MeshBasicMaterial({ map: panesTex, color: 0x6a88c8, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
+    const moon = new THREE.Mesh(new THREE.PlaneGeometry(w * 1.05, 1.5), moonM);
+    moon.rotation.x = -Math.PI / 2; moon.position.set(cx + 0.35, 0.006, z + 1.25); moon.renderOrder = 2; this.root.add(moon);
+    const zone = { ...P, position: V3(cx, cy + h * 0.15, z - 0.1), dir: V3(0, 0, 1), enabled: () => this.state !== 'night' };
+    this.windowLights.push(zone);
+    this.onState((st) => {
+      const night = st === 'night', eve = st === 'evening';
+      const k = eve ? 0.45 : 1;
+      moonM.opacity = night ? 0.25 : 0;
+      glareMat.opacity = night ? 0.14 : 0.22 * k; glareMat.color.set(night ? 0x5070b0 : P.color);
+      shaftMat.opacity = (night ? 0.45 : k) * P.shaft * 1.6; shaftMat.color.set(night ? 0x5a78c0 : P.color);
+      patch.material.opacity = (night ? 0.5 : k) * P.patch; patch.material.color.set(night ? 0x5a78c0 : P.color);
+    });
+    return zone;
+  }
+
+  // ---------------------------------------------------------------- ceiling lights
+
+  /** Pendant: cord from the ceiling at height y, a fabric drum or glass dome shade, a lamp. */
+  pendant(id, x, y, z, { drop = 0.7, shade = 0xe8dcc4, kind = 'drum', on = { evening: 1, night: 0, day: 0 }, intensity = 3.5, color = 0xffc488 } = {}) {
+    const sy = y - drop;
+    this.rod([x, y, z], [x, sy + 0.12, z], 0.004, this.M('cord', 0x2a2420));
+    this.cy(0.04, 0.04, 0.02, this.M('canopy', 0xe8e4dc), x, y - 0.01, z, { seg: 20 });
+    const sm = this.glowM(`pendant-${id}`, shade, 0xffc890, { side: THREE.DoubleSide });
+    if (kind === 'dome') this.lathe([[0.02, 0.12], [0.08, 0.09], [0.16, 0.03], [0.19, 0]], sm, x, sy, z, { seg: 28 });
+    else this.cy(0.2, 0.22, 0.24, sm, x, sy + 0.08, z, { open: true, seg: 28 });
+    return this.lamp(id, {
+      light: this.pointLight(color, intensity, 7, x, sy - 0.05, z + 0.1, 1.2),
+      glows: [this.halo(0xffc890, 1.1, 0.3, x, sy + 0.02, z)], mats: [[sm, 1.1]], on,
+      flare: { pos: this.P(x, sy, z) },
+    });
+  }
+  /** Fluorescent ceiling panel (offices, schools, hospitals): housing, emissive tube, a spotlight down. */
+  fluorescent(id, x, y, z, { w = 1.2, d = 0.3, color = 0xdfeaff, intensity = 9, range = 7, on = { evening: 1, night: 0.3, day: 1 } } = {}) {
+    this.rb(w + 0.08, 0.06, d + 0.08, 0.01, this.M('fluoHousing', 0xb0b4b8, { roughness: 0.6 }), x, y, z);
+    const tm = this.glowM(`fluo-${color}`, 0x202020, color, { side: THREE.DoubleSide });
+    this.pl(w, d, tm, x, y - 0.035, z, { rx: Math.PI / 2 });
+    const l = new THREE.SpotLight(color, intensity, range, 1.2, 0.9, 1.4);
+    l.position.copy(this.P(x, y - 0.1, z)); l.target.position.copy(this.P(x, 0, z + 0.4));
+    // the ceiling around a lit panel catches its light (else the ceiling reads pure black at night)
+    const pool = lightPool(color, w * 3.2, d * 9, 0.32);
+    pool.rotation.x = Math.PI / 2; pool.position.copy(this.P(x, y + 0.035, z)); this.root.add(pool);
+    const L = this.lamp(id, { light: l, glows: [this.halo(color, w * 1.4, 0.16, x, y - 0.12, z + 0.1)], mats: [[tm, 2.2]], on });
+    this.onState(() => { pool.visible = L.level > 0.01; pool.material.opacity = 0.32 * L.level; });
+    return L;
+  }
+  /** Panel radiator under a window: fins, end caps, a valve. Local frame (wall at z = 0). */
+  radiator(x, y, z, w = 1.2, { h = 0.6, color = 0xe8e6e0 } = {}) {
+    const m = this.M(`radiator-${color}`, color, { roughness: 0.45 });
+    const n = Math.max(4, Math.round(w / 0.06));
+    for (let i = 0; i < n; i++) this.rb(0.045, h, 0.09, 0.015, m, x - w / 2 + (i + 0.5) * (w / n), y + h / 2, z + 0.08);
+    for (const yy of [y + 0.04, y + h - 0.04]) this.cy(0.02, 0.02, w, m, x, yy, z + 0.08, { rz: Math.PI / 2, seg: 16 });
+    this.rod([x + w / 2 + 0.04, y + 0.05, z + 0.08], [x + w / 2 + 0.04, 0, z + 0.08], 0.012, m);
+    this.cy(0.025, 0.025, 0.05, this.M('valve', 0xc8ccd0, { metalness: 0.8, roughness: 0.3 }), x + w / 2 + 0.04, y + 0.1, z + 0.08, { seg: 16 });
+  }
+  /** Fire extinguisher on a wall bracket at height y. */
+  extinguisher(x, y, z) {
+    const red = this.M('extRed', 0xb81c18, { roughness: 0.35 });
+    this.lathe([[0.001, 0], [0.075, 0], [0.08, 0.03], [0.08, 0.42], [0.06, 0.48], [0.025, 0.5], [0.001, 0.5]], red, x, y, z + 0.1, { seg: 20 });
+    this.rb(0.06, 0.05, 0.04, 0.01, this.M('extHead', 0x2a2a2c, { roughness: 0.4 }), x, y + 0.53, z + 0.1);
+    this.tube([[x + 0.03, y + 0.52, z + 0.12], [x + 0.11, y + 0.4, z + 0.16], [x + 0.09, y + 0.12, z + 0.17]], 0.008, this.M('hose', 0x141414));
+    this.rb(0.14, 0.04, 0.06, 0.01, this.M('steel', 0x9aa0a6, { metalness: 0.8, roughness: 0.35 }), x, y + 0.3, z + 0.03);
+    this.rb(0.2, 0.26, 0.004, 0.002, this.M('extSign', 0xc82020, { roughness: 0.6 }), x, y + 0.82, z + 0.004);
+  }
+  /** Lit EXIT sign (a lamp: on in every state by default). */
+  exitSign(id, x, y, z, { text = 'EXIT', on = { evening: 1, night: 1, day: 1 } } = {}) {
+    const tex = TX(`exit-${text}`, 40, 14, (ctx, w, h) => {
+      ctx.fillStyle = '#1a6a3a'; ctx.fillRect(0, 0, w, h);
+      ctx.fillStyle = '#e8fff0'; ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(text, w / 2, h / 2 + 1);
+    });
+    this.rb(0.42, 0.16, 0.06, 0.01, this.M('exitBox', 0xe8e8e4, { roughness: 0.5 }), x, y, z + 0.03);
+    const fm = this.mat(`exitFace-${text}`, { map: tex, color: 0xffffff, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0 });
+    this.pl(0.38, 0.13, fm, x, y, z + 0.062);
+    return this.lamp(id, { glows: [this.halo(0x40ff90, 0.7, 0.12, x, y, z + 0.1)], mats: [[fm, 0.9]], on });
   }
 
   // ---------------------------------------------------------------- small props
@@ -867,7 +1311,11 @@ export class FurnitureKit {
       if (glassTop && y0 > 1.4) continue;
       this.rb(pw, ph * (h / 2.1), 0.012, 0.01, leafM, s * (pw / 2 + 0.04), (y0 + ph / 2) * (h / 2.1), -0.022);
     }
-    if (glassTop) this.pl(w - 0.24, 0.4, this.mat('doorGlass', { color: 0xc8b890, roughness: 0.2, emissive: 0x2a1c0c }), 0, h * 0.82, -0.025);
+    if (glassTop) {   // a glazed top: tinted glass, a muntin, a reflection streak
+      this.pl(w - 0.24, 0.4, this.mat('doorGlass', { color: 0x6a7a84, roughness: 0.1, metalness: 0.3, emissive: 0x141c24 }), 0, h * 0.82, -0.026);
+      this.rb(0.025, 0.4, 0.02, 0.006, leafM, 0, h * 0.82, -0.02);
+      this.pl(0.04, 0.34, this.mat('doorGlassHi', { color: 0xffffff, transparent: true, opacity: 0.18, depthWrite: false }), -(w - 0.24) / 4, h * 0.82, -0.024, { rz: -0.4 });
+    }
     const br = this.brass();
     this.sph(0.03, br, w / 2 - 0.1, 1.0, -0.005);
     this.cy(0.035, 0.035, 0.01, br, w / 2 - 0.1, 1.0, -0.025, { rx: Math.PI / 2 });
@@ -950,7 +1398,7 @@ export class FurnitureKit {
     this.lathe([[0.001, 0], [0.06, 0], [0.09, 0.08], [0.08, 0.2], [0.03, 0.26], [0.012, 0.32], [0.001, 0.32]], this.M(`lampBase-${base}`, base, { roughness: 0.2, metalness: 0.3 }), x, y, z);
     const shadeM = this.glowM(`shade-${id}`, shade, 0xffc890, { side: THREE.DoubleSide });
     this.cy(0.13, 0.16, 0.22, shadeM, x, y + 0.4, z, { open: true, seg: 24 });
-    return this.lamp(id, { light: this.pointLight(0xffc488, 2.6, 5, x + 0.15, y + 0.4, z + 0.15, 1.3), glows: [this.halo(0xffc890, 0.9, 0.4, x, y + 0.4, z + 0.05)], mats: [[shadeM, 1.2]], on });
+    return this.lamp(id, { light: this.pointLight(0xffc488, 2.6, 5, x + 0.15, y + 0.4, z + 0.15, 1.3), glows: [this.halo(0xffc890, 0.8, 0.26, x, y + 0.4, z + 0.05)], mats: [[shadeM, 0.9]], on });
   }
 
   /** Nightstand with a drawer and a ring pull; returns the top y. */
@@ -1049,3 +1497,5 @@ export class FurnitureKit {
     });
   }
 }
+
+export { LocationKit as FurnitureKit };

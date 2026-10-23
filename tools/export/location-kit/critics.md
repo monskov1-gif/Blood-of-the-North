@@ -52,9 +52,12 @@ in one image.
   restart, start it again and check the PNG modification times, or "new" shots will be old ones.
 - Playwright with its preinstalled Chromium: `export PWPATH=$(npm root -g)/playwright`; don't run
   `playwright install` if a browser is already provided.
-- `node shoot.mjs http://localhost:8765/preview.html /tmp/shots/r1 '[{"name":"evening","state":"evening"},{"name":"night","state":"night","params":{"low":"1"}},{"name":"desk","cam":[2.6,1.4,1.2],"look":[3.2,0.8,-2.2]}]'`
+- `node shoot.mjs http://localhost:8765/preview.html /tmp/shots/r1 '[{"name":"room_eve","state":"evening","params":{"scene":"room"}},{"name":"room_night","state":"night","params":{"scene":"room"}},{"name":"corridor","state":"day","params":{"scene":"corridor","px":"-4.6,-1.6"}},{"name":"stairs","cam":[1.6,1.6,1.8],"look":[2.2,1.3,-2.4],"params":{"scene":"room"}}]'
   — in a real project point it at the game page and pass `js` to place the player / force the state.
 - Shoot **sequentially**: software GL (swiftshader) runs at a few fps; parallel browsers time out.
+  Heavy outdoor scenes with bloom can exceed the screenshot timeout there — add `"low":"1"`.
+- Walk the player past every bright window and lamp (`px`) — the flare and exposure response is
+  part of what the critics judge.
 - Smooth effects (fades, light ramps) don't reach their final value in a short test — force them in
   the shot's `js`.
 - Grid: `python3 -c "from PIL import Image; …"` — paste shots into one image, ≤ 2 columns, so text
